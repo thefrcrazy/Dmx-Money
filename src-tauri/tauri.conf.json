@@ -35,7 +35,7 @@
       "endpoints": [
         "https://github.com/thefrcrazy/Dmx-Money/releases/latest/download/latest.json"
       ],
-      "pubkey": "VOTRE_CLE_PUBLIQUE_ICI"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRCNEQ2RDJBQzM4ODc4OTMKUldTVGVJakRLbTFOUzdLSVhCNllDQXh6c3o2N0FKN3lOdzZVSDd3SmQxZGRYNUlJUlM2d2U3eVcK"
     }
   },
   "bundle": {
