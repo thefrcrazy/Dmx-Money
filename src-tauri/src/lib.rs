@@ -30,7 +30,7 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                window_builder = window_builder.traffic_light_position(14.0, 22.0);
+                window_builder = window_builder.traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
             }
 
             window_builder.build().expect("failed to build window");
