@@ -18,7 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
     const { currentBalance, checkedBalance } = useFinancialMetrics();
     const { updateAvailable } = useUpdater();
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [appVersion, setAppVersion] = useState('0.1.2');
+    const [appVersion, setAppVersion] = useState('?.?.?');
 
     React.useEffect(() => {
         import('@tauri-apps/api/app').then(app => {

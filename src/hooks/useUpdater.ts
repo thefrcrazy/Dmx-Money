@@ -13,16 +13,16 @@ export const useUpdater = () => {
         
         setIsChecking(true);
         try {
-            const update = await check();
+            const updateResult = await check();
             
-            if (update) {
-                console.log(`Update available: ${update.version}`);
+            if (updateResult) {
+                console.log(`Update available: ${updateResult.version}`);
                 setUpdateAvailable(true);
                 
                 // If not silent (manual check), ask to update immediately
                 if (!silent) {
                     const yes = await ask(
-                        `Update to ${update.version} is available!\n\nRelease notes: ${update.body}`,
+                        `Update to ${updateResult.version} is available!\n\nRelease notes: ${updateResult.body}`,
                         {
                             title: 'Update Available',
                             kind: 'info',
@@ -32,7 +32,7 @@ export const useUpdater = () => {
                     );
 
                     if (yes) {
-                        await update.downloadAndInstall();
+                        await updateResult.downloadAndInstall();
                         await relaunch();
                     }
                 }
@@ -43,7 +43,7 @@ export const useUpdater = () => {
                 }
             }
         } catch (error) {
-            console.error(error);
+            console.error('Update check failed:', error);
             if (!silent) {
                 await message(`Failed to check for updates.\n${error}`, { title: 'Error', kind: 'error' });
             }
