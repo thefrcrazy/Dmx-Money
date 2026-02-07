@@ -27,7 +27,7 @@ pub fn run() {
             // macOS specific: set traffic light position
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
+                let _ = window.window().set_traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
             }
 
             // Restore window settings
