@@ -17,16 +17,8 @@ import { useUpdater } from './hooks/useUpdater';
 
 const AppContent: React.FC = () => {
   const { activePage, setActivePage } = useNavigation();
-  const { checkUpdate } = useUpdater();
-
-  // Check for updates automatically at startup (silent mode)
-  React.useEffect(() => {
-    // Small delay to let the app settle
-    const timer = setTimeout(() => {
-      checkUpdate(true);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [checkUpdate]);
+  // Initialize updater polling (silent check at startup + interval)
+  useUpdater();
 
   return (
     <Layout activePage={activePage} setActivePage={setActivePage}>

@@ -11,7 +11,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest]
+        include:
+          - platform: 'macos-latest' # Apple Silicon (M1/M2/M3)
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-13'     # Intel Mac
+            args: '--target x86_64-apple-darwin'
+          - platform: 'windows-latest' # Windows x64
+            args: ''
+          - platform: 'ubuntu-22.04'   # Linux x64
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -24,11 +32,20 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # On ajoute les cibles spécifiques si nécessaire (ex: aarch64 pour mac)
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+
+      - name: Install Linux dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Install Frontend dependencies
         run: bun install
 
-      # On s'assure que l'app est build en mode Modern (Tailwind v4)
+      # Force Modern Mode
       - name: Switch to Modern Mode
         run: |
           chmod +x ./switch-tailwind.sh
@@ -46,21 +63,21 @@ jobs:
           releaseName: 'DmxMoney ${{ github.ref_name }}'
           releaseBody: |
             ### 🚀 Nouvelles Fonctionnalités
-            - **Sidebar Rétractable** : Gagnez de l'espace de travail en un clic.
+            - **Sidebar Rétractable** : Gagnez de l'espace de travail.
             - **Édition Inline** : Modifiez vos transactions directement dans le tableau.
-            - **Multi-sélection** : Actions groupées pour supprimer ou pointer vos transactions.
-            - **Mises à jour Automatiques** : Système complet de détection et d'installation.
+            - **Multi-sélection** : Actions groupées pour supprimer ou pointer.
+            - **Mises à jour Automatiques** : Système de détection intégré.
             
             ### 🎨 Améliorations UI/UX
-            - **Graphiques Premium** : Courbes plus lisses et calculs instantanés.
-            - **Animations Nerveuses** : Transitions et ouvertures de modales accélérées.
-            - **Toasts de Notification** : Feedback visuel sur chaque action réussie ou échouée.
-            - **Bordures Adoucies** : Design plus moderne et épuré.
+            - **Graphiques Premium** : Courbes lisses et réactives.
+            - **Animations** : Interface fluide et rapide.
+            - **Thème** : Mode sombre #121212 harmonisé.
             
-            ### 🛠️ Stabilité & Sécurité
-            - **Permissions Granulaires** : Accès au système de fichiers limité au strict nécessaire.
-            - **Transactions BDD** : Migrations de base de données sécurisées en Rust.
-            - **Gestion des Erreurs** : Messages d'erreur BDD clairs et traduits.
-            - **Compatibilité** : Support optimisé pour les navigateurs plus anciens (Safari 13).
+            ### 🛠️ Technique
+            - Tauri v2.1.1 (Stable).
+            - Support macOS Intel & Apple Silicon.
+            - Support Windows x64.
+            - Support Linux.
           releaseDraft: false
           prerelease: false
+          args: ${{ matrix.args }}

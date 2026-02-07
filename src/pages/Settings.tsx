@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Moon, Sun, Monitor, Download, Upload, RefreshCw } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
+import { getVersion } from '@tauri-apps/api/app';
 import { dbService } from '../services/db';
 import { useSettings } from '../context/SettingsContext';
 import { useBank } from '../context/BankContext';
@@ -17,7 +18,12 @@ import Card from '../components/ui/Card';
 const SettingsPage: React.FC = () => {
     const { settings, updateTheme, updatePrimaryColor } = useSettings();
     const { addTransaction } = useBank();
-    const { checkUpdate, isChecking } = useUpdater();
+    const { checkUpdate, isChecking, updateAvailable } = useUpdater();
+    const [appVersion, setAppVersion] = useState('0.0.0');
+
+    useEffect(() => {
+        getVersion().then(setAppVersion).catch(() => setAppVersion('0.1.1'));
+    }, []);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isCsvImportModalOpen, setIsCsvImportModalOpen] = useState(false);
@@ -181,16 +187,23 @@ const SettingsPage: React.FC = () => {
             <Card title="Mises à jour" subtitle="Vérifiez si une nouvelle version est disponible.">
                 <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
                     <div>
-                        <div className="font-semibold text-gray-900 dark:text-gray-100">Version actuelle</div>
-                        <div className="text-xs text-gray-500">v1.0.0</div>
+                        <div className="flex items-center gap-2">
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">Version actuelle</div>
+                            {updateAvailable && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 animate-pulse">
+                                    Nouvelle version dispo
+                                </span>
+                            )}
+                        </div>
+                        <div className="text-xs text-gray-500">v{appVersion}</div>
                     </div>
                     <Button 
                         onClick={() => checkUpdate()} 
                         isLoading={isChecking}
                         icon={RefreshCw}
-                        variant="secondary"
+                        variant={updateAvailable ? "primary" : "secondary"}
                     >
-                        Vérifier
+                        {updateAvailable ? "Mettre à jour" : "Vérifier"}
                     </Button>
                 </div>
             </Card>

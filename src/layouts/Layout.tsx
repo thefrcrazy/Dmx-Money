@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Wallet, LayoutDashboard, PieChart, TrendingUp, Settings, Receipt, CalendarClock, Tag, Calculator, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { useBank } from '../context/BankContext';
+import { useUpdater } from '../hooks/useUpdater';
 import MultiSelect from '../components/ui/MultiSelect';
 import TitleBar from '../components/ui/TitleBar';
 import { useFinancialMetrics } from '../hooks/useFinancialMetrics';
@@ -15,6 +16,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) => {
     const { accounts, filterAccount, setFilterAccount } = useBank();
     const { currentBalance, checkedBalance } = useFinancialMetrics();
+    const { updateAvailable } = useUpdater();
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const navGroups = [
@@ -105,12 +107,24 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                         <button
                             onClick={() => setActivePage('settings')}
                             title={isCollapsed ? "Paramètres" : ""}
-                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer relative ${
                                 activePage === 'settings' ? 'bg-primary-500 text-white' : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
                             } ${isCollapsed ? 'justify-center px-0' : ''}`}
                         >
-                            <Settings className="w-4 h-4 shrink-0" />
-                            {!isCollapsed && <span>Paramètres</span>}
+                            <div className="relative">
+                                <Settings className="w-4 h-4 shrink-0" />
+                                {updateAvailable && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-black animate-pulse" />
+                                )}
+                            </div>
+                            {!isCollapsed && (
+                                <div className="flex-1 flex justify-between items-center">
+                                    <span>Paramètres</span>
+                                    {updateAvailable && (
+                                        <span className="w-2 h-2 bg-red-500 rounded-full" title="Mise à jour disponible" />
+                                    )}
+                                </div>
+                            )}
                         </button>
                     </div>
                     {!isCollapsed && (
