@@ -2,7 +2,7 @@ mod commands;
 mod db;
 mod models;
 
-use tauri::Manager;
+use tauri::{Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -19,15 +19,32 @@ pub fn run() {
                     .build(),
             )?;
 
+            // Manual Window Creation for full control (especially traffic lights)
+            let mut window_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                .title("DmxMoney 2025")
+                .inner_size(1320.0, 790.0)
+                .resizable(true)
+                .fullscreen(false)
+                .hidden_title(true)
+                .title_bar_style(TitleBarStyle::Overlay);
+
+            #[cfg(target_os = "macos")]
+            {
+                window_builder = window_builder.traffic_light_position(14.0, 22.0);
+            }
+
+            window_builder.build().expect("failed to build window");
+
             let handle = app.handle();
             let pool = tauri::async_runtime::block_on(db::init_db(handle))
                 .expect("failed to initialize database");
             app.manage(pool.clone());
 
-            // Restore window settings
+            // Restore window settings logic
+            // Note: We create the window with default size above, but this logic 
+            // will resize it immediately if settings exist.
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                // Fetch settings directly from DB
                 #[derive(sqlx::FromRow)]
                 struct WindowSettingsRow {
                     #[sqlx(rename = "windowPositionX")]

@@ -10,18 +10,6 @@
     "beforeBuildCommand": "bun run build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "DmxMoney 2025",
-        "width": 1320,
-        "height": 790,
-        "resizable": true,
-        "fullscreen": false,
-        "hiddenTitle": true,
-        "titleBarStyle": "Overlay",
-        "devtools": true
-      }
-    ],
     "security": {
       "csp": null
     }
