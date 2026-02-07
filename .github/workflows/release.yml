@@ -44,6 +44,23 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'DmxMoney ${{ github.ref_name }}'
-          releaseBody: 'Voir les assets pour télécharger et installer cette version.'
-          releaseDraft: true
+          releaseBody: |
+            ### 🚀 Nouvelles Fonctionnalités
+            - **Sidebar Rétractable** : Gagnez de l'espace de travail en un clic.
+            - **Édition Inline** : Modifiez vos transactions directement dans le tableau.
+            - **Multi-sélection** : Actions groupées pour supprimer ou pointer vos transactions.
+            - **Mises à jour Automatiques** : Système complet de détection et d'installation.
+            
+            ### 🎨 Améliorations UI/UX
+            - **Graphiques Premium** : Courbes plus lisses et calculs instantanés.
+            - **Animations Nerveuses** : Transitions et ouvertures de modales accélérées.
+            - **Toasts de Notification** : Feedback visuel sur chaque action réussie ou échouée.
+            - **Bordures Adoucies** : Design plus moderne et épuré.
+            
+            ### 🛠️ Stabilité & Sécurité
+            - **Permissions Granulaires** : Accès au système de fichiers limité au strict nécessaire.
+            - **Transactions BDD** : Migrations de base de données sécurisées en Rust.
+            - **Gestion des Erreurs** : Messages d'erreur BDD clairs et traduits.
+            - **Compatibilité** : Support optimisé pour les navigateurs plus anciens (Safari 13).
+          releaseDraft: false
           prerelease: false
