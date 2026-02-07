@@ -1,0 +1,105 @@
+import React, { useEffect } from 'react';
+import { X } from 'lucide-react';
+import Button from './Button';
+
+interface FormPopupProps {
+    isOpen: boolean;
+    onClose: () => void;
+    children: React.ReactNode;
+    title?: string;
+    onSubmit?: (e: React.FormEvent) => void;
+    submitLabel?: string;
+    isSubmitting?: boolean;
+    maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+}
+
+const FormPopup: React.FC<FormPopupProps> = ({
+    isOpen,
+    onClose,
+    children,
+    title,
+    onSubmit,
+    submitLabel = 'Enregistrer',
+    isSubmitting = false,
+    maxWidth = 'lg'
+}) => {
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        if (isOpen) window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, onClose]);
+
+    if (!isOpen) return null;
+
+    const maxWidthClasses = {
+        sm: 'max-w-sm',
+        md: 'max-w-md',
+        lg: 'max-w-lg',
+        xl: 'max-w-xl',
+        '2xl': 'max-w-2xl'
+    };
+
+    const Content = (
+        <div className="space-y-4 app-form-content">
+            {children}
+            {onSubmit && (
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-neutral-700 app-modal-footer">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                    >
+                        Annuler
+                    </Button>
+                    <Button
+                        type="submit"
+                        isLoading={isSubmitting}
+                    >
+                        {submitLabel}
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm app-modal-overlay"
+            onClick={onClose}
+        >
+            <div
+                className={`app-formpop w-full ${maxWidthClasses[maxWidth]} animate-in fade-in zoom-in duration-100 bg-white dark:bg-[#121212] app-modal-content`}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {title && (
+                    <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-neutral-700 app-modal-header">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 app-modal-title">
+                            {title}
+                        </h3>
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors app-modal-close-btn"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                )}
+
+                <div className={onSubmit ? "p-4 app-modal-body" : "app-modal-body"}>
+                    {onSubmit ? (
+                        <form onSubmit={onSubmit}>
+                            {Content}
+                        </form>
+                    ) : (
+                        Content
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default FormPopup;

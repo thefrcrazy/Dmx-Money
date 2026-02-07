@@ -1,0 +1,66 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "DmxMoney 2025",
+  "version": "0.1.0",
+  "identifier": "com.dmxmoney.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DmxMoney 2025",
+        "width": 1320,
+        "height": 790,
+        "resizable": true,
+        "fullscreen": false,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 22
+        },
+        "devtools": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/thefrcrazy/Dmx-Money/releases/latest/download/latest.json"
+      ],
+      "pubkey": "VOTRE_CLE_PUBLIQUE_ICI"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "dmx"
+        ],
+        "name": "DMX Money Backup",
+        "description": "DMX Money backup file",
+        "role": "Editor",
+        "mimeType": "application/x-dmxmoney-backup"
+      }
+    ]
+  }
+}
