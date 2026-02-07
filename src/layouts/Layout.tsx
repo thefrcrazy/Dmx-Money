@@ -18,6 +18,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
     const { currentBalance, checkedBalance } = useFinancialMetrics();
     const { updateAvailable } = useUpdater();
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [appVersion, setAppVersion] = useState('0.1.2');
+
+    React.useEffect(() => {
+        import('@tauri-apps/api/app').then(app => {
+            app.getVersion().then(setAppVersion).catch(() => {});
+        });
+    }, []);
 
     const navGroups = [
         {
@@ -129,7 +136,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                     </div>
                     {!isCollapsed && (
                         <div className="mt-4 text-[9px] text-gray-400 text-center font-bold uppercase tracking-widest opacity-60 animate-in fade-in duration-500">
-                            DmxMoney 2025 • v1.0.0
+                            DmxMoney 2025 • v{appVersion}
                         </div>
                     )}
                 </div>

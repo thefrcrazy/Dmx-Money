@@ -14,7 +14,7 @@ jobs:
         include:
           - platform: 'macos-latest' # Apple Silicon (M1/M2/M3)
             args: '--target aarch64-apple-darwin'
-          - platform: 'macos-13'     # Intel Mac
+          - platform: 'macos-latest' # Intel Mac (Cross-compiled from ARM runner)
             args: '--target x86_64-apple-darwin'
           - platform: 'windows-latest' # Windows x64
             args: ''
