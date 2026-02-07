@@ -24,13 +24,14 @@ pub fn run() {
                 .title("DmxMoney 2025")
                 .inner_size(1320.0, 790.0)
                 .resizable(true)
-                .fullscreen(false)
-                .hidden_title(true)
-                .title_bar_style(TitleBarStyle::Overlay);
+                .fullscreen(false);
 
             #[cfg(target_os = "macos")]
             {
-                window_builder = window_builder.traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
+                window_builder = window_builder
+                    .hidden_title(true)
+                    .title_bar_style(TitleBarStyle::Overlay)
+                    .traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
             }
 
             window_builder.build().expect("failed to build window");
