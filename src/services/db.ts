@@ -1,30 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { Account, Transaction, Category, ScheduledTransaction, Settings } from '../types';
-import { loadData as loadJsonData } from '../utils/storage';
 
 export class DatabaseService {
     async init(): Promise<void> {
+        // Rust init_db call is not needed here as tauri-plugin-sql or manual rust init 
+        // handles it on app setup. We just verify connection by fetching accounts.
         try {
-            // Check if we have data by trying to fetch accounts
-            const accounts = await this.getAccounts();
-
-            if (accounts.length === 0) {
-                await this.checkAndMigrateData();
-            }
+            await this.getAccounts();
         } catch (error) {
-
             throw error;
-        }
-    }
-
-    private async checkAndMigrateData(): Promise<void> {
-        try {
-            const jsonData = await loadJsonData();
-            if (jsonData.accounts.length > 0 || jsonData.categories.length > 0) {
-                await invoke('import_data', { data: jsonData });
-            }
-        } catch (error) {
-
         }
     }
 

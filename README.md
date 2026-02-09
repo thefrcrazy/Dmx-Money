@@ -74,46 +74,50 @@ L'interface est construite autour de Contextes pour la gestion d'état globale.
 
 ---
 
-## 🚀 Guide de Développement
+## 🚀 Installation
 
-### Pré-requis
-- **Bun** installé (`curl -fsSL https://bun.sh/install | bash`).
-- **Rust** installé (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`).
 
-### Installation
-```bash
-git clone https://github.com/thefrcrazy/Dmx-Money.git
-cd dmxmoney-2025
-bun install
-```
 
-### Lancer en développement
-```bash
-bun tauri dev
-```
+###  macOS (Intel & Apple Silicon)
 
-### Compilation (Production)
-Le projet utilise GitHub Actions pour compiler automatiquement les versions Windows (.exe) et macOS (.dmg).
-Pour déclencher une release manuellement en local :
-```bash
-bun tauri build
-```
+Comme l'application est Open Source et n'est pas signée avec un certificat Apple Developer payant, macOS affichera un message indiquant qu'elle est "endommagée" ou que le développeur est inconnu.
+
+
+
+Pour l'installer correctement :
+
+1. Téléchargez le fichier `.dmg` depuis les [Releases](https://github.com/thefrcrazy/Dmx-Money/releases).
+
+2. Ouvrez le `.dmg` et faites glisser **DmxMoney 2025** dans votre dossier **Applications**.
+
+3. Ouvrez votre **Terminal** (via Spotlight ou Dossier Utilitaires).
+
+4. Copiez et collez la commande suivante, puis appuyez sur Entrée :
+
+   ```bash
+
+   xattr -cr "/Applications/DmxMoney 2025.app"
+
+   ```
+
+5. Vous pouvez maintenant lancer l'application normalement.
+
+
+
+### ⊞ Windows
+
+Téléchargez le fichier `.msi` ou le setup `.exe` et lancez l'installation. Si Windows SmartScreen affiche une alerte, cliquez sur "Informations complémentaires" puis "Exécuter quand même".
+
+
+
+### 🐧 Linux
+
+Téléchargez le fichier `.AppImage`, rendez-le exécutable (`chmod +x`) et lancez-le.
+
+
 
 ---
 
-## 🔄 Gestion des Modes (Tailwind v3 vs v4)
-Le projet supporte deux configurations CSS pour assurer la compatibilité avec les anciens macOS.
-- **Modern (Défaut)** : Tailwind v4, `@theme` CSS variables, build natif.
-- **Legacy** : Tailwind v3, `postcss`, compatibilité Safari 13.
 
-Pour basculer :
-```bash
-./switch-tailwind.sh modern  # ou legacy
-```
 
----
-
-## 🔒 Sécurité
-- **Permissions FS** : L'accès au disque est strictement limité au fichier de base de données et aux fichiers d'import dans les dossiers `Documents` et `Downloads`.
-- **Isolation** : Le frontend ne peut pas exécuter de code arbitraire sur le système (CSP strict).
-- **Sanitisation** : Toutes les entrées SQL sont paramétrées pour éviter les injections.
+## 🛠️ Stack Technologique

@@ -22,7 +22,7 @@ const SettingsPage: React.FC = () => {
     const [appVersion, setAppVersion] = useState('0.0.0');
 
     useEffect(() => {
-        getVersion().then(setAppVersion).catch(() => setAppVersion('?.?.?'));
+        getVersion().then(setAppVersion).catch(() => setAppVersion('0.1.4'));
     }, []);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
