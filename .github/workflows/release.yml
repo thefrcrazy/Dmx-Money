@@ -83,85 +83,48 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-      - name: Debug Environment and Artifacts
-        if: always()
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          echo "🔍 Checking Environment:"
-          if [ -n "$HAS_KEY" ]; then
-            echo "✅ TAURI_SIGNING_PRIVATE_KEY is set (length: ${#HAS_KEY})."
-          else
-            echo "❌ TAURI_SIGNING_PRIVATE_KEY is MISSING or EMPTY."
-          fi
-          
-          echo "🔍 Listing all build artifacts (recursive):"
-          find src-tauri/target/release -maxdepth 4 -not -path '*/deps/*' || true
-          
-          echo "🔍 Checking for .sig files:"
-          find src-tauri/target -name "*.sig" || true
-
       - name: Generate and Upload Updater JSON Manually
         if: always()
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNER_KEY_B64: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
           echo "🔍 Searching for asset files..."
           ASSET_FILE=$(find . -name "*.app.tar.gz" | grep -v "target/release/deps" | head -n 1)
           
           if [ -z "$ASSET_FILE" ]; then
-            echo "❌ No asset file found (.app.tar.gz). Cannot proceed."
+            echo "❌ No asset file found (.app.tar.gz)."
             exit 1
           fi
           
           echo "✅ Found asset file: $ASSET_FILE"
           
-          # Check for signature file, generate if missing
-          SIG_FILE="$ASSET_FILE.sig"
-          if [ ! -f "$SIG_FILE" ]; then
-            echo "⚠️ Signature file missing. Attempting manual signing..."
-            if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-              # Decode Base64 key if it is encoded, otherwise use as is
-              if [[ "$TAURI_SIGNING_PRIVATE_KEY" == dW50* ]]; then
-                echo "🔓 Decoding Base64 private key..."
-                echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > ./signer.key
-              else
-                echo "📝 Using raw private key..."
-                printf "%s" "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
-              fi
-              
-              # Execute signing
-              echo "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
-              
-              rm ./signer.key
-              if [ -f "$SIG_FILE" ]; then
-                echo "✅ Manual signing successful."
-                gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
-              else
-                echo "❌ Manual signing failed to produce a .sig file."
-                exit 1
-              fi
-            else
-              echo "❌ TAURI_SIGNING_PRIVATE_KEY is empty."
-              exit 1
-            fi
+          # Préparation de la clé
+          if [[ "$SIGNER_KEY_B64" == dW50* ]]; then
+            echo "🔓 Decoding Base64 key..."
+            echo "$SIGNER_KEY_B64" | base64 -d > ./signer.key
+          else
+            echo "📝 Using raw key..."
+            printf "%s" "$SIGNER_KEY_B64" > ./signer.key
           fi
           
-          echo "✅ Signature file is ready: $SIG_FILE"
-          SIGNATURE=$(cat "$SIG_FILE")
-          ASSET_NAME=$(basename "$ASSET_FILE")
+          # Manual sign using tauri CLI
+          SIG_FILE="$ASSET_FILE.sig"
+          echo "✍️ Signing $ASSET_FILE..."
+          echo "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
           
-          VERSION="${{ github.ref_name }}"
-          CLEAN_VERSION="${VERSION#v}"
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
-          
-          cat <<EOF > latest.json
+          if [ -f "$SIG_FILE" ]; then
+            echo "✅ Signature generated."
+            SIGNATURE=$(cat "$SIG_FILE")
+            ASSET_NAME=$(basename "$ASSET_FILE")
+            VERSION="${{ github.ref_name }}"
+            CLEAN_VERSION="${VERSION#v}"
+            PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
+            
+            cat <<EOF > latest.json
           {
             "version": "$CLEAN_VERSION",
             "notes": "Update for version $CLEAN_VERSION",
@@ -174,7 +137,9 @@ jobs:
             }
           }
           EOF
-          
-          echo "📄 Generated latest.json:"
-          cat latest.json
-          gh release upload $VERSION latest.json --clobber
+            echo "🚀 Uploading latest.json and signature..."
+            gh release upload $VERSION latest.json "$SIG_FILE" --clobber
+          else
+            echo "❌ Failed to generate signature file."
+            exit 1
+          fi
