@@ -88,7 +88,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SIGNER_KEY_B64: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          MY_B64_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
           echo "🔍 Searching for asset files..."
@@ -101,19 +101,17 @@ jobs:
           
           echo "✅ Found asset file: $ASSET_FILE"
           
-          # Préparation de la clé
-          if [[ "$SIGNER_KEY_B64" == dW50* ]]; then
-            echo "🔓 Decoding Base64 key..."
-            echo "$SIGNER_KEY_B64" | base64 -d > ./signer.key
-          else
-            echo "📝 Using raw key..."
-            printf "%s" "$SIGNER_KEY_B64" > ./signer.key
-          fi
+          # Décoder la clé dans un fichier
+          echo "🔓 Decoding private key..."
+          echo "$MY_B64_KEY" | base64 -d > ./signer.key
           
-          # Manual sign using tauri CLI
+          # IMPORTANT: Unset TAURI_SIGNING_PRIVATE_KEY for this shell to avoid conflict with Base64 content
+          unset TAURI_SIGNING_PRIVATE_KEY
+          
+          # Signature manuelle
           SIG_FILE="$ASSET_FILE.sig"
           echo "✍️ Signing $ASSET_FILE..."
-          echo "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+          printf "%s\n" "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
           
           if [ -f "$SIG_FILE" ]; then
             echo "✅ Signature generated."
@@ -139,7 +137,9 @@ jobs:
           EOF
             echo "🚀 Uploading latest.json and signature..."
             gh release upload $VERSION latest.json "$SIG_FILE" --clobber
+            rm ./signer.key
           else
             echo "❌ Failed to generate signature file."
+            rm -f ./signer.key
             exit 1
           fi
