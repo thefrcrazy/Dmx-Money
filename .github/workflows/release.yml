@@ -85,13 +85,14 @@ jobs:
 
       - name: Debug Environment and Artifacts
         if: always()
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           echo "🔍 Checking Environment:"
-          if [ "$HAS_KEY" == "true" ]; then
-            echo "✅ TAURI_SIGNING_PRIVATE_KEY is set."
+          if [ -n "$HAS_KEY" ]; then
+            echo "✅ TAURI_SIGNING_PRIVATE_KEY is set (length: ${#HAS_KEY})."
           else
             echo "❌ TAURI_SIGNING_PRIVATE_KEY is MISSING or EMPTY."
           fi
