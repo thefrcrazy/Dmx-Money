@@ -10,17 +10,16 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         include:
           - platform: 'macos-latest' # Apple Silicon (M1/M2/M3)
             args: '--target aarch64-apple-darwin'
-          # - platform: 'macos-latest' # Intel Mac (Cross-compiled from ARM runner)
-          #   args: '--target x86_64-apple-darwin'
-          # - platform: 'windows-latest' # Windows x64
-          #   args: ''
-          # - platform: 'ubuntu-22.04'   # Linux x64
-          #   args: ''
+          - platform: 'macos-latest' # Intel Mac (Cross-compiled from ARM runner)
+            args: '--target x86_64-apple-darwin'
+          - platform: 'windows-latest' # Windows x64
+            args: ''
+          - platform: 'ubuntu-22.04'   # Linux x64
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -88,41 +87,43 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MY_B64_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
           echo "🔍 Searching for asset files..."
-          ASSET_FILE=$(find . -name "*.app.tar.gz" | grep -v "target/release/deps" | head -n 1)
+          # On cherche le fichier de mise à jour (.app.tar.gz pour mac, .zip ou .msi.zip pour win/linux)
+          ASSET_FILE=$(find . -name "*.app.tar.gz" -o -name "*.zip" | grep -v "target/release/deps" | head -n 1)
           
           if [ -z "$ASSET_FILE" ]; then
-            echo "❌ No asset file found (.app.tar.gz)."
-            exit 1
+            echo "⚠️ No update asset found. Skipping JSON generation."
+            exit 0
           fi
           
           echo "✅ Found asset file: $ASSET_FILE"
           
-          # Décoder la clé dans un fichier
-          echo "🔓 Decoding private key..."
-          echo "$MY_B64_KEY" | base64 -d > ./signer.key
-          
-          # IMPORTANT: Unset TAURI_SIGNING_PRIVATE_KEY for this shell to avoid conflict with Base64 content
-          unset TAURI_SIGNING_PRIVATE_KEY
-          
-          # Signature manuelle
+          # Signature
           SIG_FILE="$ASSET_FILE.sig"
-          echo "✍️ Signing $ASSET_FILE..."
-          printf "%s\n" "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+          if [ ! -f "$SIG_FILE" ]; then
+            echo "✍️ Signing with raw key..."
+            printf "%s" "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
+            printf "%s\n" "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+            rm ./signer.key
+          fi
           
           if [ -f "$SIG_FILE" ]; then
-            echo "✅ Signature generated."
-            SIGNATURE=$(cat "$SIG_FILE")
-            ASSET_NAME=$(basename "$ASSET_FILE")
-            VERSION="${{ github.ref_name }}"
-            CLEAN_VERSION="${VERSION#v}"
-            PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
+            echo "✅ Signature ready."
+            gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
             
-            cat <<EOF > latest.json
+            # Pour macOS ARM, on génère/écrase le latest.json
+            if [[ "$ASSET_FILE" == *"aarch64"* ]]; then
+              SIGNATURE=$(cat "$SIG_FILE")
+              ASSET_NAME=$(basename "$ASSET_FILE")
+              VERSION="${{ github.ref_name }}"
+              CLEAN_VERSION="${VERSION#v}"
+              PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+              DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
+              
+              cat <<EOF > latest.json
           {
             "version": "$CLEAN_VERSION",
             "notes": "Update for version $CLEAN_VERSION",
@@ -135,11 +136,6 @@ jobs:
             }
           }
           EOF
-            echo "🚀 Uploading latest.json and signature..."
-            gh release upload $VERSION latest.json "$SIG_FILE" --clobber
-            rm ./signer.key
-          else
-            echo "❌ Failed to generate signature file."
-            rm -f ./signer.key
-            exit 1
+              gh release upload $VERSION latest.json --clobber
+            fi
           fi
