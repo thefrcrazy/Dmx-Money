@@ -2,7 +2,7 @@ mod commands;
 mod db;
 mod models;
 
-use tauri::{Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,17 +20,16 @@ pub fn run() {
             )?;
 
             // Manual Window Creation for full control (especially traffic lights)
-            let mut window_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+            let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
                 .inner_size(1320.0, 790.0)
-                .resizable(true)
-                .fullscreen(false);
+                .resizable(true);
 
             #[cfg(target_os = "macos")]
             {
                 window_builder = window_builder
                     .hidden_title(true)
-                    .title_bar_style(TitleBarStyle::Overlay)
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
                     .traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
             }
 
