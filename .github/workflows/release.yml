@@ -126,11 +126,16 @@ jobs:
           if [ ! -f "$SIG_FILE" ]; then
             echo "⚠️ Signature file missing. Attempting manual signing..."
             if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-              # Write key content to file safely
-              printf "%s" "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
+              # Decode Base64 key if it is encoded, otherwise use as is
+              if [[ "$TAURI_SIGNING_PRIVATE_KEY" == dW50* ]]; then
+                echo "🔓 Decoding Base64 private key..."
+                echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > ./signer.key
+              else
+                echo "📝 Using raw private key..."
+                printf "%s" "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
+              fi
               
               # Execute signing
-              # Note: We provide the password via stdin
               echo "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
               
               rm ./signer.key
