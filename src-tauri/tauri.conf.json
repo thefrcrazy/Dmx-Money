@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DmxMoney 2025",
+  "productName": "DmxMoney",
   "version": "0.1.4",
   "identifier": "com.dmxmoney.desktop",
   "build": {

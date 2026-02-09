@@ -108,34 +108,55 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
-          echo "🔍 Searching for signature and asset files..."
-          
-          # Broad search for the signature file
-          SIG_FILE=$(find . -name "*.app.tar.gz.sig" | head -n 1)
-          if [ -z "$SIG_FILE" ]; then
-            SIG_FILE=$(find . -name "*.sig" | head -n 1)
-          fi
-          
-          # Broad search for the asset file
+          echo "🔍 Searching for asset files..."
           ASSET_FILE=$(find . -name "*.app.tar.gz" | grep -v "target/release/deps" | head -n 1)
           
-          if [ -n "$SIG_FILE" ] && [ -n "$ASSET_FILE" ]; then
-            echo "✅ Found signature file: $SIG_FILE"
-            echo "✅ Found asset file: $ASSET_FILE"
-            
-            SIGNATURE=$(cat "$SIG_FILE")
-            ASSET_NAME=$(basename "$ASSET_FILE")
-            
-            VERSION="${{ github.ref_name }}"
-            CLEAN_VERSION="${VERSION#v}"
-            PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
-            
-            echo "📦 Asset: $ASSET_NAME"
-            echo "🔗 URL: $DOWNLOAD_URL"
-            
-            cat <<EOF > latest.json
+          if [ -z "$ASSET_FILE" ]; then
+            echo "❌ No asset file found (.app.tar.gz). Cannot proceed."
+            exit 1
+          fi
+          
+          echo "✅ Found asset file: $ASSET_FILE"
+          
+          # Check for signature file, generate if missing
+          SIG_FILE="$ASSET_FILE.sig"
+          if [ ! -f "$SIG_FILE" ]; then
+            echo "⚠️ Signature file missing. Attempting manual signing..."
+            if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+              # Manual sign using tauri CLI
+              # We use 'bun tauri' assuming it's available and configured
+              echo "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
+              bun tauri signer sign -k ./signer.key "$ASSET_FILE" <<EOF
+          $TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          EOF
+              rm ./signer.key
+              if [ -f "$SIG_FILE" ]; then
+                echo "✅ Manual signing successful."
+                # Upload the new .sig file to release
+                gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
+              else
+                echo "❌ Manual signing failed."
+                exit 1
+              fi
+            else
+              echo "❌ Cannot sign: TAURI_SIGNING_PRIVATE_KEY is empty."
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Signature file is ready: $SIG_FILE"
+          SIGNATURE=$(cat "$SIG_FILE")
+          ASSET_NAME=$(basename "$ASSET_FILE")
+          
+          VERSION="${{ github.ref_name }}"
+          CLEAN_VERSION="${VERSION#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
+          
+          cat <<EOF > latest.json
           {
             "version": "$CLEAN_VERSION",
             "notes": "Update for version $CLEAN_VERSION",
@@ -148,18 +169,7 @@ jobs:
             }
           }
           EOF
-            
-            echo "📄 Generated latest.json:"
-            cat latest.json
-            
-            echo "🚀 Uploading to release $VERSION..."
-            gh release upload $VERSION latest.json --clobber
-          else
-            echo "❌ Missing files!"
-            echo "SIG_FILE: $SIG_FILE"
-            echo "ASSET_FILE: $ASSET_FILE"
-            echo "--------------------------"
-            echo "📂 Full directory listing for debug:"
-            find . -maxdepth 10 -not -path '*/.*' -not -path './node_modules*'
-            exit 1
-          fi
+          
+          echo "📄 Generated latest.json:"
+          cat latest.json
+          gh release upload $VERSION latest.json --clobber
