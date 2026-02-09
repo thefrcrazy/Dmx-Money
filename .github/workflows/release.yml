@@ -87,34 +87,44 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # On utilise un nom différent pour éviter les conflits d'auto-détection
+          RAW_KEY_DATA: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
           echo "🔍 Searching for asset files..."
-          # On cherche le fichier de mise à jour (.app.tar.gz pour mac, .zip ou .msi.zip pour win/linux)
           ASSET_FILE=$(find . -name "*.app.tar.gz" -o -name "*.zip" | grep -v "target/release/deps" | head -n 1)
           
           if [ -z "$ASSET_FILE" ]; then
-            echo "⚠️ No update asset found. Skipping JSON generation."
+            echo "⚠️ No update asset found. Skipping."
             exit 0
           fi
           
           echo "✅ Found asset file: $ASSET_FILE"
           
-          # Signature
-          SIG_FILE="$ASSET_FILE.sig"
-          if [ ! -f "$SIG_FILE" ]; then
-            echo "✍️ Signing with raw key..."
-            printf "%s" "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
-            printf "%s\n" "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
-            rm ./signer.key
+          # Reconstruction du fichier de clé au format Tauri
+          echo "🔑 Preparing signing key..."
+          if [[ "$RAW_KEY_DATA" == "untrusted comment"* ]]; then
+            printf "%s" "$RAW_KEY_DATA" > ./signer.key
+          else
+            echo "untrusted comment: tauri-signing-key" > ./signer.key
+            printf "%s" "$RAW_KEY_DATA" >> ./signer.key
           fi
+          
+          # Signature manuelle
+          SIG_FILE="$ASSET_FILE.sig"
+          echo "✍️ Signing $ASSET_FILE..."
+          
+          # On s'assure que TAURI_SIGNING_PRIVATE_KEY n'est pas dans l'env pour forcer l'usage du fichier
+          unset TAURI_SIGNING_PRIVATE_KEY
+          
+          printf "%s\n" "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+          rm ./signer.key
           
           if [ -f "$SIG_FILE" ]; then
             echo "✅ Signature ready."
             gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
             
-            # Pour macOS ARM, on génère/écrase le latest.json
+            # Génération du latest.json pour macOS ARM
             if [[ "$ASSET_FILE" == *"aarch64"* ]]; then
               SIGNATURE=$(cat "$SIG_FILE")
               ASSET_NAME=$(basename "$ASSET_FILE")
@@ -138,4 +148,7 @@ jobs:
           EOF
               gh release upload $VERSION latest.json --clobber
             fi
+          else
+            echo "❌ Failed to generate signature."
+            exit 1
           fi
