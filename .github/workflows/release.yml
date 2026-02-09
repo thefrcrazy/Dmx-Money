@@ -82,3 +82,32 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Debug and Force Upload Updater JSON
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Listing JSON files in target directory..."
+          find src-tauri/target -name "*.json" || true
+          
+          echo "🔍 Searching for updater JSON..."
+          # Try to find latest.json or any JSON in the updater bundle directory
+          JSON_FILE=$(find src-tauri/target -name "latest.json" | head -n 1)
+          
+          if [ -z "$JSON_FILE" ]; then
+            # Fallback for Tauri v2 structure
+            JSON_FILE=$(find src-tauri/target -path "*/updater/*.json" | head -n 1)
+          fi
+          
+          if [ -n "$JSON_FILE" ]; then
+            echo "✅ Found updater JSON at: $JSON_FILE"
+            echo "🚀 Uploading to release ${{ github.ref_name }}..."
+            # Rename to latest.json for consistency if needed, but keeping original name might be safer for now
+            # Actually, the app expects latest.json, so we rename it locally
+            cp "$JSON_FILE" latest.json
+            gh release upload ${{ github.ref_name }} latest.json --clobber
+          else
+            echo "❌ No updater JSON found in build artifacts."
+          fi
+        shell: bash
