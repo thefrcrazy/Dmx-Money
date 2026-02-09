@@ -109,36 +109,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Searching for signature file..."
-          # Find the .sig file (should be in target/release/bundle/macos/)
-          SIG_FILE=$(find src-tauri/target -name "*.app.tar.gz.sig" | head -n 1)
+          echo "🔍 Searching for signature and asset files..."
           
-          if [ -n "$SIG_FILE" ]; then
+          # Broad search for the signature file
+          SIG_FILE=$(find . -name "*.app.tar.gz.sig" | head -n 1)
+          if [ -z "$SIG_FILE" ]; then
+            SIG_FILE=$(find . -name "*.sig" | head -n 1)
+          fi
+          
+          # Broad search for the asset file
+          ASSET_FILE=$(find . -name "*.app.tar.gz" | grep -v "target/release/deps" | head -n 1)
+          
+          if [ -n "$SIG_FILE" ] && [ -n "$ASSET_FILE" ]; then
             echo "✅ Found signature file: $SIG_FILE"
+            echo "✅ Found asset file: $ASSET_FILE"
             
-            # Read signature content
             SIGNATURE=$(cat "$SIG_FILE")
+            ASSET_NAME=$(basename "$ASSET_FILE")
             
-            # Define other variables
             VERSION="${{ github.ref_name }}"
-            # Remove 'v' prefix if present for JSON version field
             CLEAN_VERSION="${VERSION#v}"
             PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            
-            # Construct download URL (Standard Tauri/Github release format)
-            # Filename based on what we saw in logs: DmxMoney.2025_aarch64.app.tar.gz
-            # Wait, verify exact filename from logs or standard pattern.
-            # Usually: <productName>_<version>_<arch>.app.tar.gz
-            # In logs screenshot: DmxMoney.2025_aarch64.app.tar.gz seems to be the one?
-            # Let's try to find the actual .tar.gz file to be sure of the name
-            ASSET_FILE=$(find src-tauri/target -name "*.app.tar.gz" | head -n 1)
-            ASSET_NAME=$(basename "$ASSET_FILE")
             DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
             
-            echo "📦 Asset Name: $ASSET_NAME"
+            echo "📦 Asset: $ASSET_NAME"
             echo "🔗 URL: $DOWNLOAD_URL"
             
-            # Create latest.json content
             cat <<EOF > latest.json
           {
             "version": "$CLEAN_VERSION",
@@ -153,12 +149,17 @@ jobs:
           }
           EOF
             
-            echo "📄 Generated latest.json content:"
+            echo "📄 Generated latest.json:"
             cat latest.json
             
-            echo "🚀 Uploading latest.json to release $VERSION..."
+            echo "🚀 Uploading to release $VERSION..."
             gh release upload $VERSION latest.json --clobber
           else
-            echo "❌ No signature file found. Cannot generate latest.json."
+            echo "❌ Missing files!"
+            echo "SIG_FILE: $SIG_FILE"
+            echo "ASSET_FILE: $ASSET_FILE"
+            echo "--------------------------"
+            echo "📂 Full directory listing for debug:"
+            find . -maxdepth 10 -not -path '*/.*' -not -path './node_modules*'
             exit 1
           fi
