@@ -126,23 +126,23 @@ jobs:
           if [ ! -f "$SIG_FILE" ]; then
             echo "⚠️ Signature file missing. Attempting manual signing..."
             if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-              # Manual sign using tauri CLI
-              # We use 'bun tauri' assuming it's available and configured
-              echo "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
-              bun tauri signer sign -k ./signer.key "$ASSET_FILE" <<EOF
-          $TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-          EOF
+              # Write key content to file safely
+              printf "%s" "$TAURI_SIGNING_PRIVATE_KEY" > ./signer.key
+              
+              # Execute signing
+              # Note: We provide the password via stdin
+              echo "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+              
               rm ./signer.key
               if [ -f "$SIG_FILE" ]; then
                 echo "✅ Manual signing successful."
-                # Upload the new .sig file to release
                 gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
               else
-                echo "❌ Manual signing failed."
+                echo "❌ Manual signing failed to produce a .sig file."
                 exit 1
               fi
             else
-              echo "❌ Cannot sign: TAURI_SIGNING_PRIVATE_KEY is empty."
+              echo "❌ TAURI_SIGNING_PRIVATE_KEY is empty."
               exit 1
             fi
           fi
