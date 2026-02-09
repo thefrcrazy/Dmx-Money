@@ -60,6 +60,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'DmxMoney ${{ github.ref_name }}'
+          includeUpdaterJson: true
           releaseBody: |
             ### 🚀 Nouvelles Fonctionnalités
             - **Sidebar Rétractable** : Gagnez de l'espace de travail.
