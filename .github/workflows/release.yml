@@ -103,31 +103,62 @@ jobs:
           echo "🔍 Checking for .sig files:"
           find src-tauri/target -name "*.sig" || true
 
-      - name: Debug and Force Upload Updater JSON
+      - name: Generate and Upload Updater JSON Manually
         if: always()
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Listing JSON files in target directory..."
-          find src-tauri/target -name "*.json" || true
+          echo "🔍 Searching for signature file..."
+          # Find the .sig file (should be in target/release/bundle/macos/)
+          SIG_FILE=$(find src-tauri/target -name "*.app.tar.gz.sig" | head -n 1)
           
-          echo "🔍 Searching for updater JSON..."
-          # Try to find latest.json or any JSON in the updater bundle directory
-          JSON_FILE=$(find src-tauri/target -name "latest.json" | head -n 1)
-          
-          if [ -z "$JSON_FILE" ]; then
-            # Fallback for Tauri v2 structure
-            JSON_FILE=$(find src-tauri/target -path "*/updater/*.json" | head -n 1)
-          fi
-          
-          if [ -n "$JSON_FILE" ]; then
-            echo "✅ Found updater JSON at: $JSON_FILE"
-            echo "🚀 Uploading to release ${{ github.ref_name }}..."
-            # Rename to latest.json for consistency if needed, but keeping original name might be safer for now
-            # Actually, the app expects latest.json, so we rename it locally
-            cp "$JSON_FILE" latest.json
-            gh release upload ${{ github.ref_name }} latest.json --clobber
+          if [ -n "$SIG_FILE" ]; then
+            echo "✅ Found signature file: $SIG_FILE"
+            
+            # Read signature content
+            SIGNATURE=$(cat "$SIG_FILE")
+            
+            # Define other variables
+            VERSION="${{ github.ref_name }}"
+            # Remove 'v' prefix if present for JSON version field
+            CLEAN_VERSION="${VERSION#v}"
+            PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            
+            # Construct download URL (Standard Tauri/Github release format)
+            # Filename based on what we saw in logs: DmxMoney.2025_aarch64.app.tar.gz
+            # Wait, verify exact filename from logs or standard pattern.
+            # Usually: <productName>_<version>_<arch>.app.tar.gz
+            # In logs screenshot: DmxMoney.2025_aarch64.app.tar.gz seems to be the one?
+            # Let's try to find the actual .tar.gz file to be sure of the name
+            ASSET_FILE=$(find src-tauri/target -name "*.app.tar.gz" | head -n 1)
+            ASSET_NAME=$(basename "$ASSET_FILE")
+            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
+            
+            echo "📦 Asset Name: $ASSET_NAME"
+            echo "🔗 URL: $DOWNLOAD_URL"
+            
+            # Create latest.json content
+            cat <<EOF > latest.json
+          {
+            "version": "$CLEAN_VERSION",
+            "notes": "Update for version $CLEAN_VERSION",
+            "pub_date": "$PUB_DATE",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "$SIGNATURE",
+                "url": "$DOWNLOAD_URL"
+              }
+            }
+          }
+          EOF
+            
+            echo "📄 Generated latest.json content:"
+            cat latest.json
+            
+            echo "🚀 Uploading latest.json to release $VERSION..."
+            gh release upload $VERSION latest.json --clobber
           else
-            echo "❌ No updater JSON found in build artifacts."
+            echo "❌ No signature file found. Cannot generate latest.json."
+            exit 1
           fi
-        shell: bash
