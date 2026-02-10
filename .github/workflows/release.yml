@@ -100,15 +100,12 @@ jobs:
           # Run signer without -k argument
           bun tauri signer sign "$ASSET_FILE"
 
+          SIG_FILE="$ASSET_FILE.sig"
           if [ -f "$SIG_FILE" ]; then
             echo "✅ Signature generated."
             gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
-            rm ./signer.key
           else
             echo "❌ Signature failed."
-            # Debug: show if file was empty or corrupted
-            ls -l ./signer.key
-            rm -f ./signer.key
             exit 1
           fi
 
