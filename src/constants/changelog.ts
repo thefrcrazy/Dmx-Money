@@ -12,6 +12,16 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.0",
+        date: "2026-02-10",
+        title: "Simplification de l'interface",
+        changes: [
+            "Regroupement des sections 'À propos' et 'Mises à jour' pour une navigation plus fluide",
+            "Optimisation de l'espace dans les paramètres"
+        ],
+        features: []
+    },
+    {
         version: "0.2.9",
         date: "2026-02-10",
         title: "Nettoyage des paramètres",

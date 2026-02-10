@@ -232,31 +232,6 @@ const SettingsPage: React.FC = () => {
                 </div>
             </Card>
 
-            {/* Mises à jour */}
-            <Card title="Mises à jour" subtitle="Vérifiez si une nouvelle version est disponible.">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <div className="font-semibold text-gray-900 dark:text-gray-100">Version actuelle</div>
-                            {updateAvailable && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 animate-pulse">
-                                    Nouvelle version dispo
-                                </span>
-                            )}
-                        </div>
-                        <div className="text-xs text-gray-500">v{appVersion}</div>
-                    </div>
-                    <Button 
-                        onClick={() => checkUpdate()} 
-                        isLoading={isChecking}
-                        icon={RefreshCw}
-                        variant={updateAvailable ? "primary" : "secondary"}
-                    >
-                        {updateAvailable ? "Mettre à jour" : "Vérifier"}
-                    </Button>
-                </div>
-            </Card>
-
             {/* Données */}
             <Card title="Gestion des données" subtitle="Sauvegardez ou restaurez vos informations financières.">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -284,26 +259,53 @@ const SettingsPage: React.FC = () => {
                 </div>
             </Card>
 
-            {/* À propos */}
-            <Card title="À propos" subtitle="Informations sur l'application.">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-gray-100 dark:border-neutral-700">
-                            <img src="/vite.svg" alt="DmxMoney Logo" className="w-full h-full object-contain" />
+            {/* À propos & Mises à jour */}
+            <Card title="À propos & Mises à jour" subtitle="Informations sur l'application et gestion des versions.">
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-gray-100 dark:border-neutral-700">
+                                <img src="/vite.svg" alt="DmxMoney Logo" className="w-full h-full object-contain" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
+                                <div className="text-xs text-gray-500">Version {appVersion} — Créé avec ❤️</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
-                            <div className="text-xs text-gray-500">Version {appVersion} — Créé avec ❤️</div>
-                        </div>
+                        <Button 
+                            onClick={() => setIsReleaseNotesOpen(true)}
+                            variant="secondary"
+                            size="sm"
+                            icon={Sparkles}
+                        >
+                            Nouveautés
+                        </Button>
                     </div>
-                    <Button 
-                        onClick={() => setIsReleaseNotesOpen(true)}
-                        variant="secondary"
-                        size="sm"
-                        icon={Sparkles}
-                    >
-                        Nouveautés
-                    </Button>
+
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <div className="font-semibold text-gray-900 dark:text-gray-100">Mise à jour</div>
+                                {updateAvailable && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 animate-pulse">
+                                        Disponible
+                                    </span>
+                                )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                                {updateAvailable ? "Une nouvelle version est prête." : "Vous utilisez la dernière version."}
+                            </div>
+                        </div>
+                        <Button 
+                            onClick={() => checkUpdate()} 
+                            isLoading={isChecking}
+                            icon={RefreshCw}
+                            variant={updateAvailable ? "primary" : "secondary"}
+                            size="sm"
+                        >
+                            {updateAvailable ? "Installer" : "Vérifier"}
+                        </Button>
+                    </div>
                 </div>
             </Card>
 
