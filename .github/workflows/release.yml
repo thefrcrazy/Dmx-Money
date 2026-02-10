@@ -64,7 +64,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev zip
 
       - name: Install Frontend dependencies
         run: bun install
@@ -99,48 +99,73 @@ jobs:
         run: |
           echo "🔍 Finding assets..."
           
-          # Debug: list files to see where Windows bundle is
-          echo "📂 Listing files in src-tauri/target/release/bundle:"
-          ls -R src-tauri/target/release/bundle || echo "Directory not found"
-          
           CLEAN_VERSION="${VERSION#v}"
           
-          # Recherche du bundle d'update
-          # On cherche spécifiquement dans le dossier bundle pour éviter les faux positifs
-          UPDATE_BUNDLE=$(find src-tauri/target/release/bundle -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) | head -n 1)
+          # 1. Localiser le répertoire bundle (peut être dans target/release/bundle ou target/x86_64.../release/bundle)
+          BUNDLE_DIR=$(find src-tauri/target -type d -name "bundle" | head -n 1)
           
-          # Fallback Windows: n'importe quel zip dans le dossier bundle
-          if [ -z "$UPDATE_BUNDLE" ] && [ "$OS_NAME" = "windows" ]; then
-             echo "⚠️ Standard Windows bundle not found, searching for any zip..."
-             UPDATE_BUNDLE=$(find src-tauri/target/release/bundle -type f -name "*.zip" | head -n 1)
-          fi
-          
-          # Fallback général
-          if [ -z "$UPDATE_BUNDLE" ]; then
-             echo "⚠️ Bundle not found in standard location, searching everywhere in target..."
-             UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | grep -v "source" | head -n 1)
-          fi
-
-          if [ -z "$UPDATE_BUNDLE" ]; then
-            echo "❌ No update bundle found!"
-            echo "📂 Debugging directory structure:"
-            find src-tauri/target -maxdepth 4 -not -path '*/deps*' || ls -R src-tauri/target
+          if [ -z "$BUNDLE_DIR" ]; then
+            echo "❌ Bundle directory not found anywhere in src-tauri/target!"
+            find src-tauri/target -maxdepth 3
             exit 1
           fi
-          echo "📦 Found update bundle: $UPDATE_BUNDLE"
+          echo "📂 Bundle directory found: $BUNDLE_DIR"
           
-          # Extraction extension propre
+          # 2. Chercher un bundle d'update existant
+          UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) | head -n 1)
+          
+          # Fallback: chercher n'importe quel zip/tar.gz
+          if [ -z "$UPDATE_BUNDLE" ]; then
+             UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f \( -name "*.tar.gz" -o -name "*.zip" \) | head -n 1)
+          fi
+
+          # 3. Fallback CRITIQUE: Créer le bundle si absent (ex: Windows qui n'a que .exe)
+          if [ -z "$UPDATE_BUNDLE" ]; then
+            echo "⚠️ No update bundle found. Creating one from installer..."
+            
+            # Chercher un installeur principal
+            INSTALLER=$(find "$BUNDLE_DIR" -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.dmg" \) | head -n 1)
+            
+            if [ -z "$INSTALLER" ]; then
+                echo "❌ No installer found to create bundle from!"
+                ls -R "$BUNDLE_DIR"
+                exit 1
+            fi
+            
+            echo "📦 Found installer: $INSTALLER"
+            INST_FILENAME=$(basename "$INSTALLER")
+            
+            if [[ "$OS_NAME" == "windows" ]]; then
+                # Windows: Créer un zip
+                NEW_ZIP="${INSTALLER}.zip"
+                echo "🗜️ Zipping $INSTALLER to $NEW_ZIP"
+                if command -v 7z >/dev/null; then
+                    7z a "$NEW_ZIP" "$INSTALLER"
+                else
+                    # PowerShell fallback
+                    powershell -Command "Compress-Archive -Path '$INSTALLER' -DestinationPath '$NEW_ZIP'"
+                fi
+                UPDATE_BUNDLE="$NEW_ZIP"
+            else
+                # Unix: Créer un tar.gz
+                NEW_TAR="${INSTALLER}.tar.gz"
+                echo "🗜️ Compressing $INSTALLER to $NEW_TAR"
+                tar -czf "$NEW_TAR" -C "$(dirname "$INSTALLER")" "$INST_FILENAME"
+                UPDATE_BUNDLE="$NEW_TAR"
+            fi
+          fi
+
+          echo "📦 Final update bundle: $UPDATE_BUNDLE"
+          
+          # 4. Préparer le nom final standardisé
           FILENAME=$(basename "$UPDATE_BUNDLE")
           if [[ "$FILENAME" == *.app.tar.gz ]]; then EXT="app.tar.gz"
           elif [[ "$FILENAME" == *.AppImage.tar.gz ]]; then EXT="AppImage.tar.gz"
           elif [[ "$FILENAME" == *.nsis.zip ]]; then EXT="nsis.zip"
           elif [[ "$FILENAME" == *.msi.zip ]]; then EXT="msi.zip"
-          else 
-            # Fallback extension simple
-            if [[ "$FILENAME" == *.tar.gz ]]; then EXT="tar.gz"
-            elif [[ "$FILENAME" == *.zip ]]; then EXT="zip"
-            else EXT="${FILENAME##*.}"
-            fi
+          elif [[ "$FILENAME" == *.tar.gz ]]; then EXT="tar.gz"
+          elif [[ "$FILENAME" == *.zip ]]; then EXT="zip"
+          else EXT="${FILENAME##*.}"
           fi
           
           NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.${EXT}"
@@ -148,7 +173,7 @@ jobs:
           echo "🔄 Renaming bundle to $NEW_BUNDLE_NAME"
           cp "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
           
-          # Signature
+          # 5. Signature
           echo "✍️ Signing $NEW_BUNDLE_NAME..."
           export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
           export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
@@ -160,18 +185,17 @@ jobs:
              exit 1
           fi
           
-          # Upload Bundle + Signature
+          # 6. Upload
           echo "🚀 Uploading bundle and signature..."
           gh release upload "$VERSION" "./$NEW_BUNDLE_NAME" "$SIG_FILE" --clobber
           
-          # Upload Installeurs
-          echo "🔍 Searching for installers..."
-          # Recherche récursive pour gérer les sous-dossiers spécifiques (x86_64-apple-darwin, etc.)
-          find src-tauri/target -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" ! -path "*/.git/*" | while read -r INSTALLER; do
-            INST_NAME=$(basename "$INSTALLER")
-            # Nom unique pour éviter les conflits d'arch
+          # 7. Upload Installeurs (renommés)
+          echo "🔍 Searching for installers to upload..."
+          find "$BUNDLE_DIR" -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" | while read -r INSTALLER_PATH; do
+            INST_NAME=$(basename "$INSTALLER_PATH")
+            # Nom unique
             NEW_INST_NAME="${INST_NAME%.*}_${ARCH}_${OS_NAME}.${INST_NAME##*.}"
-            cp "$INSTALLER" "./$NEW_INST_NAME"
+            cp "$INSTALLER_PATH" "./$NEW_INST_NAME"
             echo "🚀 Uploading installer: $NEW_INST_NAME"
             gh release upload "$VERSION" "./$NEW_INST_NAME" --clobber
           done
