@@ -159,10 +159,10 @@ jobs:
           }
 
           # Détection de chaque plateforme
-          add_platform "darwin-aarch64" "aarch64.*\.app\.tar\.gz$"
-          add_platform "darwin-x86_64"  "x86_64.*\.app\.tar\.gz$"
-          add_platform "windows-x86_64" "\.(nsis|msi)\.zip$"
-          add_platform "linux-x86_64"   "\.AppImage\.tar\.gz$"
+          add_platform "darwin-aarch64" "aarch64.*\.app\.tar\.gz"
+          add_platform "darwin-x86_64"  "x64.*\.app\.tar\.gz"
+          add_platform "windows-x86_64" "x64.*\.msi\.zip|x64.*\.nsis\.zip"
+          add_platform "linux-x86_64"   "amd64.*\.AppImage\.tar\.gz|x86_64.*\.AppImage\.tar\.gz"
 
           # Construction du latest.json final
           jq -n \
