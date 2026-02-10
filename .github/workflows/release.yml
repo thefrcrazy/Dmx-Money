@@ -15,11 +15,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Créer ou mettre à jour la release pour s'assurer qu'elle n'est pas en draft
           gh release create ${{ github.ref_name }} \
             --title "DmxMoney ${{ github.ref_name }}" \
             --notes "Voir le [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) pour les détails." \
             --draft=false \
-            --prerelease=false || echo "Release already exists"
+            --prerelease=false || gh release edit ${{ github.ref_name }} --draft=false --prerelease=false
 
   build-and-upload:
     needs: create-release
@@ -206,6 +207,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - name: Generate multi-platform latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -225,15 +227,13 @@ jobs:
             local platform_key="$1"
             local pattern="$2"
 
-            # On cherche le fichier .sig correspondant au pattern
-            # Le pattern doit matcher le nom du bundle (PAS la signature)
-            ASSET_NAME=$(echo "$ASSETS" | grep -E "$pattern" | grep -v '\.sig$' | head -n 1)
+            # On cherche le fichier correspondant au pattern (plus flexible)
+            ASSET_NAME=$(echo "$ASSETS" | grep -iE "$pattern" | grep -v '\.sig$' | head -n 1)
             
             if [ -n "$ASSET_NAME" ]; then
               SIG_NAME="${ASSET_NAME}.sig"
               if echo "$ASSETS" | grep -qF "$SIG_NAME"; then
                 echo "✅ $platform_key : $ASSET_NAME"
-                # Download signature content
                 gh release download "$VERSION" --repo "$REPO" -p "$SIG_NAME" -D /tmp --clobber
                 SIGNATURE=$(cat "/tmp/$SIG_NAME")
                 
@@ -246,16 +246,15 @@ jobs:
                 echo "⚠️ Missing signature for $ASSET_NAME"
               fi
             else
-              echo "ℹ️ No asset match for $platform_key with pattern $pattern"
+              echo "ℹ️ No asset match for $platform_key"
             fi
           }
 
-          # Patterns basés sur le renommage effectué dans build-and-upload
-          # Nom format: DmxMoney_0.1.5_aarch64_darwin.app.tar.gz
-          add_platform "darwin-aarch64" "DmxMoney_.*_aarch64_darwin\.app\.tar\.gz"
-          add_platform "darwin-x86_64"  "DmxMoney_.*_x64_darwin\.app\.tar\.gz"
-          add_platform "windows-x86_64" "DmxMoney_.*_x64_windows\.(msi|nsis)\.zip"
-          add_platform "linux-x86_64"   "DmxMoney_.*_x64_linux\.AppImage\.tar\.gz"
+          # Patterns assouplis
+          add_platform "darwin-aarch64" "aarch64.*darwin.*app\.tar\.gz"
+          add_platform "darwin-x86_64"  "x64.*darwin.*app\.tar\.gz"
+          add_platform "windows-x86_64" "x64.*windows.*(msi|nsis)\.zip"
+          add_platform "linux-x86_64"   "x64.*linux.*AppImage.*tar\.gz"
 
           jq -n \
             --arg version "$CLEAN_VERSION" \
@@ -268,4 +267,4 @@ jobs:
           cat latest.json
 
           echo "🚀 Uploading latest.json..."
-          gh release upload "$VERSION" latest.json --clobber
+          gh release upload "$VERSION" latest.json --repo "$REPO" --clobber
