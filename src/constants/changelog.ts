@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.1",
+        date: "2026-02-10",
+        title: "Correctif de stabilité des paramètres",
+        changes: [
+            "Correction définitive de la perte des paramètres (thème, couleurs) au démarrage",
+            "Correction de l'affichage répétitif des nouveautés à chaque lancement",
+            "Amélioration de la synchronisation entre la fenêtre et la base de données"
+        ],
+        features: []
+    },
+    {
         version: "0.3.0",
         date: "2026-02-10",
         title: "Simplification de l'interface",

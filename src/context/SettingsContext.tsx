@@ -3,6 +3,7 @@ import { getCurrentWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/ap
 import { Theme, Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
 import { generatePalette, formatRgb, hexToRgb as parseHexToRgb } from '../utils/colors';
+import { LATEST_VERSION } from '../constants/changelog';
 
 // Cache for window icons to prevent redundant fetches
 const iconCache: Record<string, Uint8Array> = {};
@@ -33,13 +34,15 @@ const DEFAULT_SETTINGS: Settings = {
     windowPosition: null,
     windowSize: null,
     componentSpacing: 6,
-    componentPadding: 6
+    componentPadding: 6,
+    lastSeenVersion: LATEST_VERSION
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+    const isLoadedRef = useRef(false);
 
     // Initial load
     useEffect(() => {
@@ -53,7 +56,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     ...prev,
                     ...savedSettings
                 }));
+            } else {
+                // First launch: save default settings
+                dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
             }
+            isLoadedRef.current = true;
         });
 
 
@@ -254,15 +261,21 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const updateWindowPosition = async (x: number, y: number) => {
-        const newSettings = { ...settings, windowPosition: { x, y } };
-        setSettings(newSettings);
-        await dbService.saveSettings(newSettings);
+        if (!isLoadedRef.current) return;
+        setSettings(prev => {
+            const newSettings = { ...prev, windowPosition: { x, y } };
+            dbService.saveSettings(newSettings).catch(console.error);
+            return newSettings;
+        });
     };
 
     const updateWindowSize = async (width: number, height: number) => {
-        const newSettings = { ...settings, windowSize: { width, height } };
-        setSettings(newSettings);
-        await dbService.saveSettings(newSettings);
+        if (!isLoadedRef.current) return;
+        setSettings(prev => {
+            const newSettings = { ...prev, windowSize: { width, height } };
+            dbService.saveSettings(newSettings).catch(console.error);
+            return newSettings;
+        });
     };
 
     return (
