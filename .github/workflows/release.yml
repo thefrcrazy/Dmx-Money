@@ -55,94 +55,123 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # On ne passe PAS les clés ici pour éviter le crash automatique
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'DmxMoney ${{ github.ref_name }}'
-          includeUpdaterJson: false # On le fera manuellement
+          includeUpdaterJson: false
           releaseBody: |
-            ### 🚀 Nouvelles Fonctionnalités
-            - **Sidebar Rétractable** : Gagnez de l'espace de travail.
-            - **Édition Inline** : Modifiez vos transactions directement dans le tableau.
-            - **Multi-sélection** : Actions groupées pour supprimer ou pointer.
-            - **Mises à jour Automatiques** : Système de détection intégré.
-            
-            ### 🎨 Améliorations UI/UX
-            - **Graphiques Premium** : Courbes lisses et réactives.
-            - **Animations** : Interface fluide et rapide.
-            - **Thème** : Mode sombre #121212 harmonisé.
-            
-            ### 🛠️ Technique
-            - Tauri v2.1.1 (Stable).
-            - Support macOS Intel & Apple Silicon.
-            - Support Windows x64.
-            - Support Linux.
+            ## DmxMoney ${{ github.ref_name }}
+
+            Voir le [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) pour les détails.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
-      - name: Generate and Upload Updater JSON Manually
-        if: always()
+      # Signature manuelle de l'update bundle pour chaque plateforme
+      - name: Sign Update Bundle
+        if: success()
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # On utilise des noms de variables différents pour ne pas être détecté par Tauri automatiquement
           MY_B64_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          MY_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+          MY_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          echo "🔍 Searching for asset files..."
-          ASSET_FILE=$(find . -name "*.app.tar.gz" -o -name "*.zip" | grep -v "target/release/deps" | head -n 1)
-          
+          echo "🔍 Searching for update bundle..."
+          ASSET_FILE=$(find . \( -name "*.app.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" -o -name "*.AppImage.tar.gz" \) ! -path "*/target/release/deps/*" | head -n 1)
+
           if [ -z "$ASSET_FILE" ]; then
             echo "⚠️ No update asset found. Skipping."
             exit 0
           fi
-          
-          echo "✅ Found asset file: $ASSET_FILE"
-          
-          # Décodage de la clé Base64 (on décode la chaîne globale)
+
+          echo "✅ Found: $ASSET_FILE"
+
           echo "🔓 Decoding private key..."
           echo "$MY_B64_KEY" | base64 -d > ./signer.key
-          
-          # Signature manuelle
+
           SIG_FILE="$ASSET_FILE.sig"
           echo "✍️ Signing $ASSET_FILE..."
-          
-          # On utilise le fichier décodé
+
           printf "%s\n" "$MY_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
-          
+
           if [ -f "$SIG_FILE" ]; then
-            echo "✅ Signature generated successfully."
+            echo "✅ Signature generated."
             gh release upload ${{ github.ref_name }} "$SIG_FILE" --clobber
-            
-            # Génération du latest.json pour macOS ARM (ou toutes plateformes si besoin)
-            if [[ "$ASSET_FILE" == *"aarch64"* ]]; then
-              SIGNATURE=$(cat "$SIG_FILE")
-              ASSET_NAME=$(basename "$ASSET_FILE")
-              VERSION="${{ github.ref_name }}"
-              CLEAN_VERSION="${VERSION#v}"
-              PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-              DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/$ASSET_NAME"
-              
-              cat <<EOF > latest.json
-          {
-            "version": "$CLEAN_VERSION",
-            "notes": "Update for version $CLEAN_VERSION",
-            "pub_date": "$PUB_DATE",
-            "platforms": {
-              "darwin-aarch64": {
-                "signature": "$SIGNATURE",
-                "url": "$DOWNLOAD_URL"
-              }
-            }
-          }
-          EOF
-              echo "🚀 Uploading latest.json..."
-              gh release upload $VERSION latest.json --clobber
-            fi
             rm ./signer.key
           else
-            echo "❌ Failed to generate signature."
+            echo "❌ Signature failed."
             rm -f ./signer.key
             exit 1
           fi
+
+  # Job d'agrégation : collecte les signatures de toutes les plateformes
+  # et génère un latest.json multi-plateforme pour l'updater
+  generate-updater-json:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Generate multi-platform latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          CLEAN_VERSION="${VERSION#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          REPO="${{ github.repository }}"
+          BASE_URL="https://github.com/$REPO/releases/download/$VERSION"
+
+          echo "📦 Fetching release assets for $VERSION..."
+          ASSETS=$(gh release view "$VERSION" --repo "$REPO" --json assets -q '.assets[].name')
+
+          # Initialisation du JSON des plateformes
+          PLATFORMS="{}"
+
+          # Fonction : trouver l'asset + sa signature et ajouter au JSON
+          add_platform() {
+            local platform_key="$1"
+            local pattern="$2"
+
+            ASSET_NAME=$(echo "$ASSETS" | grep -E "$pattern" | grep -v '\.sig$' | head -n 1)
+            if [ -n "$ASSET_NAME" ]; then
+              SIG_NAME="${ASSET_NAME}.sig"
+              if echo "$ASSETS" | grep -qF "$SIG_NAME"; then
+                echo "✅ $platform_key : $ASSET_NAME"
+                gh release download "$VERSION" --repo "$REPO" -p "$SIG_NAME" -D /tmp --clobber
+                SIGNATURE=$(cat "/tmp/$SIG_NAME")
+                PLATFORMS=$(echo "$PLATFORMS" | jq \
+                  --arg key "$platform_key" \
+                  --arg sig "$SIGNATURE" \
+                  --arg url "$BASE_URL/$ASSET_NAME" \
+                  '. + {($key): {"signature": $sig, "url": $url}}')
+              else
+                echo "⚠️ Pas de signature trouvée pour $ASSET_NAME"
+              fi
+            else
+              echo "ℹ️ Aucun asset trouvé pour $platform_key"
+            fi
+          }
+
+          # Détection de chaque plateforme
+          add_platform "darwin-aarch64" "aarch64.*\.app\.tar\.gz$"
+          add_platform "darwin-x86_64"  "x86_64.*\.app\.tar\.gz$"
+          add_platform "windows-x86_64" "\.(nsis|msi)\.zip$"
+          add_platform "linux-x86_64"   "\.AppImage\.tar\.gz$"
+
+          # Construction du latest.json final
+          jq -n \
+            --arg version "$CLEAN_VERSION" \
+            --arg notes "Mise à jour vers la version $CLEAN_VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --argjson platforms "$PLATFORMS" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: $platforms}' > latest.json
+
+          echo ""
+          echo "📄 latest.json généré :"
+          cat latest.json
+
+          echo ""
+          echo "🚀 Upload de latest.json..."
+          gh release upload "$VERSION" --repo "$REPO" latest.json --clobber
+          echo "✅ Terminé !"
