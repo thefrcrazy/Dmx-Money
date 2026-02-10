@@ -415,6 +415,8 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
         custom_groups_order: Option<String>,
         #[sqlx(rename = "accountsOrder")]
         accounts_order: Option<String>,
+        #[sqlx(rename = "lastSeenVersion")]
+        last_seen_version: Option<String>,
     }
 
     match sqlx::query_as::<_, SettingsRow>("SELECT * FROM settings WHERE id = 1")
@@ -448,6 +450,7 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
                 custom_groups: row.custom_groups,
                 custom_groups_order: row.custom_groups_order,
                 accounts_order: row.accounts_order,
+                last_seen_version: row.last_seen_version,
             }))
         }
         None => Ok(None),
@@ -471,8 +474,8 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
     };
 
     sqlx::query(
-        "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\")
-         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\")
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT(id) DO UPDATE SET
             theme = $1,
             \"primaryColor\" = $2,
@@ -484,7 +487,8 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
             \"accountGroups\" = $8,
             \"customGroups\" = $9,
             \"customGroupsOrder\" = $10,
-            \"accountsOrder\" = $11"
+            \"accountsOrder\" = $11,
+            \"lastSeenVersion\" = $12"
     )
     .bind(settings.theme)
     .bind(settings.primary_color)
@@ -497,6 +501,7 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
     .bind(settings.custom_groups)
     .bind(settings.custom_groups_order)
     .bind(settings.accounts_order)
+    .bind(settings.last_seen_version)
     .execute(&*pool)
     .await
     .map_err(|e| map_db_error(e, "sauvegarde des paramètres"))?;

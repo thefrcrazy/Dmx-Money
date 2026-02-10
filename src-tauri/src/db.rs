@@ -238,6 +238,22 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
             .await?;
     }
 
+    // Migration: Add lastSeenVersion to settings
+    let has_last_seen_version: bool = sqlx::query_scalar(
+        "SELECT count(*) FROM pragma_table_info('settings') WHERE name='lastSeenVersion'",
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(0)
+        > 0;
+
+    if !has_last_seen_version {
+        println!("Migrating settings table: adding lastSeenVersion column");
+        sqlx::query("ALTER TABLE settings ADD COLUMN \"lastSeenVersion\" TEXT")
+            .execute(&mut *tx)
+            .await?;
+    }
+
     tx.commit().await?;
 
     Ok(())

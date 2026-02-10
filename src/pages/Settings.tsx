@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, Monitor, Download, Upload, RefreshCw } from 'lucide-react';
+import { Moon, Sun, Monitor, Download, Upload, RefreshCw, Sparkles } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
@@ -14,6 +14,7 @@ import OfxImportModal from '../features/import/OfxImportModal';
 import Button from '../components/ui/Button';
 import AlertModal from '../components/ui/AlertModal';
 import Card from '../components/ui/Card';
+import ReleaseNotesModal from '../components/ui/ReleaseNotesModal';
 
 const SettingsPage: React.FC = () => {
     const { settings, updateTheme, updatePrimaryColor } = useSettings();
@@ -22,13 +23,14 @@ const SettingsPage: React.FC = () => {
     const [appVersion, setAppVersion] = useState('0.0.0');
 
     useEffect(() => {
-        getVersion().then(setAppVersion).catch(() => setAppVersion('0.1.4'));
+        getVersion().then(setAppVersion).catch(() => setAppVersion('0.2.4'));
     }, []);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isCsvImportModalOpen, setIsCsvImportModalOpen] = useState(false);
     const [isQifImportModalOpen, setIsQifImportModalOpen] = useState(false);
     const [isOfxImportModalOpen, setIsOfxImportModalOpen] = useState(false);
+    const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
     const [importFile, setImportFile] = useState<{ name: string; content: string } | null>(null);
     const [alertState, setAlertState] = useState<{ 
         isOpen: boolean; 
@@ -282,6 +284,29 @@ const SettingsPage: React.FC = () => {
                 </div>
             </Card>
 
+            {/* À propos */}
+            <Card title="À propos" subtitle="Informations sur l'application.">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-gray-100 dark:border-neutral-700">
+                            <img src="/vite.svg" alt="DmxMoney Logo" className="w-full h-full object-contain" />
+                        </div>
+                        <div>
+                            <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
+                            <div className="text-xs text-gray-500">Version {appVersion} — Créé avec ❤️</div>
+                        </div>
+                    </div>
+                    <Button 
+                        onClick={() => setIsReleaseNotesOpen(true)}
+                        variant="secondary"
+                        size="sm"
+                        icon={Sparkles}
+                    >
+                        Nouveautés
+                    </Button>
+                </div>
+            </Card>
+
             <AlertModal
                 isOpen={alertState.isOpen}
                 onClose={() => setAlertState({ ...alertState, isOpen: false })}
@@ -289,6 +314,10 @@ const SettingsPage: React.FC = () => {
                 message={alertState.message}
                 type={alertState.type}
                 technicalDetails={alertState.technicalDetails}
+            />
+            <ReleaseNotesModal 
+                isOpen={isReleaseNotesOpen} 
+                onClose={() => setIsReleaseNotesOpen(false)} 
             />
             <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleConfirmImport} fileName={importFile?.name || ''} />
             <CsvImportModal isOpen={isCsvImportModalOpen} onClose={() => setIsCsvImportModalOpen(false)} file={importFile} onImport={handleTransactionImport} />

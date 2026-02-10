@@ -101,6 +101,7 @@ export interface Settings {
     accountsOrder?: string[];
     componentSpacing: number;
     componentPadding: number;
+    lastSeenVersion?: string;
 }
 
 export interface SettingsContextType {
@@ -116,4 +117,5 @@ export interface SettingsContextType {
     updateAccountsOrder: (order: string[]) => Promise<void>;
     updateComponentSpacing: (spacing: number) => Promise<void>;
     updateComponentPadding: (padding: number) => Promise<void>;
+    updateLastSeenVersion: (version: string) => Promise<void>;
 }

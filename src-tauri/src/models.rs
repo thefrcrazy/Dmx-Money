@@ -128,4 +128,6 @@ pub struct Settings {
     pub custom_groups_order: Option<String>, // JSON string
     #[serde(rename = "accountsOrder")]
     pub accounts_order: Option<String>, // JSON string
+    #[serde(rename = "lastSeenVersion")]
+    pub last_seen_version: Option<String>,
 }

@@ -331,6 +331,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         dbService.saveSettings(newSettings).catch(console.error);
                         return newSettings;
                     });
+                },
+                updateLastSeenVersion: async (version: string) => {
+                    setSettings(prev => {
+                        const newSettings = { ...prev, lastSeenVersion: version };
+                        dbService.saveSettings(newSettings).catch(console.error);
+                        return newSettings;
+                    });
                 }
             }}
         >
