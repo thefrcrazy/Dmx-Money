@@ -30,6 +30,7 @@ const loadIcon = async (isDark: boolean): Promise<Uint8Array | null> => {
 const DEFAULT_SETTINGS: Settings = {
     theme: 'system',
     primaryColor: 'default',
+    displayStyle: 'modern',
     windowPosition: null,
     windowSize: null,
     componentSpacing: 6,
@@ -49,9 +50,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 // Apply visual changes immediately
                 applyVisualSettings(savedSettings);
                 // Then update state
-                setSettings(savedSettings);
+                setSettings(prev => ({
+                    ...prev,
+                    ...savedSettings
+                }));
             }
         });
+
 
         let unlistenMove: (() => void) | undefined;
         let unlistenResize: (() => void) | undefined;
@@ -249,6 +254,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     };
 
+    const updateDisplayStyle = async (style: 'modern' | 'legacy') => {
+        setSettings(prev => {
+            const newSettings = { ...prev, displayStyle: style };
+            dbService.saveSettings(newSettings).catch(console.error);
+            return newSettings;
+        });
+    };
+
     const updateWindowPosition = async (x: number, y: number) => {
         const newSettings = { ...settings, windowPosition: { x, y } };
         setSettings(newSettings);
@@ -267,6 +280,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 settings,
                 updateTheme,
                 updatePrimaryColor,
+                updateDisplayStyle,
                 updateWindowPosition,
                 updateWindowSize,
                 updateAccountGroup: async (accountId: string, groupName: string) => {

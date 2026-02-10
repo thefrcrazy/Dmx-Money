@@ -130,4 +130,8 @@ pub struct Settings {
     pub accounts_order: Option<String>, // JSON string
     #[serde(rename = "lastSeenVersion")]
     pub last_seen_version: Option<String>,
+    #[serde(rename = "componentSpacing")]
+    pub component_spacing: i32,
+    #[serde(rename = "componentPadding")]
+    pub component_padding: i32,
 }

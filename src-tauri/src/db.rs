@@ -102,7 +102,9 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
             \"windowPositionX\" INTEGER,
             \"windowPositionY\" INTEGER,
             \"windowSizeWidth\" INTEGER,
-            \"windowSizeHeight\" INTEGER
+            \"windowSizeHeight\" INTEGER,
+            \"componentSpacing\" INTEGER NOT NULL DEFAULT 6,
+            \"componentPadding\" INTEGER NOT NULL DEFAULT 6
         )",
     )
     .execute(&mut *tx)
@@ -126,6 +128,38 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         .await?;
     }
 
+    // Migration: Add componentSpacing column if it doesn't exist
+    let has_component_spacing: bool = sqlx::query_scalar(
+        "SELECT count(*) FROM pragma_table_info('settings') WHERE name='componentSpacing'",
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(0)
+        > 0;
+
+    if !has_component_spacing {
+        println!("Migrating settings table: adding componentSpacing column");
+        sqlx::query("ALTER TABLE settings ADD COLUMN \"componentSpacing\" INTEGER NOT NULL DEFAULT 6")
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // Migration: Add componentPadding column if it doesn't exist
+    let has_component_padding: bool = sqlx::query_scalar(
+        "SELECT count(*) FROM pragma_table_info('settings') WHERE name='componentPadding'",
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(0)
+        > 0;
+
+    if !has_component_padding {
+        println!("Migrating settings table: adding componentPadding column");
+        sqlx::query("ALTER TABLE settings ADD COLUMN \"componentPadding\" INTEGER NOT NULL DEFAULT 6")
+            .execute(&mut *tx)
+            .await?;
+    }
+
     // Migration: Add accountGroups column to settings
     let has_account_groups: bool = sqlx::query_scalar(
         "SELECT count(*) FROM pragma_table_info('settings') WHERE name='accountGroups'",
@@ -134,6 +168,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
     .await
     .unwrap_or(0)
         > 0;
+
 
     if !has_account_groups {
         println!("Migrating settings table: adding accountGroups column");

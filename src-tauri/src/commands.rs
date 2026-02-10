@@ -8,7 +8,7 @@ use tauri::{command, State};
 // Helper to map SQLx errors to user-friendly strings
 fn map_db_error(e: sqlx::Error, context: &str) -> String {
     let err_msg = e.to_string();
-    println!("Database Error during {}: {}", context, err_msg);
+    println!("Database Error during {context}: {err_msg}");
     
     if err_msg.contains("FOREIGN KEY constraint failed") {
         return "Impossible de supprimer cet élément car il est utilisé ailleurs.".to_string();
@@ -17,7 +17,7 @@ fn map_db_error(e: sqlx::Error, context: &str) -> String {
         return "Un élément avec cet identifiant existe déjà.".to_string();
     }
     
-    format!("Erreur BDD ({}): {}", context, err_msg)
+    format!("Erreur BDD ({context}): {err_msg}")
 }
 
 // --- Accounts ---
@@ -32,7 +32,7 @@ pub async fn get_accounts(pool: State<'_, DbPool>) -> Result<Vec<Account>, Strin
 
 #[command]
 pub async fn add_account(pool: State<'_, DbPool>, account: Account) -> Result<(), String> {
-    println!("Invoked add_account: {:?}", account);
+    println!("Invoked add_account: {account:?}");
     sqlx::query(
         "INSERT OR IGNORE INTO accounts (id, name, \"type\", \"initialBalance\", color, icon) VALUES ($1, $2, $3, $4, $5, $6)"
     )
@@ -50,7 +50,7 @@ pub async fn add_account(pool: State<'_, DbPool>, account: Account) -> Result<()
 
 #[command]
 pub async fn update_account(pool: State<'_, DbPool>, account: Account) -> Result<(), String> {
-    println!("Invoked update_account: {:?}", account);
+    println!("Invoked update_account: {account:?}");
     sqlx::query(
         "UPDATE accounts SET name = $1, \"type\" = $2, \"initialBalance\" = $3, color = $4, icon = $5 WHERE id = $6"
     )
@@ -68,7 +68,7 @@ pub async fn update_account(pool: State<'_, DbPool>, account: Account) -> Result
 
 #[command]
 pub async fn delete_account(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_account: {}", id);
+    println!("Invoked delete_account: {id}");
     // Transactional delete
     let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
 
@@ -109,7 +109,7 @@ pub async fn add_transaction(
     pool: State<'_, DbPool>,
     transaction: Transaction,
 ) -> Result<(), String> {
-    println!("Invoked add_transaction: {:?}", transaction);
+    println!("Invoked add_transaction: {transaction:?}");
     sqlx::query(
         "INSERT INTO transactions (id, date, \"accountId\", \"type\", amount, category, description, checked, \"isTransfer\", \"linkedTransactionId\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
     )
@@ -134,7 +134,7 @@ pub async fn update_transaction(
     pool: State<'_, DbPool>,
     transaction: Transaction,
 ) -> Result<(), String> {
-    println!("Invoked update_transaction: {:?}", transaction);
+    println!("Invoked update_transaction: {transaction:?}");
     sqlx::query(
         "UPDATE transactions SET date = $1, \"accountId\" = $2, \"type\" = $3, amount = $4, category = $5, description = $6, checked = $7, \"isTransfer\" = $8, \"linkedTransactionId\" = $9 WHERE id = $10"
     )
@@ -156,7 +156,7 @@ pub async fn update_transaction(
 
 #[command]
 pub async fn delete_transaction(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_transaction: {}", id);
+    println!("Invoked delete_transaction: {id}");
     sqlx::query("DELETE FROM transactions WHERE id = $1")
         .bind(id)
         .execute(&*pool)
@@ -177,7 +177,7 @@ pub async fn get_categories(pool: State<'_, DbPool>) -> Result<Vec<Category>, St
 
 #[command]
 pub async fn add_category(pool: State<'_, DbPool>, category: Category) -> Result<(), String> {
-    println!("Invoked add_category: {:?}", category);
+    println!("Invoked add_category: {category:?}");
     sqlx::query("INSERT OR IGNORE INTO categories (id, name, icon, color) VALUES ($1, $2, $3, $4)")
         .bind(category.id)
         .bind(category.name)
@@ -191,7 +191,7 @@ pub async fn add_category(pool: State<'_, DbPool>, category: Category) -> Result
 
 #[command]
 pub async fn update_category(pool: State<'_, DbPool>, category: Category) -> Result<(), String> {
-    println!("Invoked update_category: {:?}", category);
+    println!("Invoked update_category: {category:?}");
     sqlx::query("UPDATE categories SET name = $1, icon = $2, color = $3 WHERE id = $4")
         .bind(category.name)
         .bind(category.icon)
@@ -205,7 +205,7 @@ pub async fn update_category(pool: State<'_, DbPool>, category: Category) -> Res
 
 #[command]
 pub async fn delete_category(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_category: {}", id);
+    println!("Invoked delete_category: {id}");
     sqlx::query("DELETE FROM categories WHERE id = $1")
         .bind(id)
         .execute(&*pool)
@@ -229,7 +229,7 @@ pub async fn add_scheduled(
     pool: State<'_, DbPool>,
     scheduled: ScheduledTransaction,
 ) -> Result<(), String> {
-    println!("Invoked add_scheduled: {:?}", scheduled);
+    println!("Invoked add_scheduled: {scheduled:?}");
     sqlx::query(
         "INSERT INTO scheduled_transactions (id, description, amount, \"type\", frequency, \"accountId\", \"nextDate\", category, \"toAccountId\", \"includeInForecast\", \"endDate\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
     )
@@ -255,7 +255,7 @@ pub async fn update_scheduled(
     pool: State<'_, DbPool>,
     scheduled: ScheduledTransaction,
 ) -> Result<(), String> {
-    println!("Invoked update_scheduled: {:?}", scheduled);
+    println!("Invoked update_scheduled: {scheduled:?}");
     sqlx::query(
         "UPDATE scheduled_transactions SET description = $1, amount = $2, \"type\" = $3, frequency = $4, \"accountId\" = $5, \"nextDate\" = $6, category = $7, \"toAccountId\" = $8, \"includeInForecast\" = $9, \"endDate\" = $10 WHERE id = $11"
     )
@@ -278,7 +278,7 @@ pub async fn update_scheduled(
 
 #[command]
 pub async fn delete_scheduled(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_scheduled: {}", id);
+    println!("Invoked delete_scheduled: {id}");
     sqlx::query("DELETE FROM scheduled_transactions WHERE id = $1")
         .bind(id)
         .execute(&*pool)
@@ -417,6 +417,10 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
         accounts_order: Option<String>,
         #[sqlx(rename = "lastSeenVersion")]
         last_seen_version: Option<String>,
+        #[sqlx(rename = "componentSpacing")]
+        component_spacing: i32,
+        #[sqlx(rename = "componentPadding")]
+        component_padding: i32,
     }
 
     match sqlx::query_as::<_, SettingsRow>("SELECT * FROM settings WHERE id = 1")
@@ -451,6 +455,8 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
                 custom_groups_order: row.custom_groups_order,
                 accounts_order: row.accounts_order,
                 last_seen_version: row.last_seen_version,
+                component_spacing: row.component_spacing,
+                component_padding: row.component_padding,
             }))
         }
         None => Ok(None),
@@ -459,7 +465,7 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
 
 #[command]
 pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Result<(), String> {
-    println!("Invoked save_settings: {:?}", settings);
+    println!("Invoked save_settings: {settings:?}");
 
     let (pos_x, pos_y) = if let Some(pos) = settings.window_position {
         (Some(pos.x), Some(pos.y))
@@ -474,8 +480,8 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
     };
 
     sqlx::query(
-        "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\")
-         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\")
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT(id) DO UPDATE SET
             theme = $1,
             \"primaryColor\" = $2,
@@ -488,7 +494,9 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
             \"customGroups\" = $9,
             \"customGroupsOrder\" = $10,
             \"accountsOrder\" = $11,
-            \"lastSeenVersion\" = $12"
+            \"lastSeenVersion\" = $12,
+            \"componentSpacing\" = $13,
+            \"componentPadding\" = $14"
     )
     .bind(settings.theme)
     .bind(settings.primary_color)
@@ -502,6 +510,8 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
     .bind(settings.custom_groups_order)
     .bind(settings.accounts_order)
     .bind(settings.last_seen_version)
+    .bind(settings.component_spacing)
+    .bind(settings.component_padding)
     .execute(&*pool)
     .await
     .map_err(|e| map_db_error(e, "sauvegarde des paramètres"))?;
