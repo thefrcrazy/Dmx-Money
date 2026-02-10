@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.4",
+        date: "2026-02-10",
+        title: "Mises à jour intelligentes",
+        changes: [
+            "Système de mise à jour plus robuste : l'application ne propose plus de mise à jour tant qu'elle n'est pas 100% prête",
+            "Amélioration des messages d'erreur lors des vérifications manuelles",
+            "Mise à jour en arrière-plan plus discrète"
+        ],
+        features: []
+    },
+    {
         version: "0.3.3",
         date: "2026-02-10",
         title: "Nouvel écran de chargement",

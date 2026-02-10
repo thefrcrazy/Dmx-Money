@@ -43,9 +43,19 @@ export const useUpdater = () => {
                 }
             }
         } catch (error) {
+            const errorMsg = String(error);
             console.error('Update check failed:', error);
+            
+            // Only show error if not silent
             if (!silent) {
-                await message(`Failed to check for updates.\n${error}`, { title: 'Error', kind: 'error' });
+                if (errorMsg.includes('fetch a valid release JSON')) {
+                    await message(
+                        'Une mise à jour est probablement en cours de préparation sur le serveur.\n\nVeuillez réessayer dans quelques minutes.',
+                        { title: 'Mise à jour en cours', kind: 'info' }
+                    );
+                } else {
+                    await message(`Impossible de vérifier les mises à jour.\n\n${errorMsg}`, { title: 'Erreur', kind: 'error' });
+                }
             }
         } finally {
             setIsChecking(false);

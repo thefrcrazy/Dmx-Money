@@ -15,12 +15,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Créer ou mettre à jour la release pour s'assurer qu'elle n'est pas en draft
+          # Créer la release en DRAFT d'abord pour ne pas casser le lien 'latest'
           gh release create ${{ github.ref_name }} \
             --title "DmxMoney ${{ github.ref_name }}" \
             --notes "Voir le [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) pour les détails." \
-            --draft=false \
-            --prerelease=false || gh release edit ${{ github.ref_name }} --draft=false --prerelease=false
+            --draft=true \
+            --prerelease=false || echo "Release already exists"
 
   build-and-upload:
     needs: create-release
@@ -268,3 +268,6 @@ jobs:
 
           echo "🚀 Uploading latest.json..."
           gh release upload "$VERSION" latest.json --repo "$REPO" --clobber
+
+          echo "🔓 Undrafting release..."
+          gh release edit "$VERSION" --draft=false --repo "$REPO"
