@@ -44,27 +44,61 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
     const isLoadedRef = useRef(false);
 
-    // Initial load
-    useEffect(() => {
-        // Load settings from DB
-        dbService.getSettings().then(savedSettings => {
-            if (savedSettings) {
-                // Apply visual changes immediately
-                applyVisualSettings(savedSettings);
-                // Then update state
-                setSettings(prev => ({
-                    ...prev,
-                    ...savedSettings
-                }));
-            } else {
-                // First launch: save default settings
-                dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
-            }
-            isLoadedRef.current = true;
-        });
+        // Initial load
 
+        useEffect(() => {
 
-        let unlistenMove: (() => void) | undefined;
+            // Load settings from DB
+
+            dbService.getSettings()
+
+                .then(savedSettings => {
+
+                    if (savedSettings) {
+
+                        // Apply visual changes immediately
+
+                        applyVisualSettings(savedSettings);
+
+                        // Then update state
+
+                        setSettings(prev => ({
+
+                            ...prev,
+
+                            ...savedSettings
+
+                        }));
+
+                    } else {
+
+                        // First launch: save default settings
+
+                        dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
+
+                    }
+
+                    isLoadedRef.current = true;
+
+                })
+
+                .finally(() => {
+
+                    // Show window only when theme is ready to avoid FOUC
+
+                    // Small delay to ensure CSS variables are applied
+
+                    setTimeout(() => {
+
+                        getCurrentWindow().show().catch(console.error);
+
+                    }, 50);
+
+                });
+
+    
+
+            let unlistenMove: (() => void) | undefined;
         let unlistenResize: (() => void) | undefined;
 
         const setupWindowListeners = async () => {

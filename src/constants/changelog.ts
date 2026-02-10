@@ -12,6 +12,16 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.2",
+        date: "2026-02-10",
+        title: "Lancement fluide et instantané",
+        changes: [
+            "Suppression du 'flash' blanc/bleu au démarrage : l'application s'affiche désormais directement avec votre thème",
+            "Optimisation du processus de chargement pour une meilleure réactivité"
+        ],
+        features: []
+    },
+    {
         version: "0.3.1",
         date: "2026-02-10",
         title: "Correctif de stabilité des paramètres",
