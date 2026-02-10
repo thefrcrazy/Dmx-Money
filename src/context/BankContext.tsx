@@ -6,19 +6,53 @@ import { dbService } from '../services/db';
 const BankContext = createContext<BankContextType | undefined>(undefined);
 
 const DEFAULT_DATA: AppData = {
-    accounts: [
-        { id: '1', name: 'Compte Courant', type: 'Courant', initialBalance: 1500, icon: 'Wallet', color: '#3b82f6' },
-        { id: '2', name: 'Livret A', type: 'Épargne', initialBalance: 5000, icon: 'PiggyBank', color: '#10b981' }
-    ],
+    accounts: [],
     transactions: [],
     categories: [
-        { id: '1', name: 'Alimentation', icon: 'ShoppingCart', color: '#ef4444' },
-        { id: '2', name: 'Loyer', icon: 'Home', color: '#3b82f6' },
-        { id: '3', name: 'Salaire', icon: 'Banknote', color: '#10b981' },
-        { id: '4', name: 'Transport', icon: 'Car', color: '#f59e0b' },
-        { id: '5', name: 'Loisirs', icon: 'Gamepad2', color: '#8b5cf6' },
-        { id: '6', name: 'Santé', icon: 'HeartPulse', color: '#ec4899' },
-        { id: '7', name: 'Divers', icon: 'MoreHorizontal', color: '#6b7280' },
+        // Logement
+        { id: '1', name: 'Loyer / Prêt', icon: 'Home', color: '#1e3a8a' },
+        { id: '2', name: 'Charges / Énergie', icon: 'Zap', color: '#f59e0b' },
+        { id: '3', name: 'Eau', icon: 'Droplets', color: '#0ea5e9' },
+        { id: '4', name: 'Assurance Habitation', icon: 'Shield', color: '#4b5563' },
+        
+        // Vie Quotidienne
+        { id: '5', name: 'Alimentation', icon: 'ShoppingBag', color: '#ef4444' },
+        { id: '6', name: 'Restaurants / Cafés', icon: 'Utensils', color: '#ea580c' },
+        { id: '7', name: 'Shopping / Vêtements', icon: 'Tag', color: '#ec4899' },
+        { id: '8', name: 'Hygiène / Beauté', icon: 'Smile', color: '#f472b6' },
+        
+        // Transport
+        { id: '9', name: 'Carburant', icon: 'Fuel', color: '#b45309' },
+        { id: '10', name: 'Transport en commun', icon: 'Bus', color: '#d97706' },
+        { id: '11', name: 'Entretien Voiture', icon: 'Hammer', color: '#6b7280' },
+        { id: '12', name: 'Parking / Péage', icon: 'MapPin', color: '#4b5563' },
+        
+        // Santé
+        { id: '13', name: 'Médecin / Santé', icon: 'Heart', color: '#dc2626' },
+        { id: '14', name: 'Pharmacie', icon: 'Pill', color: '#f87171' },
+        
+        // Loisirs & Culture
+        { id: '15', name: 'Loisirs / Cinéma', icon: 'Gamepad2', color: '#8b5cf6' },
+        { id: '16', name: 'Abonnements (VOD/Musique)', icon: 'Tv', color: '#6366f1' },
+        { id: '17', name: 'Sport / Bien-être', icon: 'Dumbbell', color: '#06b6d4' },
+        { id: '18', name: 'Voyages / Vacances', icon: 'Plane', color: '#2563eb' },
+        
+        // Technologie
+        { id: '19', name: 'Téléphonie / Internet', icon: 'Wifi', color: '#3b82f6' },
+        { id: '20', name: 'High-Tech / Logiciels', icon: 'Monitor', color: '#1e40af' },
+        
+        // Revenus
+        { id: '21', name: 'Salaire', icon: 'Banknote', color: '#16a34a' },
+        { id: '22', name: 'Primes / Bonus', icon: 'Award', color: '#d9f99d' },
+        { id: '23', name: 'Cadeaux reçus', icon: 'Gift', color: '#db2777' },
+        { id: '24', name: 'Remboursements', icon: 'TrendingUp', color: '#4ade80' },
+        
+        // Autre
+        { id: '25', name: 'Cadeaux offerts', icon: 'Gift', color: '#fca5a5' },
+        { id: '26', name: 'Frais Bancaires', icon: 'Landmark', color: '#1f2937' },
+        { id: '27', name: 'Impôts / Taxes', icon: 'Briefcase', color: '#7c2d12' },
+        { id: '28', name: 'Divers', icon: 'MoreHorizontal', color: '#6b7280' },
+        
         { id: 'transfer', name: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' }
     ],
     scheduled: []

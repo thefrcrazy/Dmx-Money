@@ -30,11 +30,18 @@ const SettingsPage: React.FC = () => {
     const [isQifImportModalOpen, setIsQifImportModalOpen] = useState(false);
     const [isOfxImportModalOpen, setIsOfxImportModalOpen] = useState(false);
     const [importFile, setImportFile] = useState<{ name: string; content: string } | null>(null);
-    const [alertState, setAlertState] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    const [alertState, setAlertState] = useState<{ 
+        isOpen: boolean; 
+        title: string; 
+        message: string; 
+        type: 'success' | 'error';
+        technicalDetails?: string;
+    }>({
         isOpen: false,
         title: '',
         message: '',
-        type: 'success'
+        type: 'success',
+        technicalDetails: ''
     });
 
     const handleExportData = async () => {
@@ -50,10 +57,21 @@ const SettingsPage: React.FC = () => {
 
             if (filePath) {
                 await writeTextFile(filePath, encodedData);
-                setAlertState({ isOpen: true, title: 'Export réussi !', message: 'Vos données ont été exportées avec succès.', type: 'success' });
+                setAlertState({ 
+                    isOpen: true, 
+                    title: 'Export réussi !', 
+                    message: 'Vos données ont été exportées avec succès.', 
+                    type: 'success' 
+                });
             }
         } catch (error) {
-            setAlertState({ isOpen: true, title: 'Erreur', message: 'Une erreur est survenue lors de l\'export.', type: 'error' });
+            setAlertState({ 
+                isOpen: true, 
+                title: 'Erreur d\'export', 
+                message: 'Une erreur est survenue lors de la création de votre sauvegarde.', 
+                type: 'error',
+                technicalDetails: error instanceof Error ? error.message : String(error)
+            });
         }
     };
 
@@ -75,6 +93,13 @@ const SettingsPage: React.FC = () => {
             }
         } catch (error) {
             console.error('File selection failed:', error);
+            setAlertState({ 
+                isOpen: true, 
+                title: 'Erreur de lecture', 
+                message: 'Impossible de lire le fichier sélectionné.', 
+                type: 'error',
+                technicalDetails: error instanceof Error ? error.message : String(error)
+            });
         }
     };
 
@@ -90,10 +115,21 @@ const SettingsPage: React.FC = () => {
             if (mode === 'merge') await dbService.mergeData(data);
             else await dbService.importData(data);
 
-            setAlertState({ isOpen: true, title: 'Import réussi !', message: 'L\'application va redémarrer.', type: 'success' });
+            setAlertState({ 
+                isOpen: true, 
+                title: 'Import réussi !', 
+                message: 'Vos données ont été restaurées. L\'application va redémarrer.', 
+                type: 'success' 
+            });
             setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
-            setAlertState({ isOpen: true, title: 'Erreur', message: 'Erreur lors de l\'import.', type: 'error' });
+            setAlertState({ 
+                isOpen: true, 
+                title: 'Erreur d\'import', 
+                message: 'Le fichier de sauvegarde semble invalide ou corrompu.', 
+                type: 'error',
+                technicalDetails: error instanceof Error ? error.message : String(error)
+            });
         } finally {
             setIsImportModalOpen(false);
             setImportFile(null);
@@ -107,9 +143,20 @@ const SettingsPage: React.FC = () => {
                 await addTransaction({ ...tx, accountId });
                 count++;
             }
-            setAlertState({ isOpen: true, title: 'Import réussi !', message: `${count} transactions importées.`, type: 'success' });
+            setAlertState({ 
+                isOpen: true, 
+                title: 'Import réussi !', 
+                message: `${count} transactions ont été importées dans votre compte.`, 
+                type: 'success' 
+            });
         } catch (error) {
-            setAlertState({ isOpen: true, title: 'Erreur', message: 'Erreur lors de l\'import des transactions.', type: 'error' });
+            setAlertState({ 
+                isOpen: true, 
+                title: 'Erreur d\'import', 
+                message: 'Certaines transactions n\'ont pas pu être importées.', 
+                type: 'error',
+                technicalDetails: error instanceof Error ? error.message : String(error)
+            });
         } finally {
             setIsCsvImportModalOpen(false);
             setIsQifImportModalOpen(false);
@@ -241,6 +288,7 @@ const SettingsPage: React.FC = () => {
                 title={alertState.title}
                 message={alertState.message}
                 type={alertState.type}
+                technicalDetails={alertState.technicalDetails}
             />
             <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleConfirmImport} fileName={importFile?.name || ''} />
             <CsvImportModal isOpen={isCsvImportModalOpen} onClose={() => setIsCsvImportModalOpen(false)} file={importFile} onImport={handleTransactionImport} />
