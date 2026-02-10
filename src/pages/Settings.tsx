@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, Monitor, Download, Upload, RefreshCw, Sparkles } from 'lucide-react';
+import { Moon, Sun, Monitor, Download, Upload, RefreshCw, Sparkles, LayoutDashboard } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';

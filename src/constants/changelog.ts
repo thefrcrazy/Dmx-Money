@@ -12,6 +12,16 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.2.8",
+        date: "2026-02-10",
+        title: "Correction critique du crash des paramètres",
+        changes: [
+            "Correction d'un crash dans la page des paramètres (icône manquante)",
+            "Optimisation du rendu des graphiques"
+        ],
+        features: []
+    },
+    {
         version: "0.2.7",
         date: "2026-02-10",
         title: "Correctif de persistence et d'affichage",
