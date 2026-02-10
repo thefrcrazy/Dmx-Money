@@ -94,15 +94,18 @@ jobs:
           echo "$SIGNING_KEY" | base64 -d > ./signer.key
           
           # Debug: inspect file content (first bytes only to avoid leaking secrets completely, but enough to see header)
-          echo "File size: $(stat -c%s ./signer.key || stat -f%z ./signer.key)"
+          # Use portable way to get file size (stat is different on macOS vs Linux)
+          echo "File size: $(wc -c < ./signer.key | xargs)"
           echo "First 50 chars (hex):"
           head -c 50 ./signer.key | xxd || echo "xxd not found"
           
           SIG_FILE="$ASSET_FILE.sig"
-          echo "✍️ Signing $ASSET_FILE..."
+          KEY_PATH="$(pwd)/signer.key"
+          echo "✍️ Signing $ASSET_FILE with key at $KEY_PATH..."
 
           # Pipe password to tauri signer
-          printf "%s\n" "$SIGNING_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+          # Use absolute path for key to avoid tauri trying to decode "./" as base64
+          printf "%s\n" "$SIGNING_KEY_PASSWORD" | bun tauri signer sign -k "$KEY_PATH" "$ASSET_FILE"
 
           if [ -f "$SIG_FILE" ]; then
             echo "✅ Signature generated."
