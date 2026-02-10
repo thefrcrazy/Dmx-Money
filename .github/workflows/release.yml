@@ -99,15 +99,25 @@ jobs:
         run: |
           echo "🔍 Finding assets..."
           
+          # Debug: list files to see where Windows bundle is
+          echo "📂 Listing files in src-tauri/target/release/bundle:"
+          ls -R src-tauri/target/release/bundle || echo "Directory not found"
+          
           CLEAN_VERSION="${VERSION#v}"
           
-          # Recherche du bundle d'update (logique plus robuste sans pipe fail)
-          # On cherche d'abord les standards
-          UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) ! -path "*/deps/*" | head -n 1)
+          # Recherche du bundle d'update
+          # On cherche spécifiquement dans le dossier bundle pour éviter les faux positifs
+          UPDATE_BUNDLE=$(find src-tauri/target/release/bundle -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) | head -n 1)
           
-          # Fallback si rien trouvé (ex: nommage différent)
+          # Fallback Windows: n'importe quel zip dans le dossier bundle
+          if [ -z "$UPDATE_BUNDLE" ] && [ "$OS_NAME" = "windows" ]; then
+             echo "⚠️ Standard Windows bundle not found, searching for any zip..."
+             UPDATE_BUNDLE=$(find src-tauri/target/release/bundle -type f -name "*.zip" | head -n 1)
+          fi
+          
+          # Fallback général
           if [ -z "$UPDATE_BUNDLE" ]; then
-             echo "⚠️ Standard bundle not found, searching for generic archives..."
+             echo "⚠️ Bundle not found in standard location, searching everywhere in target..."
              UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | grep -v "source" | head -n 1)
           fi
 
