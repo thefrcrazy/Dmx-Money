@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.8",
+        date: "2026-02-10",
+        title: "Transition Dynamique",
+        changes: [
+            "Ajout d'une transition animée entre le splash screen et l'application",
+            "Effet de zoom et de fondu fluide au démarrage",
+            "Apparition progressive de l'interface principale"
+        ],
+        features: []
+    },
+    {
         version: "0.3.7",
         date: "2026-02-10",
         title: "Splash Screen Perfectionné",

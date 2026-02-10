@@ -43,61 +43,72 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
     const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+    const [isTransitioning, setIsTransitioning] = useState(false);
     const isLoadedRef = useRef(false);
 
-            // Initial load
+                // Initial load
 
-            useEffect(() => {
+                useEffect(() => {
 
-                // Load settings from DB
+                    // Load settings from DB
 
-                dbService.getSettings()
+                    dbService.getSettings()
 
-                    .then(savedSettings => {
+                        .then(savedSettings => {
 
-                        if (savedSettings) {
+                            if (savedSettings) {
 
-                            // Apply visual changes immediately
+                                // Apply visual changes immediately
 
-                            applyVisualSettings(savedSettings);
+                                applyVisualSettings(savedSettings);
 
-                            // Then update state
+                                // Then update state
 
-                            setSettings(prev => ({
+                                setSettings(prev => ({
 
-                                ...prev,
+                                    ...prev,
 
-                                ...savedSettings
+                                    ...savedSettings
 
-                            }));
+                                }));
 
-                        } else {
+                            } else {
 
-                            // First launch: save default settings
+                                // First launch: save default settings
 
-                            dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
+                                dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
 
-                        }
+                            }
 
-                        isLoadedRef.current = true;
+                            isLoadedRef.current = true;
 
-                        
+                            
 
-                        // Small artificial delay to ensure smooth transition and allow CSS vars to propagate
+                            // Start animation after a short delay
 
-                        setTimeout(() => {
+                            setTimeout(() => {
+
+                                setIsTransitioning(true);
+
+                                
+
+                                // Wait for the fade-out animation to complete (500ms)
+
+                                setTimeout(() => {
+
+                                    setIsInitialLoadDone(true);
+
+                                }, 500);
+
+                            }, 800); // Duration splash screen is visible
+
+                        })
+
+                        .catch(() => {
 
                             setIsInitialLoadDone(true);
 
-                        }, 200);
-
-                    })
-
-                    .catch(() => {
-
-                        setIsInitialLoadDone(true);
-
-                    });
+                        });
 
     
 
@@ -405,17 +416,30 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 }
             }}
         >
-            {!isInitialLoadDone ? (
-                <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-black z-[9999]">
-                    <div className="mb-8">
-                        <img src="/vite.svg" alt="Logo" className="w-16 h-16" />
+            <div className={`transition-opacity duration-700 ${!isInitialLoadDone ? 'opacity-0' : 'opacity-100'}`}>
+                {children}
+            </div>
+
+            {!isInitialLoadDone && (
+                <div 
+                    className={`fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-black z-[9999] transition-all duration-500 ease-in-out ${
+                        isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100 scale-100'
+                    }`}
+                >
+                    <div className="mb-8 relative">
+                        <div className={`absolute inset-0 bg-indigo-500/20 rounded-full blur-2xl transition-transform duration-1000 ${isTransitioning ? 'scale-150' : 'scale-100'}`}></div>
+                        <img 
+                            src="/logo.svg" 
+                            alt="Logo" 
+                            className={`w-24 h-24 relative z-10 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : 'scale-100'}`} 
+                        />
                     </div>
-                    <div className="w-10 h-10 border-3 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin"></div>
-                    <div className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400 opacity-70">
-                        Chargement de votre environnement...
+                    <div className={`w-8 h-8 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}></div>
+                    <div className={`mt-6 text-xs font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 transition-all duration-500 ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-70 translate-y-0'}`}>
+                        DmxMoney
                     </div>
                 </div>
-            ) : children}
+            )}
         </SettingsContext.Provider>
     );
 };
