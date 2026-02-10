@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.9",
+        date: "2026-02-10",
+        title: "Optimisation de l'infrastructure",
+        changes: [
+            "Accélération majeure du processus de build multi-plateforme",
+            "Mise en cache intelligente des dépendances Rust et Frontend",
+            "Réduction du temps d'attente pour les nouvelles releases"
+        ],
+        features: []
+    },
+    {
         version: "0.3.8",
         date: "2026-02-10",
         title: "Transition Dynamique",
