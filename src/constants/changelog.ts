@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.0",
+        date: "2026-02-11",
+        title: "Correctif de l'interface",
+        changes: [
+            "Correction du problème de barre de titre manquante après le splash screen",
+            "Stabilisation de la transition entre le chargement et l'application",
+            "Amélioration de la restauration de la position de la fenêtre"
+        ],
+        features: []
+    },
+    {
         version: "0.3.9",
         date: "2026-02-10",
         title: "Optimisation de l'infrastructure",

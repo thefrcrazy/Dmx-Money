@@ -182,13 +182,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const applyVisualSettings = (newSettings: Settings) => {
-        const appWindow = getCurrentWindow();
-        
-        // 0. Re-enable resizing and decorations (was disabled for splash screen)
-        appWindow.setResizable(true).catch(() => {});
-        appWindow.setDecorations(true).catch(() => {});
-        appWindow.setShadow(true).catch(() => {});
-
         // 1. Theme
         let isDark = false;
         if (newSettings.theme === 'dark') {
@@ -211,23 +204,39 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // 3. Window Icon (Async, non-blocking)
         updateWindowIcon(isDark);
-
-        // 4. Window Size/Pos (Async, non-blocking)
-        // Transition from 500x500 splash to app size
-        setTimeout(() => {
-            if (newSettings.windowSize) {
-                appWindow.setSize(new PhysicalSize(newSettings.windowSize.width, newSettings.windowSize.height)).catch(() => {});
-            } else {
-                // Default size if no settings saved
-                appWindow.setSize(new LogicalSize(1320, 790)).catch(() => {});
-                appWindow.center().catch(() => {});
-            }
-
-            if (newSettings.windowPosition) {
-                appWindow.setPosition(new PhysicalPosition(newSettings.windowPosition.x, newSettings.windowPosition.y)).catch(() => {});
-            }
-        }, 50);
     };
+
+    // Effect to handle window restoration after splash transition
+    useEffect(() => {
+        if (isInitialLoadDone) {
+            const restoreWindow = async () => {
+                try {
+                    const appWindow = getCurrentWindow();
+                    
+                    // 1. Restore chrome (decorations and shadow)
+                    await appWindow.setDecorations(true);
+                    await appWindow.setShadow(true);
+                    await appWindow.setResizable(true);
+
+                    // 2. Restore size and position from settings
+                    if (settings.windowSize) {
+                        await appWindow.setSize(new PhysicalSize(settings.windowSize.width, settings.windowSize.height));
+                    } else {
+                        await appWindow.setSize(new LogicalSize(1320, 790));
+                        await appWindow.center();
+                    }
+
+                    if (settings.windowPosition) {
+                        await appWindow.setPosition(new PhysicalPosition(settings.windowPosition.x, settings.windowPosition.y));
+                    }
+                } catch (error) {
+                    console.error('Failed to restore window:', error);
+                }
+            };
+            restoreWindow();
+        }
+    }, [isInitialLoadDone]); // Trigger when splash is removed
+
 
     const setCssVariables = (color: string) => {
         const palette = generatePalette(color);
