@@ -88,7 +88,7 @@ Pour l'installer correctement :
 
 1. Téléchargez le fichier `.dmg` depuis les [Releases](https://github.com/thefrcrazy/Dmx-Money/releases).
 
-2. Ouvrez le `.dmg` et faites glisser **DmxMoney 2025** dans votre dossier **Applications**.
+2. Ouvrez le `.dmg` et faites glisser **DmxMoney** dans votre dossier **Applications**.
 
 3. Ouvrez votre **Terminal** (via Spotlight ou Dossier Utilitaires).
 
@@ -96,7 +96,7 @@ Pour l'installer correctement :
 
    ```bash
 
-   xattr -cr "/Applications/DmxMoney 2025.app"
+   xattr -cr "/Applications/DmxMoney.app"
 
    ```
 
