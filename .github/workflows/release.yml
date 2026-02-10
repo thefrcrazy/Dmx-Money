@@ -34,7 +34,7 @@ jobs:
             args: '--target aarch64-apple-darwin'
             arch: 'aarch64'
             os_name: 'darwin'
-          - platform: 'macos-13' # Intel Mac
+          - platform: 'macos-latest' # Intel Mac
             args: '--target x86_64-apple-darwin'
             arch: 'x64'
             os_name: 'darwin'
