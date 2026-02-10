@@ -86,25 +86,18 @@ jobs:
 
           echo "✅ Found: $ASSET_FILE"
 
-          echo "🔓 Decoding private key..."
-          # Debug: check length
-          echo "Key length: ${#SIGNING_KEY}"
-          
-          # Decode base64 to temporary file in /tmp to avoid dashes in path
-          # macOS paths in GitHub Actions often cause issues with CLI parsers
-          echo "$SIGNING_KEY" | base64 -d > /tmp/signer.key
-          
-          # Debug: inspect file content
-          echo "File size: $(wc -c < /tmp/signer.key | xargs)"
-          
-          SIG_FILE="$ASSET_FILE.sig"
           echo "✍️ Signing $ASSET_FILE..."
+          
+          # Debug: show key length to ensure env var is passed
+          echo "Key length: ${#SIGNING_KEY}"
 
-          # Use environment variables which is more robust than command line flags
-          export TAURI_SIGNING_PRIVATE_KEY="/tmp/signer.key"
+          # Use environment variables directly. 
+          # Tauri will handle the base64 decoding of the key automatically if it's not a file path.
+          # This avoids all filesystem and path parsing issues on macOS runners.
+          export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
           export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
           
-          # Run signer
+          # Run signer without -k argument
           bun tauri signer sign "$ASSET_FILE"
 
           if [ -f "$SIG_FILE" ]; then
