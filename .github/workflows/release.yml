@@ -86,12 +86,22 @@ jobs:
 
           echo "✅ Found: $ASSET_FILE"
 
-          # Écriture de la clé privée brute dans un fichier temporaire
-          printf '%s' "$SIGNING_KEY" > ./signer.key
-
+          echo "🔓 Decoding private key..."
+          # Debug: check length
+          echo "Key length: ${#SIGNING_KEY}"
+          
+          # Decode base64 to temporary file
+          echo "$SIGNING_KEY" | base64 -d > ./signer.key
+          
+          # Debug: inspect file content (first bytes only to avoid leaking secrets completely, but enough to see header)
+          echo "File size: $(stat -c%s ./signer.key || stat -f%z ./signer.key)"
+          echo "First 50 chars (hex):"
+          head -c 50 ./signer.key | xxd || echo "xxd not found"
+          
           SIG_FILE="$ASSET_FILE.sig"
           echo "✍️ Signing $ASSET_FILE..."
 
+          # Pipe password to tauri signer
           printf "%s\n" "$SIGNING_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
 
           if [ -f "$SIG_FILE" ]; then
@@ -100,6 +110,8 @@ jobs:
             rm ./signer.key
           else
             echo "❌ Signature failed."
+            # Debug: show if file was empty or corrupted
+            ls -l ./signer.key
             rm -f ./signer.key
             exit 1
           fi
