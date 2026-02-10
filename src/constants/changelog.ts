@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.6",
+        date: "2026-02-10",
+        title: "Identité visuelle rafraîchie",
+        changes: [
+            "Nouveau logo professionnel au format SVG haute définition",
+            "Mise à jour du splash screen avec le nouveau design",
+            "Icône plus nette et moderne sur toute l'interface"
+        ],
+        features: []
+    },
+    {
         version: "0.3.5",
         date: "2026-02-10",
         title: "Splash Screen optimisé",
