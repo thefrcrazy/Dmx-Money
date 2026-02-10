@@ -42,59 +42,62 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+    const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
     const isLoadedRef = useRef(false);
 
-        // Initial load
+            // Initial load
 
-        useEffect(() => {
+            useEffect(() => {
 
-            // Load settings from DB
+                // Load settings from DB
 
-            dbService.getSettings()
+                dbService.getSettings()
 
-                .then(savedSettings => {
+                    .then(savedSettings => {
 
-                    if (savedSettings) {
+                        if (savedSettings) {
 
-                        // Apply visual changes immediately
+                            // Apply visual changes immediately
 
-                        applyVisualSettings(savedSettings);
+                            applyVisualSettings(savedSettings);
 
-                        // Then update state
+                            // Then update state
 
-                        setSettings(prev => ({
+                            setSettings(prev => ({
 
-                            ...prev,
+                                ...prev,
 
-                            ...savedSettings
+                                ...savedSettings
 
-                        }));
+                            }));
 
-                    } else {
+                        } else {
 
-                        // First launch: save default settings
+                            // First launch: save default settings
 
-                        dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
+                            dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
 
-                    }
+                        }
 
-                    isLoadedRef.current = true;
+                        isLoadedRef.current = true;
 
-                })
+                        
 
-                .finally(() => {
+                        // Small artificial delay to ensure smooth transition and allow CSS vars to propagate
 
-                    // Show window only when theme is ready to avoid FOUC
+                        setTimeout(() => {
 
-                    // Small delay to ensure CSS variables are applied
+                            setIsInitialLoadDone(true);
 
-                    setTimeout(() => {
+                        }, 200);
 
-                        getCurrentWindow().show().catch(console.error);
+                    })
 
-                    }, 50);
+                    .catch(() => {
 
-                });
+                        setIsInitialLoadDone(true);
+
+                    });
 
     
 
@@ -392,7 +395,17 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 }
             }}
         >
-            {children}
+            {!isInitialLoadDone ? (
+                <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-black z-[9999]">
+                    <div className="mb-8">
+                        <img src="/vite.svg" alt="Logo" className="w-16 h-16" />
+                    </div>
+                    <div className="w-10 h-10 border-3 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin"></div>
+                    <div className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400 opacity-70">
+                        Chargement de votre environnement...
+                    </div>
+                </div>
+            ) : children}
         </SettingsContext.Provider>
     );
 };

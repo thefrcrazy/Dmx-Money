@@ -23,8 +23,7 @@ pub fn run() {
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
                 .inner_size(1320.0, 790.0)
-                .resizable(true)
-                .visible(false); // Start hidden to prevent FOUC
+                .resizable(true); // Show immediately to see the loader
 
             #[cfg(target_os = "macos")]
             {

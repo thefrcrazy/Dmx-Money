@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.3",
+        date: "2026-02-10",
+        title: "Nouvel écran de chargement",
+        changes: [
+            "Ajout d'un écran de chargement (splash screen) au démarrage",
+            "Initialisation instantanée de la fenêtre",
+            "Transition fluide entre le chargement et l'application"
+        ],
+        features: []
+    },
+    {
         version: "0.3.2",
         date: "2026-02-10",
         title: "Lancement fluide et instantané",
