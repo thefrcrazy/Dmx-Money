@@ -75,11 +75,13 @@ jobs:
           ./switch-tailwind.sh modern
         shell: bash
 
-      # Build sans release automatique
+      # Build sans release automatique mais avec les clés pour générer les bundles d'update
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           includeUpdaterJson: false
           args: ${{ matrix.args }}
@@ -93,28 +95,37 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           ARCH: ${{ matrix.arch }}
           OS_NAME: ${{ matrix.os_name }}
-          VERSION: ${{ github.ref_name }} # e.g. v0.1.5
+          VERSION: ${{ github.ref_name }} # e.g. v0.1.7
         run: |
           echo "🔍 Finding assets..."
           
           CLEAN_VERSION="${VERSION#v}"
           
-          # Recherche plus large
-          UPDATE_BUNDLE=$(find . -type f \( -name "*.app.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" -o -name "*.AppImage.tar.gz" \) ! -path "*/deps/*" ! -path "*/.git/*" | head -n 1)
+          # Recherche très large pour les bundles d'update
+          # Tauri v2 génère souvent : 
+          # Linux: .AppImage.tar.gz
+          # Windows: .nsis.zip ou .msi.zip
+          # macOS: .app.tar.gz
+          UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | grep -E "app\.tar\.gz|AppImage\.tar\.gz|nsis\.zip|msi\.zip" | head -n 1)
           
           if [ -z "$UPDATE_BUNDLE" ]; then
+            echo "⚠️ No standard update bundle found, searching for any tar.gz or zip..."
+            UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | head -n 1)
+          fi
+
+          if [ -z "$UPDATE_BUNDLE" ]; then
             echo "❌ No update bundle found!"
-            ls -R src-tauri/target/release/bundle || ls -R src-tauri/target
+            find src-tauri/target -maxdepth 10
             exit 1
           fi
           echo "📦 Found update bundle: $UPDATE_BUNDLE"
           
-          # Extraction extension
+          # Extraction extension propre
           FILENAME=$(basename "$UPDATE_BUNDLE")
           if [[ "$FILENAME" == *.app.tar.gz ]]; then EXT="app.tar.gz"
           elif [[ "$FILENAME" == *.AppImage.tar.gz ]]; then EXT="AppImage.tar.gz"
-          elif [[ "$FILENAME" == *.nsis.zip ]]; then EXT="nsis.zip"
-          elif [[ "$FILENAME" == *.msi.zip ]]; then EXT="msi.zip"
+          elif [[ "$FILENAME" == *.tar.gz ]]; then EXT="tar.gz"
+          elif [[ "$FILENAME" == *.zip ]]; then EXT="zip"
           else EXT="${FILENAME##*.}"
           fi
           
@@ -123,7 +134,7 @@ jobs:
           echo "🔄 Renaming bundle to $NEW_BUNDLE_NAME"
           cp "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
           
-          # Signature
+          # Signature (obligatoire pour l'updater même si déjà fait au build)
           echo "✍️ Signing $NEW_BUNDLE_NAME..."
           export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
           export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
@@ -139,11 +150,12 @@ jobs:
           echo "🚀 Uploading bundle and signature..."
           gh release upload "$VERSION" "./$NEW_BUNDLE_NAME" "$SIG_FILE" --clobber
           
-          # Upload Installeurs renommés
+          # Upload Installeurs
           echo "🔍 Searching for installers..."
-          find . -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" \) ! -path "*/deps/*" ! -path "*/.git/*" | while read -r INSTALLER; do
+          # On cherche .dmg, .exe, .msi, .AppImage, .deb, .rpm
+          find src-tauri/target/release/bundle -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" | while read -r INSTALLER; do
             INST_NAME=$(basename "$INSTALLER")
-            # Nom unique: DmxMoney_0.1.6_aarch64_darwin.dmg
+            # Nom unique pour éviter les conflits d'arch (ex: amd64 vs x86_64)
             NEW_INST_NAME="${INST_NAME%.*}_${ARCH}_${OS_NAME}.${INST_NAME##*.}"
             cp "$INSTALLER" "./$NEW_INST_NAME"
             echo "🚀 Uploading installer: $NEW_INST_NAME"
