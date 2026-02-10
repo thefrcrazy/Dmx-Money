@@ -115,7 +115,7 @@ pub struct Settings {
     #[serde(rename = "primaryColor")]
     pub primary_color: String,
     #[serde(rename = "displayStyle")]
-    pub display_style: String,
+    pub display_style: Option<String>,
     #[serde(rename = "windowPosition")]
     pub window_position: Option<WindowPosition>,
     #[serde(rename = "windowSize")]

@@ -447,7 +447,7 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
             Ok(Some(Settings {
                 theme: row.theme,
                 primary_color: row.primary_color,
-                display_style: row.display_style,
+                display_style: Some(row.display_style),
                 window_position,
                 window_size,
                 account_groups: row.account_groups,
@@ -479,6 +479,8 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
         (None, None)
     };
 
+    let display_style = settings.display_style.unwrap_or_else(|| "modern".to_string());
+
     sqlx::query(
         "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\")
          VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
@@ -500,7 +502,7 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
     )
     .bind(settings.theme)
     .bind(settings.primary_color)
-    .bind(settings.display_style)
+    .bind(display_style)
     .bind(pos_x)
     .bind(pos_y)
     .bind(size_w)

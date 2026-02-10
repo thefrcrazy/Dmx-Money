@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, Monitor, Download, Upload, RefreshCw, Sparkles, LayoutDashboard } from 'lucide-react';
+import { Moon, Sun, Monitor, Download, Upload, RefreshCw, Sparkles } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
@@ -17,7 +17,7 @@ import Card from '../components/ui/Card';
 import ReleaseNotesModal from '../components/ui/ReleaseNotesModal';
 
 const SettingsPage: React.FC = () => {
-    const { settings, updateTheme, updatePrimaryColor, updateDisplayStyle } = useSettings();
+    const { settings, updateTheme, updatePrimaryColor } = useSettings();
     const { addTransaction } = useBank();
     const { checkUpdate, isChecking, updateAvailable } = useUpdater();
     const [appVersion, setAppVersion] = useState('0.0.0');
@@ -226,29 +226,6 @@ const SettingsPage: React.FC = () => {
                                     }`}
                                     style={{ backgroundColor: color }}
                                 />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 block">Style d'affichage</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {[
-                                { id: 'modern', name: 'Moderne', icon: Sparkles, color: 'text-primary-500' },
-                                { id: 'legacy', name: 'Classique', icon: LayoutDashboard, color: 'text-gray-500' }
-                            ].map(s => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => updateDisplayStyle(s.id as any)}
-                                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                                        settings.displayStyle === s.id 
-                                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10' 
-                                        : 'border-gray-100 dark:border-neutral-700 hover:border-gray-200 dark:hover:border-gray-600'
-                                    }`}
-                                >
-                                    <s.icon className={`w-5 h-5 ${s.color}`} />
-                                    <span className="text-sm font-medium">{s.name}</span>
-                                </button>
                             ))}
                         </div>
                     </div>

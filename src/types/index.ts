@@ -93,7 +93,6 @@ export type Theme = 'light' | 'dark' | 'system';
 export interface Settings {
     theme: Theme;
     primaryColor: string;
-    displayStyle: 'modern' | 'legacy';
     windowPosition: { x: number; y: number } | null;
     windowSize: { width: number; height: number } | null;
     accountGroups?: Record<string, string>; // accountId -> groupName
@@ -109,7 +108,6 @@ export interface SettingsContextType {
     settings: Settings;
     updateTheme: (theme: Theme) => Promise<void>;
     updatePrimaryColor: (color: string) => Promise<void>;
-    updateDisplayStyle: (style: 'modern' | 'legacy') => Promise<void>;
     updateWindowPosition: (x: number, y: number) => Promise<void>;
     updateWindowSize: (width: number, height: number) => Promise<void>;
     updateAccountGroup: (accountId: string, groupName: string) => Promise<void>;

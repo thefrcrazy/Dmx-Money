@@ -12,6 +12,16 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.2.9",
+        date: "2026-02-10",
+        title: "Nettoyage des paramètres",
+        changes: [
+            "Suppression du sélecteur de style manuel (désormais entièrement automatique au build)",
+            "Optimisation de la structure des données de configuration"
+        ],
+        features: []
+    },
+    {
         version: "0.2.8",
         date: "2026-02-10",
         title: "Correction critique du crash des paramètres",
