@@ -73,8 +73,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MY_B64_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          MY_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           echo "🔍 Searching for update bundle..."
           ASSET_FILE=$(find . \( -name "*.app.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" -o -name "*.AppImage.tar.gz" \) ! -path "*/target/release/deps/*" | head -n 1)
@@ -86,13 +86,13 @@ jobs:
 
           echo "✅ Found: $ASSET_FILE"
 
-          echo "🔓 Decoding private key..."
-          echo "$MY_B64_KEY" | base64 -d > ./signer.key
+          # Écriture de la clé privée brute dans un fichier temporaire
+          printf '%s' "$SIGNING_KEY" > ./signer.key
 
           SIG_FILE="$ASSET_FILE.sig"
           echo "✍️ Signing $ASSET_FILE..."
 
-          printf "%s\n" "$MY_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
+          printf "%s\n" "$SIGNING_KEY_PASSWORD" | bun tauri signer sign -k ./signer.key "$ASSET_FILE"
 
           if [ -f "$SIG_FILE" ]; then
             echo "✅ Signature generated."
