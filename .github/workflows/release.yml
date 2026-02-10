@@ -101,21 +101,20 @@ jobs:
           
           CLEAN_VERSION="${VERSION#v}"
           
-          # Recherche très large pour les bundles d'update
-          # Tauri v2 génère souvent : 
-          # Linux: .AppImage.tar.gz
-          # Windows: .nsis.zip ou .msi.zip
-          # macOS: .app.tar.gz
-          UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | grep -E "app\.tar\.gz|AppImage\.tar\.gz|nsis\.zip|msi\.zip" | head -n 1)
+          # Recherche du bundle d'update (logique plus robuste sans pipe fail)
+          # On cherche d'abord les standards
+          UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) ! -path "*/deps/*" | head -n 1)
           
+          # Fallback si rien trouvé (ex: nommage différent)
           if [ -z "$UPDATE_BUNDLE" ]; then
-            echo "⚠️ No standard update bundle found, searching for any tar.gz or zip..."
-            UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | head -n 1)
+             echo "⚠️ Standard bundle not found, searching for generic archives..."
+             UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.tar.gz" -o -name "*.zip" \) ! -path "*/deps/*" | grep -v "source" | head -n 1)
           fi
 
           if [ -z "$UPDATE_BUNDLE" ]; then
             echo "❌ No update bundle found!"
-            find src-tauri/target -maxdepth 10
+            echo "📂 Debugging directory structure:"
+            find src-tauri/target -maxdepth 4 -not -path '*/deps*' || ls -R src-tauri/target
             exit 1
           fi
           echo "📦 Found update bundle: $UPDATE_BUNDLE"
@@ -124,9 +123,14 @@ jobs:
           FILENAME=$(basename "$UPDATE_BUNDLE")
           if [[ "$FILENAME" == *.app.tar.gz ]]; then EXT="app.tar.gz"
           elif [[ "$FILENAME" == *.AppImage.tar.gz ]]; then EXT="AppImage.tar.gz"
-          elif [[ "$FILENAME" == *.tar.gz ]]; then EXT="tar.gz"
-          elif [[ "$FILENAME" == *.zip ]]; then EXT="zip"
-          else EXT="${FILENAME##*.}"
+          elif [[ "$FILENAME" == *.nsis.zip ]]; then EXT="nsis.zip"
+          elif [[ "$FILENAME" == *.msi.zip ]]; then EXT="msi.zip"
+          else 
+            # Fallback extension simple
+            if [[ "$FILENAME" == *.tar.gz ]]; then EXT="tar.gz"
+            elif [[ "$FILENAME" == *.zip ]]; then EXT="zip"
+            else EXT="${FILENAME##*.}"
+            fi
           fi
           
           NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.${EXT}"
@@ -134,7 +138,7 @@ jobs:
           echo "🔄 Renaming bundle to $NEW_BUNDLE_NAME"
           cp "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
           
-          # Signature (obligatoire pour l'updater même si déjà fait au build)
+          # Signature
           echo "✍️ Signing $NEW_BUNDLE_NAME..."
           export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
           export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
@@ -152,10 +156,10 @@ jobs:
           
           # Upload Installeurs
           echo "🔍 Searching for installers..."
-          # On cherche .dmg, .exe, .msi, .AppImage, .deb, .rpm
-          find src-tauri/target/release/bundle -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" | while read -r INSTALLER; do
+          # Recherche récursive pour gérer les sous-dossiers spécifiques (x86_64-apple-darwin, etc.)
+          find src-tauri/target -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" ! -path "*/.git/*" | while read -r INSTALLER; do
             INST_NAME=$(basename "$INSTALLER")
-            # Nom unique pour éviter les conflits d'arch (ex: amd64 vs x86_64)
+            # Nom unique pour éviter les conflits d'arch
             NEW_INST_NAME="${INST_NAME%.*}_${ARCH}_${OS_NAME}.${INST_NAME##*.}"
             cp "$INSTALLER" "./$NEW_INST_NAME"
             echo "🚀 Uploading installer: $NEW_INST_NAME"
