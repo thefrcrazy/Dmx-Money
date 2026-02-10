@@ -97,33 +97,31 @@ jobs:
         run: |
           echo "🔍 Finding assets..."
           
-          # Nettoyage version pour noms de fichiers (v0.1.5 -> 0.1.5)
           CLEAN_VERSION="${VERSION#v}"
           
-          # Identifier le bundle de mise à jour (.tar.gz ou .zip)
-          # On exclut le dossier deps/ pour ne pas prendre des intermédiaires
-          UPDATE_BUNDLE=$(find src-tauri/target -type f \( -name "*.app.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" -o -name "*.AppImage.tar.gz" \) ! -path "*/deps/*" | head -n 1)
+          # Recherche plus large
+          UPDATE_BUNDLE=$(find . -type f \( -name "*.app.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" -o -name "*.AppImage.tar.gz" \) ! -path "*/deps/*" ! -path "*/.git/*" | head -n 1)
           
           if [ -z "$UPDATE_BUNDLE" ]; then
             echo "❌ No update bundle found!"
+            ls -R src-tauri/target/release/bundle || ls -R src-tauri/target
             exit 1
           fi
           echo "📦 Found update bundle: $UPDATE_BUNDLE"
           
-          # Renommage pour unicité (surtout macOS)
-          # Ex: DmxMoney_0.1.5_aarch64.app.tar.gz
-          EXT="${UPDATE_BUNDLE#*.}"
-          if [[ "$UPDATE_BUNDLE" == *.tar.gz ]]; then EXT="tar.gz"; fi
-          # macOS .app.tar.gz specific handling
-          if [[ "$UPDATE_BUNDLE" == *.app.tar.gz ]]; then EXT="app.tar.gz"; fi
+          # Extraction extension
+          FILENAME=$(basename "$UPDATE_BUNDLE")
+          if [[ "$FILENAME" == *.app.tar.gz ]]; then EXT="app.tar.gz"
+          elif [[ "$FILENAME" == *.AppImage.tar.gz ]]; then EXT="AppImage.tar.gz"
+          elif [[ "$FILENAME" == *.nsis.zip ]]; then EXT="nsis.zip"
+          elif [[ "$FILENAME" == *.msi.zip ]]; then EXT="msi.zip"
+          else EXT="${FILENAME##*.}"
+          fi
           
-          # Nom final désiré
           NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.${EXT}"
-          # Pour Windows/Linux, le nom est peut-être déjà bon ou différent, mais on standardise ici pour éviter les conflits
-          # Sauf que l'updater s'attend à ce que la signature corresponde au fichier.
           
-          echo "🔄 Renaming to $NEW_BUNDLE_NAME"
-          mv "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
+          echo "🔄 Renaming bundle to $NEW_BUNDLE_NAME"
+          cp "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
           
           # Signature
           echo "✍️ Signing $NEW_BUNDLE_NAME..."
@@ -138,19 +136,18 @@ jobs:
           fi
           
           # Upload Bundle + Signature
-          echo "roz Uploading bundle and signature..."
+          echo "🚀 Uploading bundle and signature..."
           gh release upload "$VERSION" "./$NEW_BUNDLE_NAME" "$SIG_FILE" --clobber
           
-          # Upload Installeurs (.dmg, .exe, .AppImage, .deb)
-          # On cherche tout ce qui est pertinent dans le dossier bundle
-          # macOS: .dmg
-          # Windows: .msi, .exe
-          # Linux: .AppImage, .deb
-          
+          # Upload Installeurs renommés
           echo "🔍 Searching for installers..."
-          find src-tauri/target -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" \) ! -path "*/deps/*" | while read -r INSTALLER; do
-            echo "🚀 Uploading installer: $INSTALLER"
-            gh release upload "$VERSION" "$INSTALLER" --clobber
+          find . -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" \) ! -path "*/deps/*" ! -path "*/.git/*" | while read -r INSTALLER; do
+            INST_NAME=$(basename "$INSTALLER")
+            # Nom unique: DmxMoney_0.1.6_aarch64_darwin.dmg
+            NEW_INST_NAME="${INST_NAME%.*}_${ARCH}_${OS_NAME}.${INST_NAME##*.}"
+            cp "$INSTALLER" "./$NEW_INST_NAME"
+            echo "🚀 Uploading installer: $NEW_INST_NAME"
+            gh release upload "$VERSION" "./$NEW_INST_NAME" --clobber
           done
 
   generate-updater-json:
