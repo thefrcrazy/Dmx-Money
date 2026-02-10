@@ -22,8 +22,9 @@ pub fn run() {
             // Manual Window Creation for full control (especially traffic lights)
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
-                .inner_size(1320.0, 790.0)
-                .resizable(true); // Show immediately to see the loader
+                .inner_size(500.0, 500.0) // 1:1 ratio for splash screen
+                .resizable(false) // Fixed size during splash
+                .center(); // Center on screen
 
             #[cfg(target_os = "macos")]
             {

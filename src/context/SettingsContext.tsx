@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { getCurrentWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
+import { getCurrentWindow, PhysicalPosition, PhysicalSize, LogicalSize } from '@tauri-apps/api/window';
 import { Theme, Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
 import { generatePalette, formatRgb, hexToRgb as parseHexToRgb } from '../utils/colors';
@@ -171,6 +171,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const applyVisualSettings = (newSettings: Settings) => {
+        const appWindow = getCurrentWindow();
+        
+        // 0. Re-enable resizing (was disabled for splash screen)
+        appWindow.setResizable(true).catch(() => {});
+
         // 1. Theme
         let isDark = false;
         if (newSettings.theme === 'dark') {
@@ -195,17 +200,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateWindowIcon(isDark);
 
         // 4. Window Size/Pos (Async, non-blocking)
-        if (newSettings.windowSize || newSettings.windowPosition) {
-            const appWindow = getCurrentWindow();
-            setTimeout(() => {
-                if (newSettings.windowSize) {
-                    appWindow.setSize(new PhysicalSize(newSettings.windowSize.width, newSettings.windowSize.height)).catch(() => {});
-                }
-                if (newSettings.windowPosition) {
-                    appWindow.setPosition(new PhysicalPosition(newSettings.windowPosition.x, newSettings.windowPosition.y)).catch(() => {});
-                }
-            }, 50);
-        }
+        // Transition from 500x500 splash to app size
+        setTimeout(() => {
+            if (newSettings.windowSize) {
+                appWindow.setSize(new PhysicalSize(newSettings.windowSize.width, newSettings.windowSize.height)).catch(() => {});
+            } else {
+                // Default size if no settings saved
+                appWindow.setSize(new LogicalSize(1320, 790)).catch(() => {});
+                appWindow.center().catch(() => {});
+            }
+
+            if (newSettings.windowPosition) {
+                appWindow.setPosition(new PhysicalPosition(newSettings.windowPosition.x, newSettings.windowPosition.y)).catch(() => {});
+            }
+        }, 50);
     };
 
     const setCssVariables = (color: string) => {

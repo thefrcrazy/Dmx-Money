@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.5",
+        date: "2026-02-10",
+        title: "Splash Screen optimisé",
+        changes: [
+            "Le splash screen s'affiche désormais dans une fenêtre carrée centrée",
+            "Transition fluide de la fenêtre splash vers la taille normale de l'application",
+            "Amélioration visuelle du chargement initial"
+        ],
+        features: []
+    },
+    {
         version: "0.3.4",
         date: "2026-02-10",
         title: "Mises à jour intelligentes",
