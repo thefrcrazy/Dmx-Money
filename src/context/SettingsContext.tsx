@@ -173,8 +173,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const applyVisualSettings = (newSettings: Settings) => {
         const appWindow = getCurrentWindow();
         
-        // 0. Re-enable resizing (was disabled for splash screen)
+        // 0. Re-enable resizing and decorations (was disabled for splash screen)
         appWindow.setResizable(true).catch(() => {});
+        appWindow.setDecorations(true).catch(() => {});
+        appWindow.setShadow(true).catch(() => {});
 
         // 1. Theme
         let isDark = false;

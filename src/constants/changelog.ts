@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.3.7",
+        date: "2026-02-10",
+        title: "Splash Screen Perfectionné",
+        changes: [
+            "Le splash screen est désormais un carré parfait sans bordures (borderless)",
+            "Ajout de coins arrondis pour un aspect plus moderne au démarrage",
+            "Transition améliorée vers l'interface principale"
+        ],
+        features: []
+    },
+    {
         version: "0.3.6",
         date: "2026-02-10",
         title: "Identité visuelle rafraîchie",
