@@ -12,6 +12,24 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.2.7",
+        date: "2026-02-10",
+        title: "Correctif de persistence et d'affichage",
+        changes: [
+            "Correction de la perte des paramètres utilisateur lors des mises à jour",
+            "Synchronisation complète des données entre l'interface et la base de données",
+            "Ajout d'un sélecteur de style d'affichage (Moderne / Classique) dans les paramètres",
+            "Amélioration de la stabilité de la sauvegarde des préférences"
+        ],
+        features: [
+            {
+                title: "Paramètres sauvegardés",
+                description: "Vos préférences de thème, couleurs et organisation des comptes sont maintenant conservées durablement.",
+                icon: "Settings"
+            }
+        ]
+    },
+    {
         version: "0.2.4",
         date: "2026-02-10",
         title: "Amélioration de l'expérience utilisateur",
