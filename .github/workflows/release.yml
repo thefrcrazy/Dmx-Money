@@ -30,11 +30,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
+          - platform: 'macos-14' # Apple Silicon (M1/M2/M3)
             args: '--target aarch64-apple-darwin'
             arch: 'aarch64'
             os_name: 'darwin'
-          - platform: 'macos-latest'
+          - platform: 'macos-13' # Intel Mac
             args: '--target x86_64-apple-darwin'
             arch: 'x64'
             os_name: 'darwin'
