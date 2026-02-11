@@ -12,6 +12,16 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.3",
+        date: "2026-02-11",
+        title: "Finalisation des icônes",
+        changes: [
+            "Mise à jour complète de tous les formats d'icônes système (icns, ico, png)",
+            "L'icône Gold & Silver est désormais visible dans le Dock et la barre des tâches"
+        ],
+        features: []
+    },
+    {
         version: "0.4.2",
         date: "2026-02-11",
         title: "Design Premium & Robustesse",
