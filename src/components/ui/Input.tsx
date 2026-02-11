@@ -1,4 +1,5 @@
 import React from 'react';
+import { Calendar } from 'lucide-react';
 
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
     label?: string;
@@ -17,6 +18,7 @@ const Input: React.FC<InputProps> = ({
     containerClassName = '',
     disabled,
     id,
+    type,
     ...props
 }) => {
     const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
@@ -27,8 +29,11 @@ const Input: React.FC<InputProps> = ({
         lg: "h-11 text-base",
     };
 
-    const paddingLeft = Icon ? '!pl-10' : '!pl-3';
-    const paddingRight = rightElement ? '!pr-8' : '!pr-3';
+    // Auto-add calendar icon for date inputs if no icon provided
+    const EffectiveIcon = Icon || (type === 'date' ? Calendar : undefined);
+
+    const paddingLeft = EffectiveIcon ? '!pl-10' : '!pl-3';
+    const paddingRight = (rightElement || type === 'date') ? '!pr-10' : '!pr-3';
 
     return (
         <div className={`space-y-1.5 ${containerClassName}`}>
@@ -38,15 +43,21 @@ const Input: React.FC<InputProps> = ({
                 </label>
             )}
             <div className="relative app-input-container">
-                {Icon && (
-                    <Icon className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 pointer-events-none app-input-icon`} />
+                {EffectiveIcon && (
+                    <EffectiveIcon className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 pointer-events-none app-input-icon`} />
                 )}
                 <input
                     id={inputId}
+                    type={type}
                     className={`app-input w-full ${sizes[size]} ${paddingLeft} ${paddingRight} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={disabled}
                     {...props}
                 />
+                {type === 'date' && !rightElement && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none opacity-50">
+                        <Calendar className="w-4 h-4" />
+                    </div>
+                )}
                 {rightElement && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none app-input-right-element">
                         {rightElement}

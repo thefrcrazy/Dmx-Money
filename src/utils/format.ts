@@ -17,7 +17,7 @@ export const formatCurrency = (amount: number, minimumFractionDigits: number = 2
     }).format(amount);
 };
 
-export const formatDate = (date: string | Date, formatStr: string = 'dd MMM yyyy'): string => {
+export const formatDate = (date: string | Date, formatStr: string = 'dd/MM/yyyy'): string => {
     try {
         return format(new Date(date), formatStr, { locale: getLocale() });
     } catch (e) {

@@ -43,7 +43,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const isRestoringRef = useRef(false);
     const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
 
-    const [isSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const [isSystemDark] = useState(() => {
+        try {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch (e) {
+            return false;
+        }
+    });
 
     useEffect(() => {
         if (isSystemDark && !isLoadedRef.current) {
@@ -66,22 +72,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (palette) {
             document.documentElement.style.setProperty('--color-primary', color);
             document.documentElement.style.setProperty('--color-primary-custom', color);
-            const baseRgbStr = formatRgb(palette[500]);
-            const baseRgbComma = baseRgbStr.replace(/ /g, ', ');
-            document.documentElement.style.setProperty('--color-primary-rgb', baseRgbStr);
-            document.documentElement.style.setProperty('--color-primary-rgb-custom', baseRgbComma);
+            
+            // Standard space-separated format for all Tailwind versions
+            const rgbStr = formatRgb(palette[500]);
+            
+            document.documentElement.style.setProperty('--color-primary-rgb', rgbStr);
+            document.documentElement.style.setProperty('--color-primary-rgb-custom', rgbStr);
+
             Object.entries(palette).forEach(([shade, rgb]) => {
-                const rgbStr = formatRgb(rgb);
-                document.documentElement.style.setProperty(`--color-primary-${shade}-rgb`, rgbStr);
+                document.documentElement.style.setProperty(`--color-primary-${shade}-rgb`, formatRgb(rgb));
             });
         }
     };
 
     const removeCssVariables = () => {
-        document.documentElement.style.removeProperty('--color-primary');
-        document.documentElement.style.removeProperty('--color-primary-custom');
-        document.documentElement.style.removeProperty('--color-primary-rgb');
-        document.documentElement.style.removeProperty('--color-primary-rgb-custom');
+        const props = ['--color-primary', '--color-primary-custom', '--color-primary-rgb', '--color-primary-rgb-custom'];
+        props.forEach(p => document.documentElement.style.removeProperty(p));
         [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].forEach(shade => {
             document.documentElement.style.removeProperty(`--color-primary-${shade}-rgb`);
         });
@@ -99,6 +105,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.classList.toggle('dark', isDark);
         }
+
         if (s.primaryColor && s.primaryColor !== 'default') {
             setCssVariables(s.primaryColor);
         } else {
@@ -110,25 +117,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const restoreWindow = async (currentSettings: Settings) => {
         if (isRestoringRef.current) return;
         isRestoringRef.current = true;
-        
-        console.log('Restoring window with settings:', currentSettings.windowSize, currentSettings.windowPosition);
-        
         try {
             const appWindow = getCurrentWindow();
-            
-            // 1. Setup Window State
             await appWindow.setResizable(true);
             await appWindow.setDecorations(true);
             await appWindow.setShadow(true);
             
-            // 2. Restore Size
             if (currentSettings.windowSize && currentSettings.windowSize.width > 500) {
                 await appWindow.setSize(new PhysicalSize(currentSettings.windowSize.width, currentSettings.windowSize.height));
             } else {
                 await appWindow.setSize(new LogicalSize(1320, 790));
             }
             
-            // 3. Restore Position
             if (currentSettings.windowPosition) {
                 await appWindow.setPosition(new PhysicalPosition(currentSettings.windowPosition.x, currentSettings.windowPosition.y));
             } else {
@@ -143,7 +143,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     };
 
-    // Initial load: Only apply visuals, DO NOT move window (keep 400x400 centered splash)
     useEffect(() => {
         dbService.getSettings()
             .then(savedSettings => {
@@ -151,8 +150,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 applyVisualSettings(initial);
                 setSettings(initial);
                 isLoadedRef.current = true;
-                
-                // We DON'T call restoreWindow here to keep the splash screen centered
                 
                 setTimeout(() => {
                     setIsTransitioning(true);
@@ -166,13 +163,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             });
     }, []);
 
-    // Restoration ONLY when loader is gone
     useEffect(() => {
         if (isInitialLoadDone && isLoadedRef.current) {
-            // Wait for transition to be fully over
             setTimeout(() => {
                 restoreWindow(settingsRef.current);
-            }, 200);
+            }, 500);
         }
     }, [isInitialLoadDone]);
 
@@ -209,8 +204,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 updateWindowIcon(e.matches);
             }
         };
-        mq.addEventListener('change', handler);
-        return () => mq.removeEventListener('change', handler);
+        try {
+            mq.addEventListener('change', handler);
+            return () => mq.removeEventListener('change', handler);
+        } catch (e) {
+            // Fallback for very old Safari
+            mq.addListener(handler);
+            return () => mq.removeListener(handler);
+        }
     }, []);
 
     const savePositionTimeoutRef = useRef<any>(null);
@@ -337,7 +338,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 {children}
             </div>
             {!isInitialLoadDone && (
-                <div className={`fixed inset-0 flex flex-col items-center justify-center z-[9999] transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100'} ${isSystemDark ? 'bg-black' : 'bg-white'} dark:bg-black`}>
+                <div className={`fixed inset-0 w-full h-full flex flex-col items-center justify-center z-[9999] transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100'} ${isSystemDark ? 'bg-black' : 'bg-white'} dark:bg-black`}>
                     <div className="flex flex-col items-center justify-center space-y-12">
                         <img src="/logo.svg" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
                         <div className="w-10 h-10 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />

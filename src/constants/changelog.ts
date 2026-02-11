@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.5.3",
+        date: "2026-02-11",
+        title: "Correction Thème & Calendrier",
+        changes: [
+            "Correction du mode sombre et des couleurs personnalisées en mode Legacy",
+            "Amélioration de la saisie des dates sur les anciens systèmes (macOS Catalina)",
+            "Correction du centrage du logo sur l'écran de chargement",
+            "Optimisation de la stabilité des variables CSS pour toutes les versions de Tailwind"
+        ],
+        features: []
+    },
+    {
         version: "0.5.2",
         date: "2026-02-11",
         title: "Compatibilité Intel & Tailwind Fix",
@@ -297,4 +309,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.5.2";
+export const LATEST_VERSION = "0.5.3";

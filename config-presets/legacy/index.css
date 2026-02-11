@@ -59,7 +59,7 @@
    ========================================= */
 :root {
     --color-primary: #007AFF;
-    --color-primary-rgb: 0, 122, 255;
+    --color-primary-rgb: 0 122 255;
     --color-bg-primary: #FFFFFF;
     --color-bg-secondary: #F5F5F7;
     --color-text-primary: #000000;
@@ -77,10 +77,10 @@
     --card-radius: 12px;
 }
 
-:root.dark {
+.dark {
     color-scheme: dark;
     --color-primary: #3b82f6;
-    --color-primary-rgb: 59, 130, 246;
+    --color-primary-rgb: 59 130 246;
     --color-bg-primary: #000000;
     --color-bg-secondary: #000000;
     --color-text-primary: #ffffff;
@@ -102,12 +102,6 @@
         font-feature-settings: "tnum";
         font-variant-numeric: tabular-nums;
     }
-}
-
-/* Custom View Transitions animation duration */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.15s;
 }
 
 @layer components {
@@ -202,4 +196,19 @@
 
     [data-tauri-drag-region] { -webkit-app-region: drag; }
     button, a, input, [role="button"] { -webkit-app-region: no-drag; }
+    
+    /* Chrome/Safari fix for date input on older WebKit */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        display: block;
+        background: transparent;
+        bottom: 0;
+        color: transparent;
+        cursor: pointer;
+        height: auto;
+        left: 0;
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: auto;
+    }
 }

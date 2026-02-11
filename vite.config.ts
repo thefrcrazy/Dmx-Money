@@ -9,7 +9,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     legacy({
-      // Catalina (Safari 13) support requires more aggressive transpilation
       targets: ['safari >= 13', 'ios >= 13', 'chrome >= 71', 'edge >= 79', 'firefox >= 67', 'not IE 11'],
       additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
       polyfills: [
@@ -19,17 +18,15 @@ export default defineConfig({
         'es.object.from-entries',
         'es.symbol.description'
       ],
-      modernPolyfills: true // Include polyfills for modern browsers too to be safe
+      modernPolyfills: true
     })
   ],
   build: {
-    // Explicitly target ES2015 for maximum compatibility on older systems
     target: 'es2015',
     minify: 'terser',
     terserOptions: {
-      safari10: true, // Fixes specific Safari bugs
+      safari10: true,
     },
-    // Ensure that build.cssTarget matches our compatibility goals
     cssTarget: 'safari13'
   }
 })
