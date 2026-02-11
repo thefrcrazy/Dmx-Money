@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { Calendar } from 'lucide-react';
-import flatpickr from 'flatpickr';
-import { French } from 'flatpickr/dist/l10n/fr.js';
+import React, { useState, useRef, useEffect } from 'react';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import Calendar from './Calendar';
+import { format, parseISO, isValid } from 'date-fns';
 
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
     label?: string;
@@ -21,11 +21,13 @@ const Input: React.FC<InputProps> = ({
     disabled,
     id,
     type,
+    value,
+    onChange,
     ...props
 }) => {
     const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const fpRef = useRef<any>(null);
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const sizes = {
         sm: "h-8 text-xs",
@@ -33,42 +35,42 @@ const Input: React.FC<InputProps> = ({
         lg: "h-11 text-base",
     };
 
-    const EffectiveIcon = Icon || (type === 'date' ? Calendar : undefined);
+    const EffectiveIcon = Icon || (type === 'date' ? CalendarIcon : undefined);
     const paddingLeft = EffectiveIcon ? '!pl-10' : '!pl-3';
     const paddingRight = (rightElement || type === 'date') ? '!pr-10' : '!pr-3';
 
-    // Initialize flatpickr for date inputs
+    // Handle clicks outside to close calendar
     useEffect(() => {
-        if (type === 'date' && inputRef.current && !disabled) {
-            // Check if native date picker is supported or if we want to force flatpickr for legacy
-            // On older WebKit (Safari < 14.1), type="date" fallback to text, so flatpickr is perfect.
-            fpRef.current = flatpickr(inputRef.current, {
-                locale: French,
-                dateFormat: 'Y-m-d', // Internal value stays standard
-                altInput: true,      // Show user-friendly format
-                altFormat: 'd/m/Y',  // French format JJ/MM/AAAA
-                allowInput: true,
-                disableMobile: false,
-                static: false,       // Avoid being cut off by containers with overflow:hidden
-                onOpen: (selectedDates, dateStr, instance) => {
-                    // Force dark theme if needed
-                    const isDark = document.documentElement.classList.contains('dark');
-                    if (instance.calendarContainer) {
-                        instance.calendarContainer.classList.toggle('dark', isDark);
-                    }
-                }
-            });
-        }
-
-        return () => {
-            if (fpRef.current) {
-                fpRef.current.destroy();
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsCalendarOpen(false);
             }
         };
-    }, [type, disabled]);
+        if (isCalendarOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isCalendarOpen]);
+
+    const handleDateSelect = (date: Date) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (onChange) {
+            const event = {
+                target: { value: dateStr }
+            } as React.ChangeEvent<HTMLInputElement>;
+            onChange(event);
+        }
+        setIsCalendarOpen(false);
+    };
+
+    const getDisplayDate = () => {
+        if (type !== 'date' || !value) return value;
+        const date = parseISO(value as string);
+        return isValid(date) ? format(date, 'dd/MM/yyyy') : value;
+    };
 
     return (
-        <div className={`space-y-1.5 ${containerClassName}`}>
+        <div className={`space-y-1.5 ${containerClassName}`} ref={containerRef}>
             {label && (
                 <label htmlFor={inputId} className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">
                     {label}
@@ -81,16 +83,30 @@ const Input: React.FC<InputProps> = ({
                     />
                 )}
                 <input
-                    ref={inputRef}
                     id={inputId}
-                    type={type === 'date' ? 'text' : type} // Let flatpickr handle the UI
-                    className={`app-input w-full ${sizes[size]} ${paddingLeft} ${paddingRight} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    type={type === 'date' ? 'text' : type}
+                    className={`app-input w-full ${sizes[size]} ${paddingLeft} ${paddingRight} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${type === 'date' ? 'cursor-pointer' : ''}`}
                     disabled={disabled}
+                    value={type === 'date' ? getDisplayDate() : value}
+                    onChange={type === 'date' ? undefined : onChange}
+                    onClick={() => type === 'date' && !disabled && setIsCalendarOpen(!isCalendarOpen)}
+                    readOnly={type === 'date'}
                     {...props}
                 />
                 {rightElement && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none app-input-right-element z-10">
                         {rightElement}
+                    </div>
+                )}
+
+                {/* Custom Calendar Popover */}
+                {type === 'date' && isCalendarOpen && !disabled && (
+                    <div className="absolute top-full left-0 mt-2 z-[100]">
+                        <Calendar 
+                            selectedDate={value ? parseISO(value as string) : new Date()} 
+                            onDateSelect={handleDateSelect}
+                            onClose={() => setIsCalendarOpen(false)}
+                        />
                     </div>
                 )}
             </div>

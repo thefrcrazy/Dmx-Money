@@ -2,59 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Flatpickr for Legacy support */
-@import "flatpickr/dist/flatpickr.min.css";
-
-/* Custom Flatpickr Dark Mode Support */
-.flatpickr-calendar.dark {
-    background: #121212 !important;
-    border: 1px solid #262626 !important;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
-    color: #fff !important;
-}
-
-.flatpickr-calendar.dark .flatpickr-day {
-    color: rgba(255, 255, 255, 0.9) !important;
-}
-
-.flatpickr-calendar.dark .flatpickr-day.nextMonthDay,
-.flatpickr-calendar.dark .flatpickr-day.prevMonthDay {
-    color: rgba(255, 255, 255, 0.3) !important;
-}
-
-.flatpickr-calendar.dark .flatpickr-day:hover {
-    background: #262626 !important;
-}
-
-.flatpickr-calendar.dark .flatpickr-day.selected {
-    background: var(--color-primary) !important;
-    border-color: var(--color-primary) !important;
-    color: #fff !important;
-}
-
-.flatpickr-calendar.dark .flatpickr-months .flatpickr-month,
-.flatpickr-calendar.dark .flatpickr-months .flatpickr-prev-month,
-.flatpickr-calendar.dark .flatpickr-months .flatpickr-next-month {
-    color: #fff !important;
-    fill: #fff !important;
-}
-
-.flatpickr-calendar.dark .flatpickr-current-month .flatpickr-monthDropdown-months {
-    background: #121212 !important;
-}
-
-.flatpickr-calendar.dark span.flatpickr-weekday {
-    color: rgba(255, 255, 255, 0.5) !important;
-}
-
-.flatpickr-calendar.dark .numInputWrapper span.arrowUp:after {
-    border-bottom-color: #fff !important;
-}
-
-.flatpickr-calendar.dark .numInputWrapper span.arrowDown:after {
-    border-top-color: #fff !important;
-}
-
 /* =========================================
    PRIMARY COLOR PALETTE WITH RGB (for opacity modifiers)
    ========================================= */
@@ -115,6 +62,8 @@
     --color-primary-rgb: 0 122 255;
     --color-bg-primary: #FFFFFF;
     --color-bg-secondary: #F5F5F7;
+    --color-bg-tertiary: #F9FAFB;
+    --color-bg-card: #FFFFFF;
     --color-text-primary: #000000;
     --color-text-secondary: #86868B;
     --color-border: rgba(0, 0, 0, 0.05);
@@ -136,6 +85,8 @@
     --color-primary-rgb: 59 130 246;
     --color-bg-primary: #000000;
     --color-bg-secondary: #000000;
+    --color-bg-tertiary: #000000;
+    --color-bg-card: #121212;
     --color-text-primary: #ffffff;
     --color-text-secondary: #a1a1aa;
     --color-border: rgba(255, 255, 255, 0.1);
@@ -159,15 +110,10 @@
 
 @layer components {
     .app-card {
-        background: var(--color-bg-primary);
+        background: var(--color-bg-card);
         border: 1px solid var(--color-border);
         border-radius: var(--card-radius);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    }
-
-    .dark .app-card {
-        background: #121212;
-        border: 1px solid var(--color-border);
     }
 
     .app-button {
@@ -182,29 +128,19 @@
         padding: 0.5rem;
         border-radius: 8px;
         border: 1px solid var(--color-border);
-        background: var(--color-bg-primary);
+        background: var(--color-bg-card);
         color: var(--color-text-primary);
     }
 
-    .dark .app-input {
-        background: #121212;
-        border: 1px solid var(--color-border);
-    }
-
     .app-selector-bg {
-        background-color: var(--color-bg-primary) !important;
+        background-color: var(--color-bg-card) !important;
         border: 1px solid var(--color-border);
         border-radius: var(--card-radius);
         overflow: hidden;
     }
 
-    .dark .app-selector-bg {
-        background-color: #121212 !important;
-        border: 1px solid var(--color-border);
-    }
-
     .dark .select-header {
-        background-color: #121212 !important;
+        background-color: var(--color-bg-card) !important;
     }
 
     .app-icon-button {

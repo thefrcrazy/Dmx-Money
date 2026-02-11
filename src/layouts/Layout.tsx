@@ -52,11 +52,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
     ];
 
     return (
-        <div className="flex h-screen w-screen text-gray-900 dark:text-gray-100 font-sans overflow-hidden bg-white dark:bg-black">
+        <div className="flex h-screen w-screen text-gray-900 dark:text-gray-100 font-sans overflow-hidden bg-[var(--color-bg-primary)] dark:bg-[var(--color-bg-primary)]">
             <TitleBar />
             
             {/* Sidebar */}
-            <aside className={`flex-shrink-0 flex flex-col bg-[#F5F5F7] dark:bg-black border-r border-black/[0.05] dark:border-white/10 z-20 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-56'}`}>
+            <aside className={`flex-shrink-0 flex flex-col bg-[var(--color-bg-secondary)] dark:bg-[var(--color-bg-secondary)] border-r border-black/[0.05] dark:border-white/10 z-20 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-56'}`}>
                 <div className="h-12 w-full flex-shrink-0 flex items-center justify-between px-4" data-tauri-drag-region>
                     <div className="mt-2" />
                     <button 
@@ -144,8 +144,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
             </aside>
 
             {/* Main Area */}
-            <div className="flex-1 flex flex-col min-w-0 bg-[#F9FAFB] dark:bg-black overflow-hidden">
-                <header className="h-16 flex-shrink-0 flex items-center justify-between px-8 bg-[#F9FAFB] dark:bg-black z-30 border-b border-black/[0.05] dark:border-white/10" data-tauri-drag-region>
+            <div className="flex-1 flex flex-col min-w-0 bg-[var(--color-bg-tertiary)] dark:bg-[var(--color-bg-tertiary)] overflow-hidden">
+                <header className="h-16 flex-shrink-0 flex items-center justify-between px-8 bg-[var(--color-bg-tertiary)] dark:bg-[var(--color-bg-tertiary)] z-30 border-b border-black/[0.05] dark:border-white/10" data-tauri-drag-region>
                     <div className="flex items-center gap-4">
                         <span className="text-xs font-medium text-gray-500 hidden sm:inline">Compte :</span>
                         <MultiSelect
