@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.1",
+        date: "2026-02-11",
+        title: "Optimisation Turbo du Build",
+        changes: [
+            "Implémentation de sccache pour une compilation Rust ultra-rapide",
+            "Amélioration des clés de cache pour éviter les recompilations inutiles",
+            "Optimisation de la gestion des dépendances Bun"
+        ],
+        features: []
+    },
+    {
         version: "0.4.0",
         date: "2026-02-11",
         title: "Correctif de l'interface",

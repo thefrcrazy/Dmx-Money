@@ -48,6 +48,9 @@ jobs:
             os_name: 'linux'
 
     runs-on: ${{ matrix.platform }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
 
@@ -61,10 +64,15 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: 'src-tauri -> target'
+          # Add a prefix to avoid collisions between platforms
+          prefix-key: "v1-rust"
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -82,9 +90,9 @@ jobs:
           path: |
             **/node_modules
             ${{ steps.bun-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          key: ${{ runner.os }}-v1-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-v1-bun-
 
       - name: Install Frontend dependencies
         run: bun install --frozen-lockfile
