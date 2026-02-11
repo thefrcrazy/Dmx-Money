@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.5.2",
+        date: "2026-02-11",
+        title: "Compatibilité Intel & Tailwind Fix",
+        changes: [
+            "Correction majeure du build Intel (x64) pour macOS Catalina",
+            "Force l'utilisation du mode Legacy pour les anciens systèmes Mac",
+            "Synchronisation des configurations Vite pour éviter les écrasements de paramètres",
+            "Mise à jour du pipeline de déploiement automatique"
+        ],
+        features: []
+    },
+    {
         version: "0.5.1",
         date: "2026-02-11",
         title: "Compatibilité Catalina & Optimisation",
@@ -285,4 +297,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.5.1";
+export const LATEST_VERSION = "0.5.2";

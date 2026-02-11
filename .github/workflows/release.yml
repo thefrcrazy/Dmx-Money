@@ -69,10 +69,14 @@ jobs:
       - name: Install Frontend dependencies
         run: bun install --frozen-lockfile
 
-      - name: Switch to Modern Mode
+      - name: Switch Tailwind Mode
         run: |
           chmod +x ./switch-tailwind.sh
-          ./switch-tailwind.sh modern
+          if [ "${{ matrix.arch }}" == "x64" ] && [ "${{ matrix.os_name }}" == "darwin" ]; then
+            ./switch-tailwind.sh legacy
+          else
+            ./switch-tailwind.sh modern
+          fi
         shell: bash
 
       # Build sans release automatique mais avec les clés pour générer les bundles d'update

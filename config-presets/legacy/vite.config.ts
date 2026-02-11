@@ -7,14 +7,24 @@ export default defineConfig({
   plugins: [
     react(),
     legacy({
-      targets: ['defaults', 'safari 13'],
+      targets: ['safari >= 13', 'ios >= 13', 'chrome >= 71', 'edge >= 79', 'firefox >= 67', 'not IE 11'],
       additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
-      polyfills: ['es.promise.finally', 'es/map', 'es/set'],
-      modernPolyfills: ['es.promise.finally', 'es.number.to-fixed', 'es.number.to-precision']
+      polyfills: [
+        'es.promise.finally', 
+        'es.array.flat-map', 
+        'es.array.flat', 
+        'es.object.from-entries',
+        'es.symbol.description'
+      ],
+      modernPolyfills: true
     })
   ],
   build: {
-    target: ['es2015', 'safari13'],
+    target: 'es2015',
     minify: 'terser',
+    terserOptions: {
+      safari10: true,
+    },
+    cssTarget: 'safari13'
   }
 })
