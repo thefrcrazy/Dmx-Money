@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.5.4",
+        date: "2026-02-11",
+        title: "Compatibilité Ultime & Calendrier",
+        changes: [
+            "Intégration de Flatpickr pour un calendrier fonctionnel sur tous les systèmes",
+            "Correction du rendu des couleurs sur Safari 13 (Catalina) via syntaxe RGB legacy",
+            "Saisies de dates désormais en format français (JJ/MM/AAAA)",
+            "Sécurisation des fonctions de formatage pour les anciens moteurs JavaScript"
+        ],
+        features: []
+    },
+    {
         version: "0.5.3",
         date: "2026-02-11",
         title: "Correction Thème & Calendrier",
@@ -309,4 +321,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.5.3";
+export const LATEST_VERSION = "0.5.4";

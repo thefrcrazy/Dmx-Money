@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Flatpickr for compatibility support */
+@import "flatpickr/dist/flatpickr.min.css";
+@import "flatpickr/dist/themes/dark.css";
+
 @theme {
   --color-primary: var(--color-primary-custom);
   --color-primary-rgb: var(--color-primary-rgb-custom);

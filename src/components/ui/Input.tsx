@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Calendar } from 'lucide-react';
+import flatpickr from 'flatpickr';
+import { French } from 'flatpickr/dist/l10n/fr.js';
 
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
     label?: string;
@@ -22,6 +24,8 @@ const Input: React.FC<InputProps> = ({
     ...props
 }) => {
     const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const fpRef = useRef<any>(null);
 
     const sizes = {
         sm: "h-8 text-xs",
@@ -29,11 +33,40 @@ const Input: React.FC<InputProps> = ({
         lg: "h-11 text-base",
     };
 
-    // Auto-add calendar icon for date inputs if no icon provided
     const EffectiveIcon = Icon || (type === 'date' ? Calendar : undefined);
-
     const paddingLeft = EffectiveIcon ? '!pl-10' : '!pl-3';
     const paddingRight = (rightElement || type === 'date') ? '!pr-10' : '!pr-3';
+
+    // Initialize flatpickr for date inputs
+    useEffect(() => {
+        if (type === 'date' && inputRef.current && !disabled) {
+            // Check if native date picker is supported or if we want to force flatpickr for legacy
+            // On older WebKit (Safari < 14.1), type="date" fallback to text, so flatpickr is perfect.
+            fpRef.current = flatpickr(inputRef.current, {
+                locale: French,
+                dateFormat: 'Y-m-d', // Internal value stays standard
+                altInput: true,      // Show user-friendly format
+                altFormat: 'd/m/Y',  // French format JJ/MM/AAAA
+                allowInput: true,
+                disableMobile: false,
+                static: true,        // Better for modals
+                onOpen: () => {
+                    // Force dark theme if needed
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const calendar = document.querySelector('.flatpickr-calendar');
+                    if (calendar) {
+                        calendar.classList.toggle('dark', isDark);
+                    }
+                }
+            });
+        }
+
+        return () => {
+            if (fpRef.current) {
+                fpRef.current.destroy();
+            }
+        };
+    }, [type, disabled]);
 
     return (
         <div className={`space-y-1.5 ${containerClassName}`}>
@@ -44,22 +77,25 @@ const Input: React.FC<InputProps> = ({
             )}
             <div className="relative app-input-container">
                 {EffectiveIcon && (
-                    <EffectiveIcon className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 pointer-events-none app-input-icon`} />
+                    <EffectiveIcon 
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 pointer-events-none app-input-icon z-10`} 
+                    />
                 )}
                 <input
+                    ref={inputRef}
                     id={inputId}
-                    type={type}
+                    type={type === 'date' ? 'text' : type} // Let flatpickr handle the UI
                     className={`app-input w-full ${sizes[size]} ${paddingLeft} ${paddingRight} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={disabled}
                     {...props}
                 />
                 {type === 'date' && !rightElement && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none opacity-50">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none opacity-50 z-10">
                         <Calendar className="w-4 h-4" />
                     </div>
                 )}
                 {rightElement && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none app-input-right-element">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none app-input-right-element z-10">
                         {rightElement}
                     </div>
                 )}

@@ -1,12 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 
-// Helper function to create color with opacity support
+// Helper function to create color with opacity support for old WebKit (Catalina)
 function withOpacityValue(variable) {
     return ({ opacityValue }) => {
         if (opacityValue === undefined) {
             return `rgb(var(${variable}))`
         }
-        return `rgb(var(${variable}) / ${opacityValue})`
+        // Legacy syntax: rgba(R, G, B, alpha) - variable must contain commas
+        return `rgba(var(${variable}), ${opacityValue})`
     }
 }
 

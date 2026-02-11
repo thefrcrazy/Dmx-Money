@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Flatpickr for Legacy support */
+@import "flatpickr/dist/flatpickr.min.css";
+@import "flatpickr/dist/themes/dark.css";
+
 /* =========================================
    PRIMARY COLOR PALETTE WITH RGB (for opacity modifiers)
    ========================================= */

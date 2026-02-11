@@ -73,14 +73,17 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             document.documentElement.style.setProperty('--color-primary', color);
             document.documentElement.style.setProperty('--color-primary-custom', color);
             
-            // Standard space-separated format for all Tailwind versions
+            // For legacy Safari (Catalina), we NEED commas for rgba() to work in Tailwind 3
+            // But Tailwind 4 (Modern) also accepts them.
             const rgbStr = formatRgb(palette[500]);
+            const rgbWithCommas = rgbStr.replace(/ /g, ', ');
             
-            document.documentElement.style.setProperty('--color-primary-rgb', rgbStr);
-            document.documentElement.style.setProperty('--color-primary-rgb-custom', rgbStr);
+            document.documentElement.style.setProperty('--color-primary-rgb', rgbWithCommas);
+            document.documentElement.style.setProperty('--color-primary-rgb-custom', rgbWithCommas);
 
             Object.entries(palette).forEach(([shade, rgb]) => {
-                document.documentElement.style.setProperty(`--color-primary-${shade}-rgb`, formatRgb(rgb));
+                const shadeRgb = formatRgb(rgb).replace(/ /g, ', ');
+                document.documentElement.style.setProperty(`--color-primary-${shade}-rgb`, shadeRgb);
             });
         }
     };
@@ -208,7 +211,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             mq.addEventListener('change', handler);
             return () => mq.removeEventListener('change', handler);
         } catch (e) {
-            // Fallback for very old Safari
             mq.addListener(handler);
             return () => mq.removeListener(handler);
         }
