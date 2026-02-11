@@ -36,7 +36,6 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 app-modal-overlay"
-            onClick={onClose}
         >
             <div
                 className="app-card w-full max-w-md animate-in fade-in zoom-in duration-100 app-modal-content app-confirm-modal"

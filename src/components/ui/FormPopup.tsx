@@ -68,7 +68,6 @@ const FormPopup: React.FC<FormPopupProps> = ({
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm app-modal-overlay"
-            onClick={onClose}
         >
             <div
                 className={`app-card w-full ${maxWidthClasses[maxWidth]} animate-in fade-in zoom-in duration-100 app-modal-content`}
