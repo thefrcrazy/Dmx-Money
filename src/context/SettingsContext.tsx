@@ -84,31 +84,55 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
                             
 
-                            // Start animation after a short delay
+                                            // Start animation after a short delay (Minimum 1.5s total)
 
-                            setTimeout(() => {
+                            
 
-                                setIsTransitioning(true);
+                                            setTimeout(() => {
 
-                                
+                            
 
-                                // Wait for the fade-out animation to complete (500ms)
+                                                setIsTransitioning(true);
 
-                                setTimeout(() => {
+                            
 
-                                    setIsInitialLoadDone(true);
+                                                
 
-                                }, 500);
+                            
 
-                            }, 800); // Duration splash screen is visible
+                                                // Wait for the fade-out animation to complete (500ms)
 
-                        })
+                            
 
-                        .catch(() => {
+                                                setTimeout(() => {
 
-                            setIsInitialLoadDone(true);
+                            
 
-                        });
+                                                    setIsInitialLoadDone(true);
+
+                            
+
+                                                }, 500);
+
+                            
+
+                                            }, 1500); // 1.5s visible duration
+
+                            
+
+                                        })
+
+                            
+
+                                        .catch(() => {
+
+                            
+
+                                            setIsInitialLoadDone(true);
+
+                            
+
+                                        });
 
     
 
@@ -438,18 +462,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100 scale-100'
                     }`}
                 >
-                    <div className="mb-8 relative">
-                        <div className={`absolute inset-0 bg-indigo-500/20 rounded-full blur-2xl transition-transform duration-1000 ${isTransitioning ? 'scale-150' : 'scale-100'}`}></div>
+                    <div className="relative">
+                        <div className={`absolute inset-0 bg-indigo-500/20 rounded-full blur-xl transition-transform duration-1000 ${isTransitioning ? 'scale-150' : 'scale-100'}`}></div>
                         <img 
                             src="/logo.svg" 
                             alt="Logo" 
-                            className={`w-24 h-24 relative z-10 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : 'scale-100'}`} 
+                            className={`w-16 h-16 relative z-10 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : 'scale-100'}`} 
                         />
                     </div>
-                    <div className={`w-8 h-8 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}></div>
-                    <div className={`mt-6 text-xs font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 transition-all duration-500 ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-70 translate-y-0'}`}>
-                        DmxMoney
-                    </div>
+                    <div className={`absolute bottom-2 w-4 h-4 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}></div>
                 </div>
             )}
         </SettingsContext.Provider>

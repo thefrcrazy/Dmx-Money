@@ -22,9 +22,9 @@ pub fn run() {
             // Manual Window Creation for full control (especially traffic lights)
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
-                .inner_size(400.0, 400.0) // Perfect square
+                .inner_size(120.0, 120.0) // Tiny square for logo only
                 .resizable(false)
-                .decorations(false) // Borderless for real splash effect
+                .decorations(true) // Keep true for shadow
                 .center();
 
             #[cfg(target_os = "macos")]
@@ -35,7 +35,13 @@ pub fn run() {
                     .traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
             }
 
-            window_builder.build().expect("failed to build window");
+            let window = window_builder.build().expect("failed to build window");
+
+            // On macOS, hide traffic lights during splash
+            #[cfg(target_os = "macos")]
+            {
+                let _ = window.set_decorations(false);
+            }
 
             let handle = app.handle();
             let pool = tauri::async_runtime::block_on(db::init_db(handle))

@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.4",
+        date: "2026-02-11",
+        title: "Démarrage Premium",
+        changes: [
+            "Splash screen miniature (120x120) pour un chargement discret et élégant",
+            "Transition animée prolongée (2s) pour une meilleure expérience utilisateur",
+            "Uniformisation du logo dans toute l'application",
+            "Gestion intelligente des boutons de fenêtre macOS au démarrage"
+        ],
+        features: []
+    },
+    {
         version: "0.4.3",
         date: "2026-02-11",
         title: "Finalisation des icônes",
