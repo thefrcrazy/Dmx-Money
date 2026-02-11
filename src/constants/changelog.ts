@@ -12,9 +12,19 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
-        version: "0.4.6",
+        version: "0.4.7",
         date: "2026-02-11",
-        title: "Stabilité du chargement",
+        title: "Optimisation & Confort macOS",
+        changes: [
+            "Suppression du flash blanc au démarrage pour les utilisateurs en mode sombre",
+            "Correction définitive de la restauration de la taille et position de la fenêtre",
+            "Ajustement natif des boutons de contrôle (Traffic Lights) sur macOS",
+            "Nettoyage de l'interface : suppression des logos redondants dans la barre de titre et sidebar"
+        ],
+        features: []
+    },
+    {
+        version: "0.4.6",
         changes: [
             "Splash screen repassé en 400x400 pour une transition plus stable",
             "Correction du bug d'interface écrasée après le démarrage",
@@ -262,4 +272,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = CHANGELOG[0].version;
+export const LATEST_VERSION = "0.4.7";

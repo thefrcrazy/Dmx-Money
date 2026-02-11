@@ -26,12 +26,7 @@ const TitleBar: React.FC = () => {
             data-tauri-drag-region
             className="app-titlebar h-10 flex items-center justify-center fixed top-0 left-0 right-0 z-[100] select-none bg-transparent pointer-events-none"
         >
-            {/* Zone de drag uniquement. Sur Mac, les boutons sont gérés par le système si configuré ou par le Layout */}
-            
-            {/* Titre centré (optionnel, souvent caché sur Mac) */}
-            <div className="flex items-center justify-center text-[11px] font-medium text-gray-400 dark:text-gray-500 pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
-                <span>DmxMoney 2025</span>
-            </div>
+            {/* Zone de drag uniquement. Sur Mac, les boutons sont gérés par le système */}
 
             {/* Boutons Windows/Linux */}
             {!isMac && (

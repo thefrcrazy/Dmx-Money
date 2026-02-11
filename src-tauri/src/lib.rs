@@ -19,12 +19,11 @@ pub fn run() {
                     .build(),
             )?;
 
-            // Manual Window Creation for full control (especially traffic lights)
+            // Manual Window Creation for full control
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
                 .inner_size(400.0, 400.0) // 400x400 square splash
-                .resizable(false)
-                .decorations(false) // Start borderless for splash screen effect
+                .resizable(true)
                 .center();
 
             #[cfg(target_os = "macos")]
@@ -36,7 +35,7 @@ pub fn run() {
 
             let window = window_builder.build().expect("failed to build window");
 
-            // Explicitly set shadow even if decorations are off
+            // Explicitly set shadow
             let _ = window.set_shadow(true);
 
             let handle = app.handle();

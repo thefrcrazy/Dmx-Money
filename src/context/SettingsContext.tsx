@@ -2,19 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { getCurrentWindow, PhysicalPosition, PhysicalSize, LogicalSize } from '@tauri-apps/api/window';
 import { Theme, Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
-import { generatePalette, formatRgb, hexToRgb as parseHexToRgb } from '../utils/colors';
+import { generatePalette, formatRgb } from '../utils/colors';
 import { LATEST_VERSION } from '../constants/changelog';
 
-// Cache for window icons to prevent redundant fetches
 const iconCache: Record<string, Uint8Array> = {};
 
 const loadIcon = async (isDark: boolean): Promise<Uint8Array | null> => {
     const iconName = isDark ? 'icon-dark.png' : 'icon-light.png';
-    
-    if (iconCache[iconName]) {
-        return iconCache[iconName];
-    }
-
+    if (iconCache[iconName]) return iconCache[iconName];
     try {
         const response = await fetch(`/icons/${iconName}`);
         const blob = await response.blob();
@@ -45,225 +40,28 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const isLoadedRef = useRef(false);
+    const isRestoringRef = useRef(false);
+    const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
 
-                // Initial load
-
-                useEffect(() => {
-
-                    // Load settings from DB
-
-                    dbService.getSettings()
-
-                        .then(savedSettings => {
-
-                            if (savedSettings) {
-
-                                // Apply visual changes immediately
-
-                                applyVisualSettings(savedSettings);
-
-                                // Then update state
-
-                                setSettings(prev => ({
-
-                                    ...prev,
-
-                                    ...savedSettings
-
-                                }));
-
-                            } else {
-
-                                // First launch: save default settings
-
-                                dbService.saveSettings(DEFAULT_SETTINGS).catch(console.error);
-
-                            }
-
-                            isLoadedRef.current = true;
-
-                            
-
-                                            // Start animation after a short delay (Minimum 1.5s total)
-
-                            
-
-                                            setTimeout(() => {
-
-                            
-
-                                                setIsTransitioning(true);
-
-                            
-
-                                                
-
-                            
-
-                                                // Wait for the fade-out animation to complete (500ms)
-
-                            
-
-                                                setTimeout(() => {
-
-                            
-
-                                                    setIsInitialLoadDone(true);
-
-                            
-
-                                                }, 500);
-
-                            
-
-                                            }, 1500); // 1.5s visible duration
-
-                            
-
-                                        })
-
-                            
-
-                                        .catch(() => {
-
-                            
-
-                                            setIsInitialLoadDone(true);
-
-                            
-
-                                        });
-
-    
-
-            let unlistenMove: (() => void) | undefined;
-        let unlistenResize: (() => void) | undefined;
-
-        const setupWindowListeners = async () => {
-            try {
-                const appWindow = getCurrentWindow();
-                unlistenMove = await appWindow.listen('tauri://move', async () => {
-                    const position = await appWindow.innerPosition();
-                    debouncedSaveWindowPosition(position.x, position.y);
-                });
-                unlistenResize = await appWindow.listen('tauri://resize', async () => {
-                    const size = await appWindow.innerSize();
-                    debouncedSaveWindowSize(size.width, size.height);
-                });
-            } catch (error) {}
-        };
-
-        setupWindowListeners();
-
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleThemeChange = (e: MediaQueryListEvent) => {
-            if (settings.theme === 'system') {
-                document.documentElement.classList.toggle('dark', e.matches);
-                updateWindowIcon(e.matches);
-            }
-        };
-
-        mediaQuery.addEventListener('change', handleThemeChange);
-        return () => {
-            if (unlistenMove) unlistenMove();
-            if (unlistenResize) unlistenResize();
-            mediaQuery.removeEventListener('change', handleThemeChange);
-        };
-    }, []); // Empty dependency array for init, theme listener manages itself or checks current state
-
-    // ... refs for debounce ...
-    const savePositionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const saveSizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const updateWindowPositionRef = useRef((_x: number, _y: number) => { });
-    const updateWindowSizeRef = useRef((_width: number, _height: number) => { });
+    // Immediate system theme detection to avoid flash
+    const [isSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 
     useEffect(() => {
-        updateWindowPositionRef.current = updateWindowPosition;
-        updateWindowSizeRef.current = updateWindowSize;
-    });
+        // Proactively apply dark mode if system is dark to avoid flash while DB loads
+        if (isSystemDark && !isLoadedRef.current) {
+            document.documentElement.classList.add('dark');
+        }
+    }, [isSystemDark]);
 
-    const debouncedSaveWindowPosition = (x: number, y: number) => {
-        if (savePositionTimeoutRef.current) clearTimeout(savePositionTimeoutRef.current);
-        savePositionTimeoutRef.current = setTimeout(() => {
-            updateWindowPositionRef.current(x, y);
-        }, 1000);
-    };
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
 
-    const debouncedSaveWindowSize = (width: number, height: number) => {
-        if (saveSizeTimeoutRef.current) clearTimeout(saveSizeTimeoutRef.current);
-        saveSizeTimeoutRef.current = setTimeout(() => {
-            updateWindowSizeRef.current(width, height);
-        }, 1000);
-    };
-
-    // Helper to update window icon non-blockingly
     const updateWindowIcon = (isDark: boolean) => {
         loadIcon(isDark).then(icon => {
-            if (icon) {
-                getCurrentWindow().setIcon(icon).catch(() => {});
-            }
+            if (icon) getCurrentWindow().setIcon(icon).catch(() => {});
         });
     };
-
-    const applyVisualSettings = (newSettings: Settings) => {
-        // 1. Theme
-        let isDark = false;
-        if (newSettings.theme === 'dark') {
-            document.documentElement.classList.add('dark');
-            isDark = true;
-        } else if (newSettings.theme === 'light') {
-            document.documentElement.classList.remove('dark');
-            isDark = false;
-        } else {
-            isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            document.documentElement.classList.toggle('dark', isDark);
-        }
-
-        // 2. Colors
-        if (newSettings.primaryColor && newSettings.primaryColor !== 'default') {
-            setCssVariables(newSettings.primaryColor);
-        } else {
-            removeCssVariables();
-        }
-
-        // 3. Window Icon (Async, non-blocking)
-        updateWindowIcon(isDark);
-    };
-
-    // Effect to handle window restoration after splash transition
-    useEffect(() => {
-        if (isInitialLoadDone) {
-            const restoreWindow = async () => {
-                try {
-                    const appWindow = getCurrentWindow();
-                    
-                    // Force decorations and shadow back
-                    await appWindow.setDecorations(true);
-                    await appWindow.setShadow(true);
-                    
-                    // Give the OS a moment to re-draw the borders before resizing
-                    setTimeout(async () => {
-                        await appWindow.setResizable(true);
-
-                        if (settings.windowSize) {
-                            await appWindow.setSize(new PhysicalSize(settings.windowSize.width, settings.windowSize.height));
-                        } else {
-                            await appWindow.setSize(new LogicalSize(1320, 790));
-                            await appWindow.center();
-                        }
-
-                        if (settings.windowPosition) {
-                            await appWindow.setPosition(new PhysicalPosition(settings.windowPosition.x, settings.windowPosition.y));
-                        }
-                    }, 100);
-                } catch (error) {
-                    console.error('Failed to restore window:', error);
-                }
-            };
-            restoreWindow();
-        }
-    }, [isInitialLoadDone]); // Trigger when splash is removed
-
 
     const setCssVariables = (color: string) => {
         const palette = generatePalette(color);
@@ -295,185 +93,254 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
     };
 
-    // Optimized update functions
-    const updateTheme = (theme: Theme) => {
-        const performUpdate = () => {
-            // 1. Immediate visual update
-            let isDark = false;
-            if (theme === 'dark') {
-                document.documentElement.classList.add('dark');
-                isDark = true;
-            } else if (theme === 'light') {
-                document.documentElement.classList.remove('dark');
-                isDark = false;
-            } else {
-                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                document.documentElement.classList.toggle('dark', isDark);
-            }
-            
-            // 2. Non-blocking side effects
-            updateWindowIcon(isDark);
-
-            // 3. State update & Persistence
-            setSettings(prev => {
-                const newSettings = { ...prev, theme };
-                dbService.saveSettings(newSettings).catch(console.error);
-                return newSettings;
-            });
-        };
-
-        // Use View Transitions API if available for smooth cross-fade
-        if (document.startViewTransition) {
-            document.startViewTransition(() => performUpdate());
+    const applyVisualSettings = (s: Settings) => {
+        // Theme logic
+        let isDark = false;
+        if (s.theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            isDark = true;
+        } else if (s.theme === 'light') {
+            document.documentElement.classList.remove('dark');
+            isDark = false;
         } else {
-            performUpdate();
+            isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.toggle('dark', isDark);
+        }
+
+        // Colors logic
+        if (s.primaryColor && s.primaryColor !== 'default') {
+            setCssVariables(s.primaryColor);
+        } else {
+            removeCssVariables();
+        }
+
+        updateWindowIcon(isDark);
+    };
+
+    const restoreWindow = async (currentSettings: Settings) => {
+        if (isRestoringRef.current) return;
+        isRestoringRef.current = true;
+        try {
+            const appWindow = getCurrentWindow();
+            await appWindow.setResizable(true);
+            await appWindow.setDecorations(true);
+            await appWindow.setShadow(true);
+            if (currentSettings.windowSize && currentSettings.windowSize.width > 500) {
+                await appWindow.setSize(new PhysicalSize(currentSettings.windowSize.width, currentSettings.windowSize.height));
+            } else {
+                await appWindow.setSize(new LogicalSize(1320, 790));
+                await appWindow.center();
+            }
+            if (currentSettings.windowPosition) {
+                await appWindow.setPosition(new PhysicalPosition(currentSettings.windowPosition.x, currentSettings.windowPosition.y));
+            } else {
+                await appWindow.center();
+            }
+        } catch (error) {
+            console.error('Failed to restore window:', error);
+        } finally {
+            setTimeout(() => {
+                isRestoringRef.current = false;
+            }, 1000);
         }
     };
 
-    const updatePrimaryColor = (color: string) => {
-        const performUpdate = () => {
-            // 1. Immediate visual update
-            if (color && color !== 'default') {
-                setCssVariables(color);
-            } else {
-                removeCssVariables();
-            }
+    // Initial load
+    useEffect(() => {
+        dbService.getSettings()
+            .then(savedSettings => {
+                const initial = savedSettings || DEFAULT_SETTINGS;
+                applyVisualSettings(initial);
+                setSettings(initial);
+                isLoadedRef.current = true;
+                restoreWindow(initial);
+                setTimeout(() => {
+                    setIsTransitioning(true);
+                    setTimeout(() => {
+                        setIsInitialLoadDone(true);
+                    }, 500);
+                }, 1500);
+            })
+            .catch(() => {
+                setIsInitialLoadDone(true);
+            });
+    }, []);
 
-            // 2. State update & Persistence
-            setSettings(prev => {
-                const newSettings = { ...prev, primaryColor: color };
-                dbService.saveSettings(newSettings).catch(console.error);
-                return newSettings;
+    // Post-loader restoration
+    useEffect(() => {
+        if (isInitialLoadDone && isLoadedRef.current) {
+            setTimeout(() => {
+                restoreWindow(settingsRef.current);
+            }, 200);
+        }
+    }, [isInitialLoadDone]);
+
+    // Window listeners
+    useEffect(() => {
+        let unlistenMove: (() => void) | undefined;
+        let unlistenResize: (() => void) | undefined;
+        const setupListeners = async () => {
+            const appWindow = getCurrentWindow();
+            unlistenMove = await appWindow.listen('tauri://move', async () => {
+                if (isRestoringRef.current) return;
+                const pos = await appWindow.innerPosition();
+                debouncedSaveWindowPosition(pos.x, pos.y);
+            });
+            unlistenResize = await appWindow.listen('tauri://resize', async () => {
+                if (isRestoringRef.current) return;
+                const size = await appWindow.innerSize();
+                if (size.width > 500 && size.height > 500) {
+                    debouncedSaveWindowSize(size.width, size.height);
+                }
             });
         };
+        setupListeners();
+        return () => {
+            if (unlistenMove) unlistenMove();
+            if (unlistenResize) unlistenResize();
+        };
+    }, []);
 
-        if (document.startViewTransition) {
-            document.startViewTransition(() => performUpdate());
-        } else {
-            performUpdate();
-        }
+    // System theme change listener
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e: MediaQueryListEvent) => {
+            if (settingsRef.current.theme === 'system') {
+                document.documentElement.classList.toggle('dark', e.matches);
+                updateWindowIcon(e.matches);
+            }
+        };
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    const savePositionTimeoutRef = useRef<any>(null);
+    const saveSizeTimeoutRef = useRef<any>(null);
+
+    const debouncedSaveWindowPosition = (x: number, y: number) => {
+        if (savePositionTimeoutRef.current) clearTimeout(savePositionTimeoutRef.current);
+        savePositionTimeoutRef.current = setTimeout(() => {
+            setSettings(prev => {
+                const updated = { ...prev, windowPosition: { x, y } };
+                dbService.saveSettings(updated).catch(() => {});
+                return updated;
+            });
+        }, 1000);
     };
 
-    const updateWindowPosition = async (x: number, y: number) => {
-        if (!isLoadedRef.current) return;
-        setSettings(prev => {
-            const newSettings = { ...prev, windowPosition: { x, y } };
-            dbService.saveSettings(newSettings).catch(console.error);
-            return newSettings;
-        });
-    };
-
-    const updateWindowSize = async (width: number, height: number) => {
-        if (!isLoadedRef.current) return;
-        setSettings(prev => {
-            const newSettings = { ...prev, windowSize: { width, height } };
-            dbService.saveSettings(newSettings).catch(console.error);
-            return newSettings;
-        });
+    const debouncedSaveWindowSize = (width: number, height: number) => {
+        if (saveSizeTimeoutRef.current) clearTimeout(saveSizeTimeoutRef.current);
+        saveSizeTimeoutRef.current = setTimeout(() => {
+            setSettings(prev => {
+                const updated = { ...prev, windowSize: { width, height } };
+                dbService.saveSettings(updated).catch(() => {});
+                return updated;
+            });
+        }, 1000);
     };
 
     return (
-        <SettingsContext.Provider
-            value={{
-                settings,
-                updateTheme,
-                updatePrimaryColor,
-                updateWindowPosition,
-                updateWindowSize,
-                updateAccountGroup: async (accountId: string, groupName: string) => {
-                    setSettings(prev => {
-                        const newGroups = { ...(prev.accountGroups || {}) };
-                        if (groupName) newGroups[accountId] = groupName;
-                        else delete newGroups[accountId];
-                        const newSettings = { ...prev, accountGroups: newGroups };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                updateCustomGroups: async (groups: string[]) => {
-                    setSettings(prev => {
-                        const newSettings = { ...prev, customGroups: groups };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                renameCustomGroup: async (oldName: string, newName: string) => {
-                    setSettings(prev => {
-                        const newCustomGroups = (prev.customGroups || []).map(g => g === oldName ? newName : g);
-                        const newAccountGroups = { ...(prev.accountGroups || {}) };
-                        Object.keys(newAccountGroups).forEach(accountId => {
-                            if (newAccountGroups[accountId] === oldName) newAccountGroups[accountId] = newName;
-                        });
-                        const newCustomGroupsOrder = (prev.customGroupsOrder || []).map(g => g === oldName ? newName : g);
-                        const newSettings = {
-                            ...prev,
-                            customGroups: newCustomGroups,
-                            accountGroups: newAccountGroups,
-                            customGroupsOrder: newCustomGroupsOrder
-                        };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                updateCustomGroupsOrder: async (order: string[]) => {
-                    setSettings(prev => {
-                        const newSettings = { ...prev, customGroupsOrder: order };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                updateAccountsOrder: async (order: string[]) => {
-                    setSettings(prev => {
-                        const newSettings = { ...prev, accountsOrder: order };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                updateComponentSpacing: async (spacing: number) => {
-                    setSettings(prev => {
-                        const newSettings = { ...prev, componentSpacing: spacing };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                updateComponentPadding: async (padding: number) => {
-                    setSettings(prev => {
-                        const newSettings = { ...prev, componentPadding: padding };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                },
-                updateLastSeenVersion: async (version: string) => {
-                    setSettings(prev => {
-                        const newSettings = { ...prev, lastSeenVersion: version };
-                        dbService.saveSettings(newSettings).catch(console.error);
-                        return newSettings;
-                    });
-                }
-            }}
-        >
+        <SettingsContext.Provider value={{
+            settings,
+            updateTheme: async (theme) => {
+                setSettings(prev => {
+                    const next = { ...prev, theme };
+                    applyVisualSettings(next);
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updatePrimaryColor: async (color) => {
+                setSettings(prev => {
+                    const next = { ...prev, primaryColor: color };
+                    applyVisualSettings(next);
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateWindowPosition: async (x, y) => {
+                setSettings(prev => {
+                    const next = { ...prev, windowPosition: { x, y } };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateWindowSize: async (width, height) => {
+                setSettings(prev => {
+                    const next = { ...prev, windowSize: { width, height } };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateAccountGroup: async (id, group) => {
+                setSettings(prev => {
+                    const groups = { ...(prev.accountGroups || {}) };
+                    if (group) groups[id] = group; else delete groups[id];
+                    const next = { ...prev, accountGroups: groups };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateCustomGroups: async (groups) => {
+                setSettings(prev => {
+                    const next = { ...prev, customGroups: groups };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            renameCustomGroup: async (oldName, newName) => {
+                setSettings(prev => {
+                    const customGroups = (prev.customGroups || []).map(g => g === oldName ? newName : g);
+                    const accountGroups = { ...(prev.accountGroups || {}) };
+                    Object.keys(accountGroups).forEach(id => { if (accountGroups[id] === oldName) accountGroups[id] = newName; });
+                    const next = { ...prev, customGroups, accountGroups };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateCustomGroupsOrder: async (order) => {
+                setSettings(prev => {
+                    const next = { ...prev, customGroupsOrder: order };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateAccountsOrder: async (order) => {
+                setSettings(prev => {
+                    const next = { ...prev, accountsOrder: order };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateComponentSpacing: async (spacing) => {
+                setSettings(prev => {
+                    const next = { ...prev, componentSpacing: spacing };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateComponentPadding: async (padding) => {
+                setSettings(prev => {
+                    const next = { ...prev, componentPadding: padding };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            },
+            updateLastSeenVersion: async (version) => {
+                setSettings(prev => {
+                    const next = { ...prev, lastSeenVersion: version };
+                    dbService.saveSettings(next).catch(() => {});
+                    return next;
+                });
+            }
+        }}>
             <div className={`transition-opacity duration-700 ${!isInitialLoadDone ? 'opacity-0' : 'opacity-100'}`}>
                 {children}
             </div>
-
             {!isInitialLoadDone && (
-                <div 
-                    className={`fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-black z-[9999] transition-all duration-500 ease-in-out ${
-                        isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100 scale-100'
-                    }`}
-                >
-                    <div className="relative mb-8">
-                        <div className={`absolute inset-0 bg-indigo-500/20 rounded-full blur-2xl transition-transform duration-1000 ${isTransitioning ? 'scale-150' : 'scale-100'}`}></div>
-                        <img 
-                            src="/logo.svg" 
-                            alt="Logo" 
-                            className={`w-32 h-32 relative z-10 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : 'scale-100'}`} 
-                        />
-                    </div>
-                    <div className={`w-8 h-8 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}></div>
-                    <div className={`mt-6 text-xs font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 transition-all duration-500 ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-70 translate-y-0'}`}>
-                        DmxMoney
-                    </div>
+                <div className={`fixed inset-0 flex flex-col items-center justify-center z-[9999] transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100'} ${isSystemDark ? 'bg-black' : 'bg-white'} dark:bg-black`}>
+                    <img src="/logo.svg" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'scale-110' : ''}`} />
+                    <div className="w-8 h-8 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin mt-8" />
                 </div>
             )}
         </SettingsContext.Provider>

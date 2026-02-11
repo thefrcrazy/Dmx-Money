@@ -58,14 +58,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
             {/* Sidebar */}
             <aside className={`flex-shrink-0 flex flex-col bg-[#F5F5F7] dark:bg-black border-r border-black/[0.05] dark:border-white/10 z-20 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-56'}`}>
                 <div className="h-12 w-full flex-shrink-0 flex items-center justify-between px-4" data-tauri-drag-region>
-                    {!isCollapsed ? (
-                        <div className="flex items-center gap-2 mt-2">
-                            <img src="/logo.svg" alt="DmxMoney" className="w-6 h-6" />
-                            <span className="text-sm font-bold tracking-tight">DmxMoney</span>
-                        </div>
-                    ) : (
-                        <div className="mt-2" />
-                    )}
+                    <div className="mt-2" />
                     <button 
                         onClick={() => setIsCollapsed(!isCollapsed)}
                         className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-900 text-gray-400 transition-colors mt-2"
