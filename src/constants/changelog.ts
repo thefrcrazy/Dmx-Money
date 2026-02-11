@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.5.5",
+        date: "2026-02-11",
+        title: "Identité visuelle & Nettoyage",
+        changes: [
+            "Mise à jour complète des icônes d'application pour toutes les plateformes (Windows, macOS, Android, iOS)",
+            "Amélioration de la résolution du logo et nettoyage des ressources obsolètes",
+            "Optimisation de la structure du projet et des types Vite",
+            "Ajustements mineurs de l'interface utilisateur pour une meilleure cohérence"
+        ],
+        features: []
+    },
+    {
         version: "0.5.4",
         date: "2026-02-11",
         title: "Compatibilité Ultime & Calendrier",
@@ -321,4 +333,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.5.4";
+export const LATEST_VERSION = "0.5.5";
