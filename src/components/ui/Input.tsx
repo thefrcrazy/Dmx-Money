@@ -27,7 +27,9 @@ const Input: React.FC<InputProps> = ({
 }) => {
     const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [displayText, setDisplayText] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const sizes = {
         sm: "h-8 text-xs",
@@ -38,6 +40,25 @@ const Input: React.FC<InputProps> = ({
     const EffectiveIcon = Icon || (type === 'date' ? CalendarIcon : undefined);
     const paddingLeft = EffectiveIcon ? '!pl-10' : '!pl-3';
     const paddingRight = (rightElement || type === 'date') ? '!pr-10' : '!pr-3';
+
+    // Sync display text with value prop (YYYY-MM-DD -> DD/MM/YYYY)
+    useEffect(() => {
+        if (type === 'date') {
+            if (value && typeof value === 'string') {
+                const date = parseISO(value);
+                if (isValid(date)) {
+                    // Only update if not focused to avoid cursor jumping
+                    if (document.activeElement !== inputRef.current) {
+                        setDisplayText(format(date, 'dd/MM/yyyy'));
+                    }
+                } else {
+                    setDisplayText(value);
+                }
+            } else {
+                setDisplayText('');
+            }
+        }
+    }, [value, type]);
 
     // Handle clicks outside to close calendar
     useEffect(() => {
@@ -52,21 +73,57 @@ const Input: React.FC<InputProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isCalendarOpen]);
 
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        if (type === 'date') {
+            setDisplayText(val);
+            
+            // Simple parsing for DD/MM/YYYY
+            const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+            const match = val.match(dateRegex);
+            if (match) {
+                const day = match[1].padStart(2, '0');
+                const month = match[2].padStart(2, '0');
+                const year = match[3];
+                const isoDate = `${year}-${month}-${day}`;
+                if (isValid(parseISO(isoDate)) && year.length === 4) {
+                    if (onChange) {
+                        const event = {
+                            ...e,
+                            target: { ...e.target, value: isoDate }
+                        } as React.ChangeEvent<HTMLInputElement>;
+                        onChange(event);
+                    }
+                }
+            }
+        } else {
+            if (onChange) onChange(e);
+        }
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        if (type === 'date') {
+            // Re-format on blur to ensure consistency
+            if (value && typeof value === 'string') {
+                const date = parseISO(value);
+                if (isValid(date)) {
+                    setDisplayText(format(date, 'dd/MM/yyyy'));
+                }
+            }
+        }
+        if (props.onBlur) props.onBlur(e);
+    };
+
     const handleDateSelect = (date: Date) => {
-        const dateStr = format(date, 'yyyy-MM-dd');
+        const isoDate = format(date, 'yyyy-MM-dd');
+        setDisplayText(format(date, 'dd/MM/yyyy'));
         if (onChange) {
             const event = {
-                target: { value: dateStr }
+                target: { value: isoDate }
             } as React.ChangeEvent<HTMLInputElement>;
             onChange(event);
         }
         setIsCalendarOpen(false);
-    };
-
-    const getDisplayDate = () => {
-        if (type !== 'date' || !value) return value;
-        const date = parseISO(value as string);
-        return isValid(date) ? format(date, 'dd/MM/yyyy') : value;
     };
 
     return (
@@ -78,19 +135,32 @@ const Input: React.FC<InputProps> = ({
             )}
             <div className="relative app-input-container">
                 {EffectiveIcon && (
-                    <EffectiveIcon 
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 pointer-events-none app-input-icon z-10`} 
-                    />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center z-20">
+                        {type === 'date' ? (
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => !disabled && setIsCalendarOpen(!isCalendarOpen)}
+                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-400 dark:text-gray-500 hover:text-primary-500 transition-colors cursor-pointer"
+                                title="Ouvrir le calendrier"
+                            >
+                                <EffectiveIcon className="w-4 h-4" />
+                            </button>
+                        ) : (
+                            <EffectiveIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                        )}
+                    </div>
                 )}
                 <input
+                    ref={inputRef}
                     id={inputId}
                     type={type === 'date' ? 'text' : type}
-                    className={`app-input w-full ${sizes[size]} ${paddingLeft} ${paddingRight} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${type === 'date' ? 'cursor-pointer' : ''}`}
+                    className={`app-input w-full ${sizes[size]} ${paddingLeft} ${paddingRight} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={disabled}
-                    value={type === 'date' ? getDisplayDate() : value}
-                    onChange={type === 'date' ? undefined : onChange}
-                    onClick={() => type === 'date' && !disabled && setIsCalendarOpen(!isCalendarOpen)}
-                    readOnly={type === 'date'}
+                    placeholder={type === 'date' ? 'JJ/MM/AAAA' : props.placeholder}
+                    value={type === 'date' ? displayText : value}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
                     {...props}
                 />
                 {rightElement && (
@@ -103,7 +173,7 @@ const Input: React.FC<InputProps> = ({
                 {type === 'date' && isCalendarOpen && !disabled && (
                     <div className="absolute top-full left-0 mt-2 z-[100]">
                         <Calendar 
-                            selectedDate={value ? parseISO(value as string) : new Date()} 
+                            selectedDate={value && typeof value === 'string' && isValid(parseISO(value)) ? parseISO(value) : new Date()} 
                             onDateSelect={handleDateSelect}
                             onClose={() => setIsCalendarOpen(false)}
                         />
