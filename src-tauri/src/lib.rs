@@ -22,9 +22,9 @@ pub fn run() {
             // Manual Window Creation for full control (especially traffic lights)
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
-                .inner_size(120.0, 120.0) // Tiny square for logo only
+                .inner_size(120.0, 120.0) // Small square for splash
                 .resizable(false)
-                .decorations(true) // Keep true for shadow
+                .decorations(false) // Start borderless for splash screen effect
                 .center();
 
             #[cfg(target_os = "macos")]
@@ -37,51 +37,13 @@ pub fn run() {
 
             let window = window_builder.build().expect("failed to build window");
 
-            // On macOS, hide traffic lights during splash
-            #[cfg(target_os = "macos")]
-            {
-                let _ = window.set_decorations(false);
-            }
+            // Explicitly set shadow even if decorations are off
+            let _ = window.set_shadow(true);
 
             let handle = app.handle();
             let pool = tauri::async_runtime::block_on(db::init_db(handle))
                 .expect("failed to initialize database");
             app.manage(pool.clone());
-
-            // Restore window settings logic
-            // Note: We create the window with default size above, but this logic 
-            // will resize it immediately if settings exist.
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                #[derive(sqlx::FromRow)]
-                struct WindowSettingsRow {
-                    #[sqlx(rename = "windowPositionX")]
-                    window_position_x: Option<i32>,
-                    #[sqlx(rename = "windowPositionY")]
-                    window_position_y: Option<i32>,
-                    #[sqlx(rename = "windowSizeWidth")]
-                    window_size_width: Option<i32>,
-                    #[sqlx(rename = "windowSizeHeight")]
-                    window_size_height: Option<i32>,
-                }
-
-                let row = sqlx::query_as::<_, WindowSettingsRow>(
-                    "SELECT \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\" FROM settings WHERE id = 1"
-                )
-                .fetch_optional(&pool)
-                .await;
-
-                if let Ok(Some(settings)) = row {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        if let (Some(width), Some(height)) = (settings.window_size_width, settings.window_size_height) {
-                            let _ = window.set_size(tauri::PhysicalSize::new(width as u32, height as u32));
-                        }
-                        if let (Some(x), Some(y)) = (settings.window_position_x, settings.window_position_y) {
-                            let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
-                        }
-                    }
-                }
-            });
 
             Ok(())
         })

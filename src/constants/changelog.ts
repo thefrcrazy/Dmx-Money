@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.5",
+        date: "2026-02-11",
+        title: "Perfectionnement du démarrage",
+        changes: [
+            "Correction de la taille du splash screen (120x120)",
+            "Activation des ombres natives au démarrage",
+            "Intégration du logo Or & Argent dans toute l'interface",
+            "Stabilisation de la transition et des bordures de fenêtre"
+        ],
+        features: []
+    },
+    {
         version: "0.4.4",
         date: "2026-02-11",
         title: "Démarrage Premium",
