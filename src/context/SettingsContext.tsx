@@ -342,7 +342,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             {!isInitialLoadDone && (
                 <div className={`fixed inset-0 w-full h-full flex flex-col items-center justify-center z-[9999] transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100'} ${isSystemDark ? 'bg-black' : 'bg-white'} dark:bg-black`}>
                     <div className="flex flex-col items-center justify-center space-y-12">
-                        <img src="/logo.webp" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
+                        <img src="/logo.png" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
                         <div className="w-10 h-10 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                     </div>
                 </div>
