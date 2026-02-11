@@ -74,51 +74,26 @@ const Input: React.FC<InputProps> = ({
     }, [isCalendarOpen]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newValue = e.target.value;
-        
+        const val = e.target.value;
         if (type === 'date') {
-            // If deleting, allow it but strip non-allowed characters
-            if (newValue.length < displayText.length) {
-                setDisplayText(newValue.replace(/[^\d/]/g, ''));
-                return;
-            }
-
-            // Only keep digits and slashes
-            let val = newValue.replace(/[^\d/]/g, '');
-            
-            // Limit length
-            if (val.length > 10) val = val.substring(0, 10);
-
-            // Smart Day prefixing (if first digit > 3, prepend 0)
-            if (val.length === 1 && /^[4-9]$/.test(val)) {
-                val = '0' + val + '/';
-            } else if (val.length === 2 && !val.includes('/')) {
-                val += '/';
-            }
-            
-            // Smart Month prefixing
-            const parts = val.split('/');
-            if (parts.length === 2) {
-                const month = parts[1];
-                if (month.length === 1 && /^[2-9]$/.test(month)) {
-                    val = parts[0] + '/0' + month + '/';
-                } else if (month.length === 2 && val.length === 5) {
-                    val += '/';
-                }
-            }
-            
             setDisplayText(val);
             
-            // Trigger onChange only for full valid date
-            const match = val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            // Try to parse DD/MM/YYYY if the user typed enough characters
+            const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+            const match = val.match(dateRegex);
             if (match) {
-                const isoDate = `${match[3]}-${match[2]}-${match[1]}`;
-                if (isValid(parseISO(isoDate)) && onChange) {
-                    const event = {
-                        ...e,
-                        target: { ...e.target, value: isoDate }
-                    } as React.ChangeEvent<HTMLInputElement>;
-                    onChange(event);
+                const day = match[1].padStart(2, '0');
+                const month = match[2].padStart(2, '0');
+                const year = match[3];
+                const isoDate = `${year}-${month}-${day}`;
+                if (isValid(parseISO(isoDate)) && year.length === 4) {
+                    if (onChange) {
+                        const event = {
+                            ...e,
+                            target: { ...e.target, value: isoDate }
+                        } as React.ChangeEvent<HTMLInputElement>;
+                        onChange(event);
+                    }
                 }
             }
         } else {
