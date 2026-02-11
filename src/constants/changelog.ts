@@ -12,6 +12,17 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.2",
+        date: "2026-02-11",
+        title: "Design Premium & Robustesse",
+        changes: [
+            "Nouveau logo Or et Argent pour une esthétique haut de gamme",
+            "Correction définitive de la restauration des bordures de fenêtre",
+            "Amélioration de la fluidité de transition après le splash screen"
+        ],
+        features: []
+    },
+    {
         version: "0.4.1",
         date: "2026-02-11",
         title: "Optimisation Turbo du Build",

@@ -213,22 +213,25 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 try {
                     const appWindow = getCurrentWindow();
                     
-                    // 1. Restore chrome (decorations and shadow)
+                    // Force decorations and shadow back
                     await appWindow.setDecorations(true);
                     await appWindow.setShadow(true);
-                    await appWindow.setResizable(true);
+                    
+                    // Give the OS a moment to re-draw the borders before resizing
+                    setTimeout(async () => {
+                        await appWindow.setResizable(true);
 
-                    // 2. Restore size and position from settings
-                    if (settings.windowSize) {
-                        await appWindow.setSize(new PhysicalSize(settings.windowSize.width, settings.windowSize.height));
-                    } else {
-                        await appWindow.setSize(new LogicalSize(1320, 790));
-                        await appWindow.center();
-                    }
+                        if (settings.windowSize) {
+                            await appWindow.setSize(new PhysicalSize(settings.windowSize.width, settings.windowSize.height));
+                        } else {
+                            await appWindow.setSize(new LogicalSize(1320, 790));
+                            await appWindow.center();
+                        }
 
-                    if (settings.windowPosition) {
-                        await appWindow.setPosition(new PhysicalPosition(settings.windowPosition.x, settings.windowPosition.y));
-                    }
+                        if (settings.windowPosition) {
+                            await appWindow.setPosition(new PhysicalPosition(settings.windowPosition.x, settings.windowPosition.y));
+                        }
+                    }, 100);
                 } catch (error) {
                     console.error('Failed to restore window:', error);
                 }
