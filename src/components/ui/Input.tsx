@@ -76,24 +76,31 @@ const Input: React.FC<InputProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         if (type === 'date') {
-            setDisplayText(val);
+            // Garde uniquement les chiffres et limite à 8
+            const clean = val.replace(/\D/g, '').substring(0, 8);
             
-            // Try to parse DD/MM/YYYY if the user typed enough characters
-            const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-            const match = val.match(dateRegex);
-            if (match) {
-                const day = match[1].padStart(2, '0');
-                const month = match[2].padStart(2, '0');
-                const year = match[3];
+            // Construit le format JJ/MM/AAAA
+            let result = '';
+            for (let i = 0; i < clean.length; i++) {
+                if (i === 2 || i === 4) result += '/';
+                result += clean[i];
+            }
+            
+            setDisplayText(result);
+            
+            // Si on a les 8 chiffres, on tente de parser pour déclencher le onChange
+            if (clean.length === 8) {
+                const day = clean.substring(0, 2);
+                const month = clean.substring(2, 4);
+                const year = clean.substring(4, 8);
                 const isoDate = `${year}-${month}-${day}`;
-                if (isValid(parseISO(isoDate)) && year.length === 4) {
-                    if (onChange) {
-                        const event = {
-                            ...e,
-                            target: { ...e.target, value: isoDate }
-                        } as React.ChangeEvent<HTMLInputElement>;
-                        onChange(event);
-                    }
+                
+                if (isValid(parseISO(isoDate)) && onChange) {
+                    const event = {
+                        ...e,
+                        target: { ...e.target, value: isoDate }
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    onChange(event);
                 }
             }
         } else {
