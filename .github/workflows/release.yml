@@ -15,7 +15,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Créer la release en DRAFT d'abord pour ne pas casser le lien 'latest'
           gh release create ${{ github.ref_name }} \
             --title "DmxMoney ${{ github.ref_name }}" \
             --notes "Voir le [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) pour les détails." \
@@ -48,9 +47,6 @@ jobs:
             os_name: 'linux'
 
     runs-on: ${{ matrix.platform }}
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
 
@@ -64,35 +60,11 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
-
-      - name: Rust Cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: 'src-tauri -> target'
-          # Add a prefix to avoid collisions between platforms
-          prefix-key: "v1-rust"
-
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev zip
-
-      - name: Get Bun cache directory
-        id: bun-cache
-        run: echo "STORE_PATH=$(bun pm cache bin)" >> $GITHUB_OUTPUT
-
-      - name: Cache Frontend dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            **/node_modules
-            ${{ steps.bun-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-v1-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-v1-bun-
 
       - name: Install Frontend dependencies
         run: bun install --frozen-lockfile
@@ -126,66 +98,34 @@ jobs:
           VERSION: ${{ github.ref_name }} # e.g. v0.1.7
         run: |
           echo "🔍 Finding assets..."
-          
           CLEAN_VERSION="${VERSION#v}"
-          
-          # 1. Localiser le répertoire bundle (peut être dans target/release/bundle ou target/x86_64.../release/bundle)
           BUNDLE_DIR=$(find src-tauri/target -type d -name "bundle" | head -n 1)
           
           if [ -z "$BUNDLE_DIR" ]; then
-            echo "❌ Bundle directory not found anywhere in src-tauri/target!"
-            find src-tauri/target -maxdepth 3
+            echo "❌ Bundle directory not found"
             exit 1
           fi
-          echo "📂 Bundle directory found: $BUNDLE_DIR"
           
-          # 2. Chercher un bundle d'update existant
           UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) | head -n 1)
           
-          # Fallback: chercher n'importe quel zip/tar.gz
           if [ -z "$UPDATE_BUNDLE" ]; then
              UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f \( -name "*.tar.gz" -o -name "*.zip" \) | head -n 1)
           fi
 
-          # 3. Fallback CRITIQUE: Créer le bundle si absent (ex: Windows qui n'a que .exe)
           if [ -z "$UPDATE_BUNDLE" ]; then
-            echo "⚠️ No update bundle found. Creating one from installer..."
-            
-            # Chercher un installeur principal
             INSTALLER=$(find "$BUNDLE_DIR" -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.dmg" \) | head -n 1)
-            
-            if [ -z "$INSTALLER" ]; then
-                echo "❌ No installer found to create bundle from!"
-                ls -R "$BUNDLE_DIR"
-                exit 1
-            fi
-            
-            echo "📦 Found installer: $INSTALLER"
             INST_FILENAME=$(basename "$INSTALLER")
-            
             if [[ "$OS_NAME" == "windows" ]]; then
-                # Windows: Créer un zip
                 NEW_ZIP="${INSTALLER}.zip"
-                echo "🗜️ Zipping $INSTALLER to $NEW_ZIP"
-                if command -v 7z >/dev/null; then
-                    7z a "$NEW_ZIP" "$INSTALLER"
-                else
-                    # PowerShell fallback
-                    powershell -Command "Compress-Archive -Path '$INSTALLER' -DestinationPath '$NEW_ZIP'"
-                fi
+                powershell -Command "Compress-Archive -Path '$INSTALLER' -DestinationPath '$NEW_ZIP'"
                 UPDATE_BUNDLE="$NEW_ZIP"
             else
-                # Unix: Créer un tar.gz
                 NEW_TAR="${INSTALLER}.tar.gz"
-                echo "🗜️ Compressing $INSTALLER to $NEW_TAR"
                 tar -czf "$NEW_TAR" -C "$(dirname "$INSTALLER")" "$INST_FILENAME"
                 UPDATE_BUNDLE="$NEW_TAR"
             fi
           fi
 
-          echo "📦 Final update bundle: $UPDATE_BUNDLE"
-          
-          # 4. Préparer le nom final standardisé
           FILENAME=$(basename "$UPDATE_BUNDLE")
           if [[ "$FILENAME" == *.app.tar.gz ]]; then EXT="app.tar.gz"
           elif [[ "$FILENAME" == *.AppImage.tar.gz ]]; then EXT="AppImage.tar.gz"
@@ -197,34 +137,18 @@ jobs:
           fi
           
           NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.${EXT}"
-          
-          echo "🔄 Renaming bundle to $NEW_BUNDLE_NAME"
           cp "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
           
-          # 5. Signature
-          echo "✍️ Signing $NEW_BUNDLE_NAME..."
           export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
           export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
           bun tauri signer sign "./$NEW_BUNDLE_NAME"
           
-          SIG_FILE="./$NEW_BUNDLE_NAME.sig"
-          if [ ! -f "$SIG_FILE" ]; then
-             echo "❌ Signature creation failed"
-             exit 1
-          fi
+          gh release upload "$VERSION" "./$NEW_BUNDLE_NAME" "./$NEW_BUNDLE_NAME.sig" --clobber
           
-          # 6. Upload
-          echo "🚀 Uploading bundle and signature..."
-          gh release upload "$VERSION" "./$NEW_BUNDLE_NAME" "$SIG_FILE" --clobber
-          
-          # 7. Upload Installeurs (renommés)
-          echo "🔍 Searching for installers to upload..."
           find "$BUNDLE_DIR" -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" | while read -r INSTALLER_PATH; do
             INST_NAME=$(basename "$INSTALLER_PATH")
-            # Nom unique
             NEW_INST_NAME="${INST_NAME%.*}_${ARCH}_${OS_NAME}.${INST_NAME##*.}"
             cp "$INSTALLER_PATH" "./$NEW_INST_NAME"
-            echo "🚀 Uploading installer: $NEW_INST_NAME"
             gh release upload "$VERSION" "./$NEW_INST_NAME" --clobber
           done
 
@@ -235,7 +159,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Generate multi-platform latest.json
+      - name: Generate latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -244,57 +168,25 @@ jobs:
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           REPO="${{ github.repository }}"
           BASE_URL="https://github.com/$REPO/releases/download/$VERSION"
-
-          echo "📦 Fetching release assets for $VERSION..."
           ASSETS=$(gh release view "$VERSION" --repo "$REPO" --json assets -q '.assets[].name')
-
           PLATFORMS="{}"
 
           add_platform() {
             local platform_key="$1"
             local pattern="$2"
-
-            # On cherche le fichier correspondant au pattern (plus flexible)
             ASSET_NAME=$(echo "$ASSETS" | grep -iE "$pattern" | grep -v '\.sig$' | head -n 1)
-            
             if [ -n "$ASSET_NAME" ]; then
-              SIG_NAME="${ASSET_NAME}.sig"
-              if echo "$ASSETS" | grep -qF "$SIG_NAME"; then
-                echo "✅ $platform_key : $ASSET_NAME"
-                gh release download "$VERSION" --repo "$REPO" -p "$SIG_NAME" -D /tmp --clobber
-                SIGNATURE=$(cat "/tmp/$SIG_NAME")
-                
-                PLATFORMS=$(echo "$PLATFORMS" | jq \
-                  --arg key "$platform_key" \
-                  --arg sig "$SIGNATURE" \
-                  --arg url "$BASE_URL/$ASSET_NAME" \
-                  '. + {($key): {"signature": $sig, "url": $url}}')
-              else
-                echo "⚠️ Missing signature for $ASSET_NAME"
-              fi
-            else
-              echo "ℹ️ No asset match for $platform_key"
+              gh release download "$VERSION" --repo "$REPO" -p "${ASSET_NAME}.sig" -D /tmp --clobber
+              SIGNATURE=$(cat "/tmp/${ASSET_NAME}.sig")
+              PLATFORMS=$(echo "$PLATFORMS" | jq --arg key "$platform_key" --arg sig "$SIGNATURE" --arg url "$BASE_URL/$ASSET_NAME" '. + {($key): {"signature": $sig, "url": $url}}')
             fi
           }
 
-          # Patterns assouplis
           add_platform "darwin-aarch64" "aarch64.*darwin.*app\.tar\.gz"
           add_platform "darwin-x86_64"  "x64.*darwin.*app\.tar\.gz"
           add_platform "windows-x86_64" "x64.*windows.*(msi|nsis)\.zip"
           add_platform "linux-x86_64"   "x64.*linux.*AppImage.*tar\.gz"
 
-          jq -n \
-            --arg version "$CLEAN_VERSION" \
-            --arg notes "Mise à jour vers la version $CLEAN_VERSION" \
-            --arg pub_date "$PUB_DATE" \
-            --argjson platforms "$PLATFORMS" \
-            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: $platforms}' > latest.json
-
-          echo "📄 latest.json content:"
-          cat latest.json
-
-          echo "🚀 Uploading latest.json..."
+          jq -n --arg version "$CLEAN_VERSION" --arg notes "Mise à jour $CLEAN_VERSION" --arg pub_date "$PUB_DATE" --argjson platforms "$PLATFORMS" '{version: $version, notes: $notes, pub_date: $pub_date, platforms: $platforms}' > latest.json
           gh release upload "$VERSION" latest.json --repo "$REPO" --clobber
-
-          echo "🔓 Undrafting release..."
           gh release edit "$VERSION" --draft=false --repo "$REPO"

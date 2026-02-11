@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.5.1",
+        date: "2026-02-11",
+        title: "Compatibilité Catalina & Optimisation",
+        changes: [
+            "Correction du crash au démarrage sur macOS Catalina (Intel)",
+            "Renforcement de la transpilation Legacy pour les anciens moteurs WebKit",
+            "Suppression des systèmes de cache de build instables",
+            "Optimisation de la minification pour Safari"
+        ],
+        features: []
+    },
+    {
         version: "0.5.0",
         date: "2026-02-11",
         title: "Mise à jour majeure : Stabilité macOS",
@@ -273,4 +285,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.5.0";
+export const LATEST_VERSION = "0.5.1";
