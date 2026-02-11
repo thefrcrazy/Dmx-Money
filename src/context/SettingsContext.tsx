@@ -462,15 +462,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100 scale-100'
                     }`}
                 >
-                    <div className="relative">
-                        <div className={`absolute inset-0 bg-indigo-500/20 rounded-full blur-xl transition-transform duration-1000 ${isTransitioning ? 'scale-150' : 'scale-100'}`}></div>
+                    <div className="relative mb-8">
+                        <div className={`absolute inset-0 bg-indigo-500/20 rounded-full blur-2xl transition-transform duration-1000 ${isTransitioning ? 'scale-150' : 'scale-100'}`}></div>
                         <img 
                             src="/logo.svg" 
                             alt="Logo" 
-                            className={`w-16 h-16 relative z-10 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : 'scale-100'}`} 
+                            className={`w-32 h-32 relative z-10 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : 'scale-100'}`} 
                         />
                     </div>
-                    <div className={`absolute bottom-2 w-4 h-4 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}></div>
+                    <div className={`w-8 h-8 border-2 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}></div>
+                    <div className={`mt-6 text-xs font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 transition-all duration-500 ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-70 translate-y-0'}`}>
+                        DmxMoney
+                    </div>
                 </div>
             )}
         </SettingsContext.Provider>

@@ -22,7 +22,7 @@ pub fn run() {
             // Manual Window Creation for full control (especially traffic lights)
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("DmxMoney 2025")
-                .inner_size(120.0, 120.0) // Small square for splash
+                .inner_size(400.0, 400.0) // 400x400 square splash
                 .resizable(false)
                 .decorations(false) // Start borderless for splash screen effect
                 .center();
@@ -31,8 +31,7 @@ pub fn run() {
             {
                 window_builder = window_builder
                     .hidden_title(true)
-                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                    .traffic_light_position(tauri::LogicalPosition::new(14.0, 22.0));
+                    .title_bar_style(tauri::TitleBarStyle::Overlay);
             }
 
             let window = window_builder.build().expect("failed to build window");

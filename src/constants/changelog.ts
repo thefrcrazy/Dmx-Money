@@ -12,6 +12,18 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.4.6",
+        date: "2026-02-11",
+        title: "Stabilité du chargement",
+        changes: [
+            "Splash screen repassé en 400x400 pour une transition plus stable",
+            "Correction du bug d'interface écrasée après le démarrage",
+            "Restauration garantie des bordures et contrôles de fenêtre",
+            "Amélioration visuelle du logo et du spinner de chargement"
+        ],
+        features: []
+    },
+    {
         version: "0.4.5",
         date: "2026-02-11",
         title: "Perfectionnement du démarrage",
