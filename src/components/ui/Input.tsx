@@ -74,19 +74,34 @@ const Input: React.FC<InputProps> = ({
     }, [isCalendarOpen]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
+        let val = e.target.value;
+        
         if (type === 'date') {
-            setDisplayText(val);
+            // Keep only digits
+            const digits = val.replace(/\D/g, '').substring(0, 8);
             
-            // Simple parsing for DD/MM/YYYY
-            const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-            const match = val.match(dateRegex);
-            if (match) {
-                const day = match[1].padStart(2, '0');
-                const month = match[2].padStart(2, '0');
-                const year = match[3];
+            // Build formatted string JJ/MM/AAAA
+            let formatted = '';
+            if (digits.length > 0) {
+                formatted = digits.substring(0, 2);
+                if (digits.length > 2) {
+                    formatted += '/' + digits.substring(2, 4);
+                    if (digits.length > 4) {
+                        formatted += '/' + digits.substring(4, 8);
+                    }
+                }
+            }
+            
+            setDisplayText(formatted);
+            
+            // Simple parsing for DD/MM/YYYY to trigger onChange
+            if (digits.length === 8) {
+                const day = digits.substring(0, 2);
+                const month = digits.substring(2, 4);
+                const year = digits.substring(4, 8);
                 const isoDate = `${year}-${month}-${day}`;
-                if (isValid(parseISO(isoDate)) && year.length === 4) {
+                
+                if (isValid(parseISO(isoDate))) {
                     if (onChange) {
                         const event = {
                             ...e,
