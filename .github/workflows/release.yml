@@ -121,7 +121,7 @@ jobs:
             INST_FILENAME=$(basename "$INSTALLER")
             if [[ "$OS_NAME" == "windows" ]]; then
                 NEW_ZIP="${INSTALLER}.zip"
-                powershell -Command "Compress-Archive -Path '$INSTALLER' -DestinationPath '$NEW_ZIP'"
+                7z a -tzip "$NEW_ZIP" "$INSTALLER"
                 UPDATE_BUNDLE="$NEW_ZIP"
             else
                 NEW_TAR="${INSTALLER}.tar.gz"
