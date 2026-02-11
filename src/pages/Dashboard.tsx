@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Tag, ArrowRightLeft, Wallet, Receipt, Plus, CalendarClock, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { useBank } from '../context/BankContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -27,48 +27,53 @@ const Dashboard: React.FC = () => {
     const [newAccountColor] = useState('#3b82f6');
 
     // --- Specific Dashboard Logic (Not in global hook) ---
-    
+
     // Accounts with individual balance (for list)
-    const accountsWithBalance = accounts.map(account => {
-        // We need to re-calculate this per account, can't easily hookify without complexity
-        // But we can optimize: this is relatively fast.
+    const accountsWithBalance = useMemo(() => accounts.map(account => {
         const accountTransactions = relevantTransactions.filter(t => t.accountId === account.id);
         const balance = account.initialBalance + accountTransactions.reduce((sum, t) => {
             return sum + (t.type === 'income' ? t.amount : -t.amount);
         }, 0);
         return { ...account, balance };
-    });
+    }), [accounts, relevantTransactions]);
 
     // Categories Breakdown
-    const expensesByCategory = relevantTransactions
-        .filter(t => t.type === 'expense' && new Date(t.date).getMonth() === new Date().getMonth())
-        .reduce((acc, t) => {
-            acc[t.category] = (acc[t.category] || 0) + t.amount;
-            return acc;
-        }, {} as Record<string, number>);
+    const topCategories = useMemo(() => {
+        const currentMonth = new Date().getMonth();
+        const expensesByCategory = relevantTransactions
+            .filter(t => t.type === 'expense' && new Date(t.date).getMonth() === currentMonth)
+            .reduce((acc, t) => {
+                acc[t.category] = (acc[t.category] || 0) + t.amount;
+                return acc;
+            }, {} as Record<string, number>);
 
-    const topCategories = Object.entries(expensesByCategory)
-        .map(([id, amount]) => {
-            const cat = categories.find(c => c.id === id);
-            return {
-                id,
-                name: cat?.name || 'Inconnu',
-                color: cat?.color || '#9ca3af',
-                icon: cat?.icon || 'Tag',
-                amount,
-                percentage: monthlyExpenses > 0 ? (amount / monthlyExpenses) * 100 : 0
-            };
-        })
-        .sort((a, b) => b.amount - a.amount);
+        return Object.entries(expensesByCategory)
+            .map(([id, amount]) => {
+                const cat = categories.find(c => c.id === id);
+                return {
+                    id,
+                    name: cat?.name || 'Inconnu',
+                    color: cat?.color || '#9ca3af',
+                    icon: cat?.icon || 'Tag',
+                    amount,
+                    percentage: monthlyExpenses > 0 ? (amount / monthlyExpenses) * 100 : 0
+                };
+            })
+            .sort((a, b) => b.amount - a.amount);
+    }, [relevantTransactions, categories, monthlyExpenses]);
 
     // Budget Logic
-    const relevantScheduled = scheduled.filter(s => s.includeInForecast);
-    const totalBudgeted = relevantScheduled.reduce((sum, s) => sum + s.amount, 0);
-    const budgetRemaining = totalBudgeted - monthlyExpenses;
-    const budgetProgress = totalBudgeted > 0 ? Math.min((monthlyExpenses / totalBudgeted) * 100, 100) : 0;
+    const { totalBudgeted, budgetRemaining, budgetProgress } = useMemo(() => {
+        const total = scheduled.filter(s => s.includeInForecast).reduce((sum, s) => sum + s.amount, 0);
+        return {
+            totalBudgeted: total,
+            budgetRemaining: total - monthlyExpenses,
+            budgetProgress: total > 0 ? Math.min((monthlyExpenses / total) * 100, 100) : 0
+        };
+    }, [scheduled, monthlyExpenses]);
 
     // Upcoming Scheduled
-    const upcomingScheduled = scheduled
+    const upcomingScheduled = useMemo(() => scheduled
         .map(s => {
             const nextDate = new Date(s.nextDate);
             const today = new Date();
@@ -77,7 +82,7 @@ const Dashboard: React.FC = () => {
             return { ...s, diffDays, dateObj: nextDate };
         })
         .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
-        .slice(0, 3);
+        .slice(0, 3), [scheduled]);
 
     const renderCategoryIcon = (iconName: string, className: string = "w-4 h-4") => {
         if (iconName === 'ArrowRightLeft') return <ArrowRightLeft className={className} />;

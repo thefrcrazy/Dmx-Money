@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Account, Transaction, Category, ScheduledTransaction, BankContextType, AppData } from '../types';
 import { dbService } from '../services/db';
@@ -281,140 +281,6 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         init();
     }, []);
 
-    // --- Accounts ---
-    const addAccount = async (account: Omit<Account, 'id'>) => {
-        const newAccount: Account = {
-            ...account,
-            id: uuidv4(),
-            icon: account.icon || getAccountDefaults(account.type).icon,
-            color: account.color || getAccountDefaults(account.type).color
-        };
-        await dbService.addAccount(newAccount);
-        setAccounts(prev => [...prev, newAccount]);
-        return newAccount.id;
-    };
-
-    const updateAccount = async (account: Account) => {
-        await dbService.updateAccount(account);
-        setAccounts(prev => prev.map(a => a.id === account.id ? account : a));
-    };
-
-    const deleteAccount = async (id: string) => {
-        await dbService.deleteAccount(id);
-        // Also delete associated transactions and scheduled transactions
-        const transactionsToDelete = transactions.filter(t => t.accountId === id).map(t => t.id);
-        const scheduledToDelete = scheduled.filter(s => s.accountId === id).map(s => s.id);
-
-        await Promise.all([
-            ...transactionsToDelete.map(txId => dbService.deleteTransaction(txId)),
-            ...scheduledToDelete.map(schId => dbService.deleteScheduled(schId))
-        ]);
-
-        setAccounts(prev => prev.filter(a => a.id !== id));
-        setTransactions(prev => prev.filter(t => t.accountId !== id));
-        setScheduled(prev => prev.filter(s => s.accountId !== id));
-        if (filterAccount.includes(id)) setFilterAccount(filterAccount.filter(a => a !== id));
-    };
-
-    // --- Transactions ---
-    const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
-        const newTransaction: Transaction = { ...transaction, id: uuidv4() };
-        await dbService.addTransaction(newTransaction);
-        setTransactions(prev => [newTransaction, ...prev]);
-        return newTransaction.id;
-    };
-
-    const addTransfer = async (fromAccountId: string, toAccountId: string, amount: number, date: string, description: string) => {
-        const fromTxId = uuidv4();
-        const toTxId = uuidv4();
-
-        const fromTx: Transaction = {
-            id: fromTxId,
-            date,
-            accountId: fromAccountId,
-            type: 'expense',
-            amount,
-            category: 'transfer',
-            description,
-            checked: false,
-            isTransfer: true,
-            linkedTransactionId: toTxId
-        };
-
-        const toTx: Transaction = {
-            id: toTxId,
-            date,
-            accountId: toAccountId,
-            type: 'income',
-            amount,
-            category: 'transfer',
-            description,
-            checked: false,
-            isTransfer: true,
-            linkedTransactionId: fromTxId
-        };
-
-        await Promise.all([
-            dbService.addTransaction(fromTx),
-            dbService.addTransaction(toTx)
-        ]);
-
-        setTransactions(prev => [fromTx, toTx, ...prev]);
-    };
-
-    const updateTransaction = async (transaction: Transaction) => {
-        await dbService.updateTransaction(transaction);
-        setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
-    };
-
-    const deleteTransaction = async (id: string) => {
-        await dbService.deleteTransaction(id);
-        setTransactions(prev => prev.filter(t => t.id !== id));
-    };
-
-    const toggleTransactionCheck = async (id: string) => {
-        const transaction = transactions.find(t => t.id === id);
-        if (transaction) {
-            const updated = { ...transaction, checked: !transaction.checked };
-            await updateTransaction(updated);
-        }
-    };
-
-    // --- Categories ---
-    const addCategory = async (category: Omit<Category, 'id'>) => {
-        const newCategory: Category = { ...category, id: uuidv4() };
-        await dbService.addCategory(newCategory);
-        setCategories(prev => [...prev, newCategory]);
-        return newCategory.id;
-    };
-
-    const updateCategory = async (category: Category) => {
-        await dbService.updateCategory(category);
-        setCategories(prev => prev.map(c => c.id === category.id ? category : c));
-    };
-
-    const deleteCategory = async (id: string) => {
-        await dbService.deleteCategory(id);
-        setCategories(prev => prev.filter(c => c.id !== id));
-    };
-
-    // --- Scheduled ---
-    const addScheduled = async (scheduledTx: Omit<ScheduledTransaction, 'id'>) => {
-        const newScheduled: ScheduledTransaction = { ...scheduledTx, id: uuidv4() };
-        await dbService.addScheduled(newScheduled);
-        setScheduled(prev => [...prev, newScheduled]);
-    };
-
-    const updateScheduled = async (scheduledTx: ScheduledTransaction) => {
-        await dbService.updateScheduled(scheduledTx);
-        setScheduled(prev => prev.map(s => s.id === scheduledTx.id ? scheduledTx : s));
-    };
-
-    const deleteScheduled = async (id: string) => {
-        await dbService.deleteScheduled(id);
-        setScheduled(prev => prev.filter(s => s.id !== id));
-    };
-
     const getAccountDefaults = (type: string) => {
         switch (type) {
             case 'Épargne': return { icon: 'PiggyBank', color: '#10b981' };
@@ -424,30 +290,150 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // --- Accounts ---
+    const addAccount = useCallback(async (account: Omit<Account, 'id'>) => {
+        const newAccount: Account = {
+            ...account,
+            id: uuidv4(),
+            icon: account.icon || getAccountDefaults(account.type).icon,
+            color: account.color || getAccountDefaults(account.type).color
+        };
+        await dbService.addAccount(newAccount);
+        setAccounts(prev => [...prev, newAccount]);
+        return newAccount.id;
+    }, []);
+
+    const updateAccount = useCallback(async (account: Account) => {
+        await dbService.updateAccount(account);
+        setAccounts(prev => prev.map(a => a.id === account.id ? account : a));
+    }, []);
+
+    const deleteAccount = useCallback(async (id: string) => {
+        // Rust delete_account already deletes associated transactions and scheduled in a SQL transaction
+        await dbService.deleteAccount(id);
+        setAccounts(prev => prev.filter(a => a.id !== id));
+        setTransactions(prev => prev.filter(t => t.accountId !== id));
+        setScheduled(prev => prev.filter(s => s.accountId !== id));
+        setFilterAccount(prev => prev.includes(id) ? prev.filter(a => a !== id) : prev);
+    }, []);
+
+    // --- Transactions ---
+    const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id'>) => {
+        const newTransaction: Transaction = { ...transaction, id: uuidv4() };
+        await dbService.addTransaction(newTransaction);
+        setTransactions(prev => [newTransaction, ...prev]);
+        return newTransaction.id;
+    }, []);
+
+    const addTransfer = useCallback(async (fromAccountId: string, toAccountId: string, amount: number, date: string, description: string) => {
+        const fromTxId = uuidv4();
+        const toTxId = uuidv4();
+
+        const fromTx: Transaction = {
+            id: fromTxId, date, accountId: fromAccountId, type: 'expense', amount,
+            category: 'transfer', description, checked: false, isTransfer: true, linkedTransactionId: toTxId
+        };
+
+        const toTx: Transaction = {
+            id: toTxId, date, accountId: toAccountId, type: 'income', amount,
+            category: 'transfer', description, checked: false, isTransfer: true, linkedTransactionId: fromTxId
+        };
+
+        await Promise.all([
+            dbService.addTransaction(fromTx),
+            dbService.addTransaction(toTx)
+        ]);
+
+        setTransactions(prev => [fromTx, toTx, ...prev]);
+    }, []);
+
+    const updateTransaction = useCallback(async (transaction: Transaction) => {
+        await dbService.updateTransaction(transaction);
+        setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
+    }, []);
+
+    const deleteTransaction = useCallback(async (id: string) => {
+        await dbService.deleteTransaction(id);
+        setTransactions(prev => prev.filter(t => t.id !== id));
+    }, []);
+
+    const toggleTransactionCheck = useCallback(async (id: string) => {
+        setTransactions(prev => {
+            const transaction = prev.find(t => t.id === id);
+            if (!transaction) return prev;
+            const updated = { ...transaction, checked: !transaction.checked };
+            dbService.updateTransaction(updated);
+            return prev.map(t => t.id === id ? updated : t);
+        });
+    }, []);
+
+    // --- Categories ---
+    const addCategory = useCallback(async (category: Omit<Category, 'id'>) => {
+        const newCategory: Category = { ...category, id: uuidv4() };
+        await dbService.addCategory(newCategory);
+        setCategories(prev => [...prev, newCategory]);
+        return newCategory.id;
+    }, []);
+
+    const updateCategory = useCallback(async (category: Category) => {
+        await dbService.updateCategory(category);
+        setCategories(prev => prev.map(c => c.id === category.id ? category : c));
+    }, []);
+
+    const deleteCategory = useCallback(async (id: string) => {
+        await dbService.deleteCategory(id);
+        setCategories(prev => prev.filter(c => c.id !== id));
+    }, []);
+
+    // --- Scheduled ---
+    const addScheduled = useCallback(async (scheduledTx: Omit<ScheduledTransaction, 'id'>) => {
+        const newScheduled: ScheduledTransaction = { ...scheduledTx, id: uuidv4() };
+        await dbService.addScheduled(newScheduled);
+        setScheduled(prev => [...prev, newScheduled]);
+    }, []);
+
+    const updateScheduled = useCallback(async (scheduledTx: ScheduledTransaction) => {
+        await dbService.updateScheduled(scheduledTx);
+        setScheduled(prev => prev.map(s => s.id === scheduledTx.id ? scheduledTx : s));
+    }, []);
+
+    const deleteScheduled = useCallback(async (id: string) => {
+        await dbService.deleteScheduled(id);
+        setScheduled(prev => prev.filter(s => s.id !== id));
+    }, []);
+
+    const contextValue = useMemo(() => ({
+        accounts,
+        transactions,
+        categories,
+        scheduled,
+        addAccount,
+        updateAccount,
+        deleteAccount,
+        addTransaction,
+        addTransfer,
+        updateTransaction,
+        deleteTransaction,
+        toggleTransactionCheck,
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        addScheduled,
+        updateScheduled,
+        deleteScheduled,
+        filterAccount,
+        setFilterAccount,
+        isLoading
+    }), [
+        accounts, transactions, categories, scheduled, filterAccount, isLoading,
+        addAccount, updateAccount, deleteAccount,
+        addTransaction, addTransfer, updateTransaction, deleteTransaction, toggleTransactionCheck,
+        addCategory, updateCategory, deleteCategory,
+        addScheduled, updateScheduled, deleteScheduled
+    ]);
+
     return (
-        <BankContext.Provider value={{
-            accounts,
-            transactions,
-            categories,
-            scheduled,
-            addAccount,
-            updateAccount,
-            deleteAccount,
-            addTransaction,
-            addTransfer,
-            updateTransaction,
-            deleteTransaction,
-            toggleTransactionCheck,
-            addCategory,
-            updateCategory,
-            deleteCategory,
-            addScheduled,
-            updateScheduled,
-            deleteScheduled,
-            filterAccount,
-            setFilterAccount,
-            isLoading
-        }}>
+        <BankContext.Provider value={contextValue}>
             {children}
         </BankContext.Provider>
     );

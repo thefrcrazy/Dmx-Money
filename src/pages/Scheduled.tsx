@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Calendar, Trash2, Edit2, Clock, X, Tag } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useBank } from '../context/BankContext';
@@ -18,12 +18,12 @@ const Scheduled: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<ScheduledTransaction | null>(null);
 
-    const scheduledTransactions = filterAccount.length === 0
-        ? scheduled
-        : scheduled.filter(t => filterAccount.includes(t.accountId));
-
-    // Sort by nextDate ascending
-    scheduledTransactions.sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime());
+    const scheduledTransactions = useMemo(() => {
+        const filtered = filterAccount.length === 0
+            ? scheduled
+            : scheduled.filter(t => filterAccount.includes(t.accountId));
+        return [...filtered].sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime());
+    }, [scheduled, filterAccount]);
 
     // Delete Confirmation State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);

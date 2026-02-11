@@ -74,7 +74,8 @@ const Transactions: React.FC = () => {
             return { ...t, balance: newBal };
         });
 
-        return withBalance.reverse().filter(t => displayTransactions.some(ft => ft.id === t.id));
+        const displayIds = new Set(displayTransactions.map(ft => ft.id));
+        return withBalance.reverse().filter(t => displayIds.has(t.id));
     }, [transactions, accounts, displayTransactions]);
 
     const handleOpenModal = (transaction?: Transaction) => {
@@ -137,9 +138,7 @@ const Transactions: React.FC = () => {
     const handleGroupDelete = async () => {
         const count = selectedIds.size;
         try {
-            for (const id of Array.from(selectedIds)) {
-                await deleteTransaction(id);
-            }
+            await Promise.all(Array.from(selectedIds).map(id => deleteTransaction(id)));
             setSelectedIds(new Set());
             showToast(`${count} transactions supprimées`, "success");
         } catch (e) {

@@ -110,6 +110,17 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
     .execute(&mut *tx)
     .await?;
 
+    // Indexes for query performance
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(\"accountId\")")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_scheduled_account_id ON scheduled_transactions(\"accountId\")")
+        .execute(&mut *tx)
+        .await?;
+
     // Migration: Add displayStyle column if it doesn't exist
     let has_display_style: bool = sqlx::query_scalar(
         "SELECT count(*) FROM pragma_table_info('settings') WHERE name='displayStyle'",
@@ -120,7 +131,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_display_style {
-        println!("Migrating settings table: adding displayStyle column");
+        log::info!("Migrating settings table: adding displayStyle column");
         sqlx::query(
             "ALTER TABLE settings ADD COLUMN \"displayStyle\" TEXT NOT NULL DEFAULT 'modern'",
         )
@@ -138,7 +149,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_component_spacing {
-        println!("Migrating settings table: adding componentSpacing column");
+        log::info!("Migrating settings table: adding componentSpacing column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"componentSpacing\" INTEGER NOT NULL DEFAULT 6")
             .execute(&mut *tx)
             .await?;
@@ -154,7 +165,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_component_padding {
-        println!("Migrating settings table: adding componentPadding column");
+        log::info!("Migrating settings table: adding componentPadding column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"componentPadding\" INTEGER NOT NULL DEFAULT 6")
             .execute(&mut *tx)
             .await?;
@@ -171,7 +182,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
 
 
     if !has_account_groups {
-        println!("Migrating settings table: adding accountGroups column");
+        log::info!("Migrating settings table: adding accountGroups column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"accountGroups\" TEXT")
             .execute(&mut *tx)
             .await?;
@@ -187,7 +198,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_custom_groups {
-        println!("Migrating settings table: adding customGroups column");
+        log::info!("Migrating settings table: adding customGroups column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"customGroups\" TEXT")
             .execute(&mut *tx)
             .await?;
@@ -203,7 +214,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_custom_groups_order {
-        println!("Migrating settings table: adding customGroupsOrder column");
+        log::info!("Migrating settings table: adding customGroupsOrder column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"customGroupsOrder\" TEXT")
             .execute(&mut *tx)
             .await?;
@@ -219,7 +230,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_accounts_order {
-        println!("Migrating settings table: adding accountsOrder column");
+        log::info!("Migrating settings table: adding accountsOrder column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"accountsOrder\" TEXT")
             .execute(&mut *tx)
             .await?;
@@ -235,7 +246,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_to_account_id {
-        println!("Migrating scheduled_transactions table: adding toAccountId column");
+        log::info!("Migrating scheduled_transactions table: adding toAccountId column");
         sqlx::query("ALTER TABLE scheduled_transactions ADD COLUMN \"toAccountId\" TEXT")
             .execute(&mut *tx)
             .await?;
@@ -251,7 +262,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_include_in_forecast {
-        println!("Migrating scheduled_transactions table: adding includeInForecast column");
+        log::info!("Migrating scheduled_transactions table: adding includeInForecast column");
         sqlx::query("ALTER TABLE scheduled_transactions ADD COLUMN \"includeInForecast\" BOOLEAN DEFAULT 1")
             .execute(&mut *tx)
             .await?;
@@ -267,7 +278,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_end_date {
-        println!("Migrating scheduled_transactions table: adding endDate column");
+        log::info!("Migrating scheduled_transactions table: adding endDate column");
         sqlx::query("ALTER TABLE scheduled_transactions ADD COLUMN \"endDate\" TEXT")
             .execute(&mut *tx)
             .await?;
@@ -283,7 +294,7 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         > 0;
 
     if !has_last_seen_version {
-        println!("Migrating settings table: adding lastSeenVersion column");
+        log::info!("Migrating settings table: adding lastSeenVersion column");
         sqlx::query("ALTER TABLE settings ADD COLUMN \"lastSeenVersion\" TEXT")
             .execute(&mut *tx)
             .await?;

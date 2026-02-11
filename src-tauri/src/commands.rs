@@ -8,7 +8,7 @@ use tauri::{command, State};
 // Helper to map SQLx errors to user-friendly strings
 fn map_db_error(e: sqlx::Error, context: &str) -> String {
     let err_msg = e.to_string();
-    println!("Database Error during {context}: {err_msg}");
+    log::error!("Database Error during {context}: {err_msg}");
     
     if err_msg.contains("FOREIGN KEY constraint failed") {
         return "Impossible de supprimer cet élément car il est utilisé ailleurs.".to_string();
@@ -23,7 +23,7 @@ fn map_db_error(e: sqlx::Error, context: &str) -> String {
 // --- Accounts ---
 #[command]
 pub async fn get_accounts(pool: State<'_, DbPool>) -> Result<Vec<Account>, String> {
-    println!("Invoked get_accounts");
+    log::debug!("Invoked get_accounts");
     sqlx::query_as::<_, Account>("SELECT * FROM accounts")
         .fetch_all(&*pool)
         .await
@@ -32,7 +32,7 @@ pub async fn get_accounts(pool: State<'_, DbPool>) -> Result<Vec<Account>, Strin
 
 #[command]
 pub async fn add_account(pool: State<'_, DbPool>, account: Account) -> Result<(), String> {
-    println!("Invoked add_account: {account:?}");
+    log::debug!("Invoked add_account: {account:?}");
     sqlx::query(
         "INSERT OR IGNORE INTO accounts (id, name, \"type\", \"initialBalance\", color, icon) VALUES ($1, $2, $3, $4, $5, $6)"
     )
@@ -50,7 +50,7 @@ pub async fn add_account(pool: State<'_, DbPool>, account: Account) -> Result<()
 
 #[command]
 pub async fn update_account(pool: State<'_, DbPool>, account: Account) -> Result<(), String> {
-    println!("Invoked update_account: {account:?}");
+    log::debug!("Invoked update_account: {account:?}");
     sqlx::query(
         "UPDATE accounts SET name = $1, \"type\" = $2, \"initialBalance\" = $3, color = $4, icon = $5 WHERE id = $6"
     )
@@ -68,7 +68,7 @@ pub async fn update_account(pool: State<'_, DbPool>, account: Account) -> Result
 
 #[command]
 pub async fn delete_account(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_account: {id}");
+    log::debug!("Invoked delete_account: {id}");
     // Transactional delete
     let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
 
@@ -97,7 +97,7 @@ pub async fn delete_account(pool: State<'_, DbPool>, id: String) -> Result<(), S
 // --- Transactions ---
 #[command]
 pub async fn get_transactions(pool: State<'_, DbPool>) -> Result<Vec<Transaction>, String> {
-    println!("Invoked get_transactions");
+    log::debug!("Invoked get_transactions");
     sqlx::query_as::<_, Transaction>("SELECT * FROM transactions ORDER BY date DESC")
         .fetch_all(&*pool)
         .await
@@ -109,7 +109,7 @@ pub async fn add_transaction(
     pool: State<'_, DbPool>,
     transaction: Transaction,
 ) -> Result<(), String> {
-    println!("Invoked add_transaction: {transaction:?}");
+    log::debug!("Invoked add_transaction: {transaction:?}");
     sqlx::query(
         "INSERT INTO transactions (id, date, \"accountId\", \"type\", amount, category, description, checked, \"isTransfer\", \"linkedTransactionId\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
     )
@@ -134,7 +134,7 @@ pub async fn update_transaction(
     pool: State<'_, DbPool>,
     transaction: Transaction,
 ) -> Result<(), String> {
-    println!("Invoked update_transaction: {transaction:?}");
+    log::debug!("Invoked update_transaction: {transaction:?}");
     sqlx::query(
         "UPDATE transactions SET date = $1, \"accountId\" = $2, \"type\" = $3, amount = $4, category = $5, description = $6, checked = $7, \"isTransfer\" = $8, \"linkedTransactionId\" = $9 WHERE id = $10"
     )
@@ -156,7 +156,7 @@ pub async fn update_transaction(
 
 #[command]
 pub async fn delete_transaction(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_transaction: {id}");
+    log::debug!("Invoked delete_transaction: {id}");
     sqlx::query("DELETE FROM transactions WHERE id = $1")
         .bind(id)
         .execute(&*pool)
@@ -168,7 +168,7 @@ pub async fn delete_transaction(pool: State<'_, DbPool>, id: String) -> Result<(
 // --- Categories ---
 #[command]
 pub async fn get_categories(pool: State<'_, DbPool>) -> Result<Vec<Category>, String> {
-    println!("Invoked get_categories");
+    log::debug!("Invoked get_categories");
     sqlx::query_as::<_, Category>("SELECT * FROM categories")
         .fetch_all(&*pool)
         .await
@@ -177,7 +177,7 @@ pub async fn get_categories(pool: State<'_, DbPool>) -> Result<Vec<Category>, St
 
 #[command]
 pub async fn add_category(pool: State<'_, DbPool>, category: Category) -> Result<(), String> {
-    println!("Invoked add_category: {category:?}");
+    log::debug!("Invoked add_category: {category:?}");
     sqlx::query("INSERT OR IGNORE INTO categories (id, name, icon, color) VALUES ($1, $2, $3, $4)")
         .bind(category.id)
         .bind(category.name)
@@ -191,7 +191,7 @@ pub async fn add_category(pool: State<'_, DbPool>, category: Category) -> Result
 
 #[command]
 pub async fn update_category(pool: State<'_, DbPool>, category: Category) -> Result<(), String> {
-    println!("Invoked update_category: {category:?}");
+    log::debug!("Invoked update_category: {category:?}");
     sqlx::query("UPDATE categories SET name = $1, icon = $2, color = $3 WHERE id = $4")
         .bind(category.name)
         .bind(category.icon)
@@ -205,7 +205,7 @@ pub async fn update_category(pool: State<'_, DbPool>, category: Category) -> Res
 
 #[command]
 pub async fn delete_category(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_category: {id}");
+    log::debug!("Invoked delete_category: {id}");
     sqlx::query("DELETE FROM categories WHERE id = $1")
         .bind(id)
         .execute(&*pool)
@@ -217,7 +217,7 @@ pub async fn delete_category(pool: State<'_, DbPool>, id: String) -> Result<(), 
 // --- Scheduled Transactions ---
 #[command]
 pub async fn get_scheduled(pool: State<'_, DbPool>) -> Result<Vec<ScheduledTransaction>, String> {
-    println!("Invoked get_scheduled");
+    log::debug!("Invoked get_scheduled");
     sqlx::query_as::<_, ScheduledTransaction>("SELECT * FROM scheduled_transactions")
         .fetch_all(&*pool)
         .await
@@ -229,7 +229,7 @@ pub async fn add_scheduled(
     pool: State<'_, DbPool>,
     scheduled: ScheduledTransaction,
 ) -> Result<(), String> {
-    println!("Invoked add_scheduled: {scheduled:?}");
+    log::debug!("Invoked add_scheduled: {scheduled:?}");
     sqlx::query(
         "INSERT INTO scheduled_transactions (id, description, amount, \"type\", frequency, \"accountId\", \"nextDate\", category, \"toAccountId\", \"includeInForecast\", \"endDate\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
     )
@@ -255,7 +255,7 @@ pub async fn update_scheduled(
     pool: State<'_, DbPool>,
     scheduled: ScheduledTransaction,
 ) -> Result<(), String> {
-    println!("Invoked update_scheduled: {scheduled:?}");
+    log::debug!("Invoked update_scheduled: {scheduled:?}");
     sqlx::query(
         "UPDATE scheduled_transactions SET description = $1, amount = $2, \"type\" = $3, frequency = $4, \"accountId\" = $5, \"nextDate\" = $6, category = $7, \"toAccountId\" = $8, \"includeInForecast\" = $9, \"endDate\" = $10 WHERE id = $11"
     )
@@ -278,7 +278,7 @@ pub async fn update_scheduled(
 
 #[command]
 pub async fn delete_scheduled(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
-    println!("Invoked delete_scheduled: {id}");
+    log::debug!("Invoked delete_scheduled: {id}");
     sqlx::query("DELETE FROM scheduled_transactions WHERE id = $1")
         .bind(id)
         .execute(&*pool)
@@ -290,11 +290,11 @@ pub async fn delete_scheduled(pool: State<'_, DbPool>, id: String) -> Result<(),
 // --- Import Data ---
 #[command]
 pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), String> {
-    println!("Invoked import_data with {} accounts", data.accounts.len());
+    log::info!("Invoked import_data with {} accounts", data.accounts.len());
     let mut tx = pool.begin().await.map_err(|e| map_db_error(e, "début de transaction d'import"))?;
 
     // STEP 1: DELETE ALL EXISTING DATA
-    println!("Clearing existing database data...");
+    log::info!("Clearing existing database data...");
     
     sqlx::query("DELETE FROM transactions")
         .execute(&mut *tx)
@@ -383,14 +383,14 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
     }
 
     tx.commit().await.map_err(|e| map_db_error(e, "validation finale de l'import"))?;
-    println!("Import data completed successfully");
+    log::info!("Import data completed successfully");
     Ok(())
 }
 
 // --- Settings ---
 #[command]
 pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, String> {
-    println!("Invoked get_settings");
+    log::debug!("Invoked get_settings");
 
     #[derive(sqlx::FromRow)]
     struct SettingsRow {
@@ -465,7 +465,7 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
 
 #[command]
 pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Result<(), String> {
-    println!("Invoked save_settings: {settings:?}");
+    log::debug!("Invoked save_settings: {settings:?}");
 
     let (pos_x, pos_y) = if let Some(pos) = settings.window_position {
         (Some(pos.x), Some(pos.y))

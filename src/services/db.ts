@@ -3,152 +3,78 @@ import { Account, Transaction, Category, ScheduledTransaction, Settings } from '
 
 export class DatabaseService {
     async init(): Promise<void> {
-        // Rust init_db call is not needed here as tauri-plugin-sql or manual rust init 
-        // handles it on app setup. We just verify connection by fetching accounts.
-        try {
-            await this.getAccounts();
-        } catch (error) {
-            throw error;
-        }
+        await this.getAccounts();
     }
 
     // --- CRUD Operations ---
 
     // Accounts
     async getAccounts(): Promise<Account[]> {
-        try {
-            const res = await invoke<Account[]>('get_accounts');
-            return res;
-        } catch (e) {
-            throw e;
-        }
+        return invoke<Account[]>('get_accounts');
     }
 
     async addAccount(account: Account): Promise<void> {
-        try {
-            await invoke('add_account', { account });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('add_account', { account });
     }
 
     async updateAccount(account: Account): Promise<void> {
-        try {
-            await invoke('update_account', { account });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('update_account', { account });
     }
 
     async deleteAccount(id: string): Promise<void> {
-        try {
-            await invoke('delete_account', { id });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('delete_account', { id });
     }
 
     // Transactions
     async getTransactions(): Promise<Transaction[]> {
-        try {
-            const res = await invoke<Transaction[]>('get_transactions');
-            return res;
-        } catch (e) {
-            throw e;
-        }
+        return invoke<Transaction[]>('get_transactions');
     }
 
     async addTransaction(transaction: Transaction): Promise<string> {
-        try {
-            await invoke('add_transaction', { transaction });
-            return transaction.id;
-        } catch (e) {
-            throw e;
-        }
+        await invoke('add_transaction', { transaction });
+        return transaction.id;
     }
 
     async updateTransaction(transaction: Transaction): Promise<void> {
-        try {
-            await invoke('update_transaction', { transaction });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('update_transaction', { transaction });
     }
 
     async deleteTransaction(id: string): Promise<void> {
-        try {
-            await invoke('delete_transaction', { id });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('delete_transaction', { id });
     }
 
     // Categories
     async getCategories(): Promise<Category[]> {
-        try {
-            const res = await invoke<Category[]>('get_categories');
-            return res;
-        } catch (e) {
-            throw e;
-        }
+        return invoke<Category[]>('get_categories');
     }
 
     async addCategory(category: Category): Promise<void> {
-        try {
-            await invoke('add_category', { category });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('add_category', { category });
     }
 
     async updateCategory(category: Category): Promise<void> {
-        try {
-            await invoke('update_category', { category });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('update_category', { category });
     }
 
     async deleteCategory(id: string): Promise<void> {
-        try {
-            await invoke('delete_category', { id });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('delete_category', { id });
     }
 
     // Scheduled
     async getScheduled(): Promise<ScheduledTransaction[]> {
-        try {
-            const res = await invoke<ScheduledTransaction[]>('get_scheduled');
-            return res;
-        } catch (e) {
-            throw e;
-        }
+        return invoke<ScheduledTransaction[]>('get_scheduled');
     }
 
     async addScheduled(scheduled: ScheduledTransaction): Promise<void> {
-        try {
-            await invoke('add_scheduled', { scheduled });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('add_scheduled', { scheduled });
     }
 
     async updateScheduled(scheduled: ScheduledTransaction): Promise<void> {
-        try {
-            await invoke('update_scheduled', { scheduled });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('update_scheduled', { scheduled });
     }
 
     async deleteScheduled(id: string): Promise<void> {
-        try {
-            await invoke('delete_scheduled', { id });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('delete_scheduled', { id });
     }
 
     // Settings
@@ -179,127 +105,96 @@ export class DatabaseService {
     }
 
     async saveSettings(settings: Settings): Promise<void> {
-        try {
-            // Convert objects to JSON strings for Rust
-            const settingsToSend = {
-                ...settings,
-                accountGroups: settings.accountGroups ? JSON.stringify(settings.accountGroups) : null,
-                customGroups: settings.customGroups ? JSON.stringify(settings.customGroups) : null,
-                customGroupsOrder: settings.customGroupsOrder ? JSON.stringify(settings.customGroupsOrder) : null,
-                accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null
-            };
+        // Convert objects to JSON strings for Rust
+        const settingsToSend = {
+            ...settings,
+            accountGroups: settings.accountGroups ? JSON.stringify(settings.accountGroups) : null,
+            customGroups: settings.customGroups ? JSON.stringify(settings.customGroups) : null,
+            customGroupsOrder: settings.customGroupsOrder ? JSON.stringify(settings.customGroupsOrder) : null,
+            accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null
+        };
 
-            await invoke('save_settings', { settings: settingsToSend });
-        } catch (e) {
-            throw e;
-        }
+        await invoke('save_settings', { settings: settingsToSend });
     }
+
     // --- Data Management ---
     async exportData(): Promise<any> {
-        try {
-            const accounts = await this.getAccounts();
-            const transactions = await this.getTransactions();
-            const categories = await this.getCategories();
-            const scheduled = await this.getScheduled();
-            const settings = await this.getSettings();
+        const [accounts, transactions, categories, scheduled, settings] = await Promise.all([
+            this.getAccounts(),
+            this.getTransactions(),
+            this.getCategories(),
+            this.getScheduled(),
+            this.getSettings()
+        ]);
 
-            return {
-                version: 1,
-                timestamp: new Date().toISOString(),
-                data: {
-                    accounts,
-                    transactions,
-                    categories,
-                    scheduled,
-                    settings
-                }
-            };
-        } catch (e) {
-            throw e;
-        }
+        return {
+            version: 1,
+            timestamp: new Date().toISOString(),
+            data: { accounts, transactions, categories, scheduled, settings }
+        };
     }
 
     async importData(backupData: any): Promise<void> {
-        try {
-            // Validate backup data structure
-            if (!backupData || !backupData.data) {
-                throw new Error('Invalid backup data format');
-            }
+        if (!backupData || !backupData.data) {
+            throw new Error('Invalid backup data format');
+        }
 
-            // Construct the import payload
-            const importPayload = {
-                accounts: backupData.data.accounts || [],
-                transactions: backupData.data.transactions || [],
-                categories: backupData.data.categories || [],
-                scheduled: backupData.data.scheduled || []
+        const importPayload = {
+            accounts: backupData.data.accounts || [],
+            transactions: backupData.data.transactions || [],
+            categories: backupData.data.categories || [],
+            scheduled: backupData.data.scheduled || []
+        };
+
+        await invoke('import_data', { data: importPayload });
+
+        // Restore settings if available (specifically groups)
+        if (backupData.data.settings) {
+            const currentSettings = await this.getSettings() || {} as Settings;
+            const importedSettings = backupData.data.settings;
+
+            const newSettings: Settings = {
+                ...currentSettings,
+                accountGroups: importedSettings.accountGroups || currentSettings.accountGroups,
+                customGroups: importedSettings.customGroups || currentSettings.customGroups,
+                // @ts-ignore
+                customGroupsOrder: importedSettings.customGroupsOrder || currentSettings.customGroupsOrder,
+                // @ts-ignore
+                accountsOrder: importedSettings.accountsOrder || currentSettings.accountsOrder
             };
 
-            await invoke('import_data', { data: importPayload });
-
-            // Restore settings if available (specifically groups)
-            if (backupData.data.settings) {
-                const currentSettings = await this.getSettings() || {} as Settings;
-                const importedSettings = backupData.data.settings;
-
-                // Merge grouping settings
-                const newSettings: Settings = {
-                    ...currentSettings,
-                    accountGroups: importedSettings.accountGroups || currentSettings.accountGroups,
-                    customGroups: importedSettings.customGroups || currentSettings.customGroups,
-                    // Restore order if available
-                    // Note: Types might need update if we added these fields to Settings interface
-                    // Assuming they are added as optional fields in Settings interface
-                    // @ts-ignore
-                    customGroupsOrder: importedSettings.customGroupsOrder || currentSettings.customGroupsOrder,
-                    // @ts-ignore
-                    accountsOrder: importedSettings.accountsOrder || currentSettings.accountsOrder
-                };
-
-                await this.saveSettings(newSettings);
-            }
-        } catch (e) {
-            throw e;
+            await this.saveSettings(newSettings);
         }
     }
 
     async mergeData(backupData: any): Promise<void> {
-        try {
-            // Validate backup data structure
-            if (!backupData || !backupData.data) {
-                throw new Error('Invalid backup data format');
-            }
-
-            // Fetch current data
-            const currentAccounts = await this.getAccounts();
-            const currentTransactions = await this.getTransactions();
-            const currentCategories = await this.getCategories();
-            const currentScheduled = await this.getScheduled();
-
-            // Helper to merge arrays by ID
-            const mergeArrays = (current: any[], incoming: any[]) => {
-                const map = new Map(current.map(item => [item.id, item]));
-                incoming.forEach(item => {
-                    map.set(item.id, item); // Overwrite existing or add new
-                });
-                return Array.from(map.values());
-            };
-
-            const mergedAccounts = mergeArrays(currentAccounts, backupData.data.accounts || []);
-            const mergedTransactions = mergeArrays(currentTransactions, backupData.data.transactions || []);
-            const mergedCategories = mergeArrays(currentCategories, backupData.data.categories || []);
-            const mergedScheduled = mergeArrays(currentScheduled, backupData.data.scheduled || []);
-
-            const importPayload = {
-                accounts: mergedAccounts,
-                transactions: mergedTransactions,
-                categories: mergedCategories,
-                scheduled: mergedScheduled
-            };
-
-            await invoke('import_data', { data: importPayload });
-        } catch (e) {
-            throw e;
+        if (!backupData || !backupData.data) {
+            throw new Error('Invalid backup data format');
         }
+
+        const [currentAccounts, currentTransactions, currentCategories, currentScheduled] = await Promise.all([
+            this.getAccounts(),
+            this.getTransactions(),
+            this.getCategories(),
+            this.getScheduled()
+        ]);
+
+        const mergeArrays = (current: any[], incoming: any[]) => {
+            const map = new Map(current.map(item => [item.id, item]));
+            incoming.forEach(item => {
+                map.set(item.id, item);
+            });
+            return Array.from(map.values());
+        };
+
+        const importPayload = {
+            accounts: mergeArrays(currentAccounts, backupData.data.accounts || []),
+            transactions: mergeArrays(currentTransactions, backupData.data.transactions || []),
+            categories: mergeArrays(currentCategories, backupData.data.categories || []),
+            scheduled: mergeArrays(currentScheduled, backupData.data.scheduled || [])
+        };
+
+        await invoke('import_data', { data: importPayload });
     }
 }
 

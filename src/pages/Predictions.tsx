@@ -251,14 +251,14 @@ const Predictions: React.FC = () => {
                 </div>
                 <div className="app-card p-6">
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Projection Total +6 Mois</h3>
-                    <div className={`text-2xl font-bold ${predictionData[6]?.total >= currentTotalBalance ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(predictionData[6]?.total || 0)}
+                    <div className={`text-2xl font-bold ${predictionData[180]?.total >= currentTotalBalance ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(predictionData[180]?.total || 0)}
                     </div>
                 </div>
                 <div className="app-card p-6">
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Projection Total +1 An</h3>
-                    <div className={`text-2xl font-bold ${predictionData[12]?.total >= currentTotalBalance ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(predictionData[12]?.total || 0)}
+                    <div className={`text-2xl font-bold ${predictionData[predictionData.length - 1]?.total >= currentTotalBalance ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(predictionData[predictionData.length - 1]?.total || 0)}
                     </div>
                 </div>
             </div>
