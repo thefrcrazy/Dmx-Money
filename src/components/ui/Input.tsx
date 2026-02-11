@@ -74,25 +74,35 @@ const Input: React.FC<InputProps> = ({
     }, [isCalendarOpen]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
+        let val = e.target.value;
         if (type === 'date') {
-            // Garde uniquement les chiffres et limite à 8
-            const clean = val.replace(/\D/g, '').substring(0, 8);
+            // On ne garde que les chiffres et les slashs
+            val = val.replace(/[^\d/]/g, '');
             
-            // Construit le format JJ/MM/AAAA
-            let result = '';
-            for (let i = 0; i < clean.length; i++) {
-                if (i === 2 || i === 4) result += '/';
-                result += clean[i];
+            const isDeleting = val.length < displayText.length;
+            
+            // Ajout automatique des slashs seulement si on ne supprime pas
+            if (!isDeleting) {
+                if ((val.length === 2 || val.length === 5) && !val.endsWith('/')) {
+                    val += '/';
+                }
             }
+
+            // On découpe par slash pour valider chaque partie (JJ, MM, AAAA)
+            const parts = val.split('/');
+            const formattedParts = parts.slice(0, 3).map((part, i) => {
+                if (i === 2) return part.substring(0, 4); // Année max 4
+                return part.substring(0, 2); // Jour et Mois max 2
+            });
             
-            setDisplayText(result);
+            const finalVal = formattedParts.join('/');
+            setDisplayText(finalVal);
             
-            // Si on a les 8 chiffres, on tente de parser pour déclencher le onChange
-            if (clean.length === 8) {
-                const day = clean.substring(0, 2);
-                const month = clean.substring(2, 4);
-                const year = clean.substring(4, 8);
+            // Déclenche le onChange seulement pour une date complète et valide
+            if (formattedParts.length === 3 && formattedParts[2].length === 4) {
+                const day = formattedParts[0].padStart(2, '0');
+                const month = formattedParts[1].padStart(2, '0');
+                const year = formattedParts[2];
                 const isoDate = `${year}-${month}-${day}`;
                 
                 if (isValid(parseISO(isoDate)) && onChange) {
