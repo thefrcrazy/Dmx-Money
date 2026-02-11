@@ -74,9 +74,13 @@ const Input: React.FC<InputProps> = ({
     }, [isCalendarOpen]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let val = e.target.value;
+        const input = e.target;
+        const selectionStart = input.selectionStart || 0;
+        let val = input.value;
+
         if (type === 'date') {
             // On ne garde que les chiffres et les slashs
+            // On autorise temporairement plus de caractères pour éviter la troncature pendant l'édition
             val = val.replace(/[^\d/]/g, '');
             
             const isDeleting = val.length < displayText.length;
@@ -96,7 +100,26 @@ const Input: React.FC<InputProps> = ({
             });
             
             const finalVal = formattedParts.join('/');
+            
+            // Calcul de la nouvelle position du curseur
+            let newPos = selectionStart;
+            // Si on a ajouté un slash automatiquement, on avance le curseur
+            if (!isDeleting && finalVal.length > val.length && (newPos === 2 || newPos === 5)) {
+                newPos++;
+            }
+            // Si on a tronqué un dépassement de partie (ex: 701 -> 70), on recule si nécessaire
+            if (finalVal.length < val.length && newPos > finalVal.length) {
+                newPos = finalVal.length;
+            }
+
             setDisplayText(finalVal);
+            
+            // Restauration de la position du curseur après le rendu
+            requestAnimationFrame(() => {
+                if (inputRef.current) {
+                    inputRef.current.setSelectionRange(newPos, newPos);
+                }
+            });
             
             // Déclenche le onChange seulement pour une date complète et valide
             if (formattedParts.length === 3 && formattedParts[2].length === 4) {
