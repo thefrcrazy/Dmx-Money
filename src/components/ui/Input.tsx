@@ -74,41 +74,51 @@ const Input: React.FC<InputProps> = ({
     }, [isCalendarOpen]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let val = e.target.value;
+        const newValue = e.target.value;
         
         if (type === 'date') {
-            // Keep only digits
-            const digits = val.replace(/\D/g, '').substring(0, 8);
+            // If deleting, allow it but strip non-allowed characters
+            if (newValue.length < displayText.length) {
+                setDisplayText(newValue.replace(/[^\d/]/g, ''));
+                return;
+            }
+
+            // Only keep digits and slashes
+            let val = newValue.replace(/[^\d/]/g, '');
             
-            // Build formatted string JJ/MM/AAAA
-            let formatted = '';
-            if (digits.length > 0) {
-                formatted = digits.substring(0, 2);
-                if (digits.length > 2) {
-                    formatted += '/' + digits.substring(2, 4);
-                    if (digits.length > 4) {
-                        formatted += '/' + digits.substring(4, 8);
-                    }
+            // Limit length
+            if (val.length > 10) val = val.substring(0, 10);
+
+            // Smart Day prefixing (if first digit > 3, prepend 0)
+            if (val.length === 1 && /^[4-9]$/.test(val)) {
+                val = '0' + val + '/';
+            } else if (val.length === 2 && !val.includes('/')) {
+                val += '/';
+            }
+            
+            // Smart Month prefixing
+            const parts = val.split('/');
+            if (parts.length === 2) {
+                const month = parts[1];
+                if (month.length === 1 && /^[2-9]$/.test(month)) {
+                    val = parts[0] + '/0' + month + '/';
+                } else if (month.length === 2 && val.length === 5) {
+                    val += '/';
                 }
             }
             
-            setDisplayText(formatted);
+            setDisplayText(val);
             
-            // Simple parsing for DD/MM/YYYY to trigger onChange
-            if (digits.length === 8) {
-                const day = digits.substring(0, 2);
-                const month = digits.substring(2, 4);
-                const year = digits.substring(4, 8);
-                const isoDate = `${year}-${month}-${day}`;
-                
-                if (isValid(parseISO(isoDate))) {
-                    if (onChange) {
-                        const event = {
-                            ...e,
-                            target: { ...e.target, value: isoDate }
-                        } as React.ChangeEvent<HTMLInputElement>;
-                        onChange(event);
-                    }
+            // Trigger onChange only for full valid date
+            const match = val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (match) {
+                const isoDate = `${match[3]}-${match[2]}-${match[1]}`;
+                if (isValid(parseISO(isoDate)) && onChange) {
+                    const event = {
+                        ...e,
+                        target: { ...e.target, value: isoDate }
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    onChange(event);
                 }
             }
         } else {
