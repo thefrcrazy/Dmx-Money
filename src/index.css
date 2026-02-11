@@ -1,5 +1,58 @@
 @import "tailwindcss";
 
+/* Flatpickr for compatibility support */
+@import "flatpickr/dist/flatpickr.min.css";
+
+/* Custom Flatpickr Dark Mode Support */
+.flatpickr-calendar.dark {
+    background: #121212 !important;
+    border: 1px solid #262626 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+    color: #fff !important;
+}
+
+.flatpickr-calendar.dark .flatpickr-day {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.flatpickr-calendar.dark .flatpickr-day.nextMonthDay,
+.flatpickr-calendar.dark .flatpickr-day.prevMonthDay {
+    color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.flatpickr-calendar.dark .flatpickr-day:hover {
+    background: #262626 !important;
+}
+
+.flatpickr-calendar.dark .flatpickr-day.selected {
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #fff !important;
+}
+
+.flatpickr-calendar.dark .flatpickr-months .flatpickr-month,
+.flatpickr-calendar.dark .flatpickr-months .flatpickr-prev-month,
+.flatpickr-calendar.dark .flatpickr-months .flatpickr-next-month {
+    color: #fff !important;
+    fill: #fff !important;
+}
+
+.flatpickr-calendar.dark .flatpickr-current-month .flatpickr-monthDropdown-months {
+    background: #121212 !important;
+}
+
+.flatpickr-calendar.dark span.flatpickr-weekday {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.flatpickr-calendar.dark .numInputWrapper span.arrowUp:after {
+    border-bottom-color: #fff !important;
+}
+
+.flatpickr-calendar.dark .numInputWrapper span.arrowDown:after {
+    border-top-color: #fff !important;
+}
+
 @theme {
   --color-primary: var(--color-primary-custom);
   --color-primary-rgb: var(--color-primary-rgb-custom);
@@ -37,7 +90,7 @@
     --color-bg-secondary: #F5F5F7;
     --color-text-primary: #000000;
     --color-text-secondary: #86868B;
-    --color-border: #E5E7EB;
+    --color-border: rgba(0, 0, 0, 0.05);
 }
 
 /* On utilise une variable differente pour eviter la recursion infinie dans @theme */
@@ -54,7 +107,7 @@
     --color-bg-secondary: #000000;
     --color-text-primary: #ffffff;
     --color-text-secondary: #a1a1aa;
-    --color-border: #262626;
+    --color-border: rgba(255, 255, 255, 0.1);
 }
 
 /* Base Styles */

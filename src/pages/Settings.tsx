@@ -190,7 +190,7 @@ const SettingsPage: React.FC = () => {
                                     onClick={() => updateTheme(t.id as any)}
                                     className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all ${settings.theme === t.id
                                         ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10'
-                                        : 'border-gray-100 dark:border-neutral-700 hover:border-gray-200 dark:hover:border-gray-600'
+                                        : 'border-black/[0.05] dark:border-white/10 hover:border-gray-200 dark:hover:border-gray-600'
                                         }`}
                                 >
                                     <t.icon className={`w-6 h-6 mb-2 ${t.color}`} />
@@ -207,7 +207,7 @@ const SettingsPage: React.FC = () => {
                                 onClick={() => updatePrimaryColor('default')}
                                 className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${settings.primaryColor === 'default'
                                     ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
-                                    : 'border-gray-100 dark:border-neutral-700'
+                                    : 'border-black/[0.05] dark:border-white/10'
                                     }`}
                             >
                                 Défaut
@@ -232,7 +232,7 @@ const SettingsPage: React.FC = () => {
             {/* Données */}
             <Card title="Gestion des données" subtitle="Sauvegardez ou restaurez vos informations financières.">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                    <div className="p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
                                 <Download className="w-5 h-5" />
@@ -243,7 +243,7 @@ const SettingsPage: React.FC = () => {
                         <Button variant="secondary" size="sm" fullWidth onClick={handleExportData}>Générer un backup (.dmx)</Button>
                     </div>
 
-                    <div className="p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                    <div className="p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
                                 <Upload className="w-5 h-5" />
@@ -259,9 +259,9 @@ const SettingsPage: React.FC = () => {
             {/* À propos & Mises à jour */}
             <Card title="À propos & Mises à jour" subtitle="Informations sur l'application et gestion des versions.">
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-gray-100 dark:border-neutral-700">
+                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-black/[0.05] dark:border-white/10">
                                 <img src="/logo.png" alt="DmxMoney Logo" className="w-full h-full object-contain" />
                             </div>
                             <div>                                <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
@@ -278,7 +278,7 @@ const SettingsPage: React.FC = () => {
                         </Button>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
                         <div>
                             <div className="flex items-center gap-2">
                                 <div className="font-semibold text-gray-900 dark:text-gray-100">Mise à jour</div>

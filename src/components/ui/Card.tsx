@@ -27,13 +27,13 @@ const Card: React.FC<CardProps> = ({
     return (
         <div 
             className={cn(
-                "bg-white dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-neutral-800 shadow-sm transition-all overflow-hidden",
+                "bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm transition-all overflow-hidden",
                 className
             )} 
             {...props}
         >
             {(title || action) && (
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between">
+                <div className="px-6 py-4 border-b border-black/[0.05] dark:border-white/10 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         {Icon && <Icon className="w-5 h-5 text-primary-600" />}
                         <div>

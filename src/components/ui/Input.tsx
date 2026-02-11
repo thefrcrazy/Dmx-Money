@@ -49,13 +49,12 @@ const Input: React.FC<InputProps> = ({
                 altFormat: 'd/m/Y',  // French format JJ/MM/AAAA
                 allowInput: true,
                 disableMobile: false,
-                static: true,        // Better for modals
-                onOpen: () => {
+                static: false,       // Avoid being cut off by containers with overflow:hidden
+                onOpen: (selectedDates, dateStr, instance) => {
                     // Force dark theme if needed
                     const isDark = document.documentElement.classList.contains('dark');
-                    const calendar = document.querySelector('.flatpickr-calendar');
-                    if (calendar) {
-                        calendar.classList.toggle('dark', isDark);
+                    if (instance.calendarContainer) {
+                        instance.calendarContainer.classList.toggle('dark', isDark);
                     }
                 }
             });
@@ -89,11 +88,6 @@ const Input: React.FC<InputProps> = ({
                     disabled={disabled}
                     {...props}
                 />
-                {type === 'date' && !rightElement && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none opacity-50 z-10">
-                        <Calendar className="w-4 h-4" />
-                    </div>
-                )}
                 {rightElement && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none app-input-right-element z-10">
                         {rightElement}

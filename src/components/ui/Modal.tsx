@@ -22,7 +22,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm app-modal-overlay">
             <div className="app-card w-full max-w-2xl animate-in fade-in zoom-in duration-200 app-modal-content">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-800 app-modal-header">
+                <div className="flex items-center justify-between p-4 border-b border-black/[0.05] dark:border-white/10 app-modal-header">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 app-modal-title">{title}</h3>
                     <button
                         onClick={onClose}

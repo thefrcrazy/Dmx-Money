@@ -194,7 +194,7 @@ const Budget: React.FC = () => {
                     })()}
                 </div>
                 {/* Légende */}
-                <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-100 dark:border-neutral-800">
+                <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-black/[0.05] dark:border-white/10">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-purple-500" />
                         <span className="text-sm text-gray-500">Budget Prévu</span>
@@ -293,7 +293,7 @@ const Budget: React.FC = () => {
 
             {/* Detailed Budget List (Scheduled Transactions) */}
             <div className="app-card overflow-hidden flex flex-col max-h-[400px]" style={{ padding: `${settings.componentPadding * 4}px` }}>
-                <div className="p-6 border-b border-gray-100 dark:border-neutral-800 flex-none">
+                <div className="p-6 border-b border-black/[0.05] dark:border-white/10 flex-none">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200">Détail du Budget Prévu</h3>
                 </div>
                 <div className="divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto scrollbar-thin flex-1">

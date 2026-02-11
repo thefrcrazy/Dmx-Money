@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
                         <div className={`text-4xl font-bold mb-6 ${monthlySaved >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {monthlySaved > 0 ? '+' : ''}{Math.round(monthlySaved)} €
                         </div>
-                        <div className="grid grid-cols-3 w-full gap-2 text-center border-t border-gray-50 dark:border-neutral-700 pt-4">
+                        <div className="grid grid-cols-3 w-full gap-2 text-center border-t border-black/[0.05] dark:border-white/10 pt-4">
                             <div>
                                 <div className="flex items-center justify-center gap-1 text-[10px] text-gray-500 mb-0.5">
                                     <TrendingUp className="w-3 h-3 text-emerald-500" /> Revenus
@@ -212,7 +212,7 @@ const Dashboard: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        <div className="px-6 py-4 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center bg-neutral-50/30 dark:bg-neutral-900/50">
+                        <div className="px-6 py-4 border-t border-black/[0.05] dark:border-white/10 flex justify-between items-center bg-neutral-50/30 dark:bg-neutral-900/50">
                             <span className="text-xs font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Total</span>
                             <span className="text-lg font-bold text-primary-600">{formatCurrency(currentBalance)}</span>
                         </div>

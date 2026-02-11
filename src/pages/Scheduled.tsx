@@ -140,7 +140,7 @@ const Scheduled: React.FC = () => {
                 </Button>
             </div>
 
-            <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-neutral-800 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
+            <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
                 <Table
                     data={scheduledTransactions}
                     keyExtractor={(t) => t.id}
