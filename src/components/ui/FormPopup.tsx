@@ -45,7 +45,7 @@ const FormPopup: React.FC<FormPopupProps> = ({
         <div className="space-y-4 app-form-content">
             {children}
             {onSubmit && (
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-neutral-700 app-modal-footer">
+                <div className="flex justify-end gap-3 pt-4 border-t border-black/[0.05] dark:border-white/10 app-modal-footer">
                     <Button
                         type="button"
                         variant="secondary"
@@ -71,11 +71,11 @@ const FormPopup: React.FC<FormPopupProps> = ({
             onClick={onClose}
         >
             <div
-                className={`app-formpop w-full ${maxWidthClasses[maxWidth]} animate-in fade-in zoom-in duration-100 bg-white dark:bg-[#121212] app-modal-content`}
+                className={`app-card w-full ${maxWidthClasses[maxWidth]} animate-in fade-in zoom-in duration-100 app-modal-content`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {title && (
-                    <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-neutral-700 app-modal-header">
+                    <div className="flex items-center justify-between p-4 border-b border-black/[0.05] dark:border-white/10 app-modal-header">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 app-modal-title">
                             {title}
                         </h3>

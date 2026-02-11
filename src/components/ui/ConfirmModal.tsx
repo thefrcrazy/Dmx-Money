@@ -39,7 +39,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             onClick={onClose}
         >
             <div
-                className="app-formpop w-full max-w-md animate-in fade-in zoom-in duration-100 bg-white dark:bg-[#121212] app-modal-content app-confirm-modal"
+                className="app-card w-full max-w-md animate-in fade-in zoom-in duration-100 app-modal-content app-confirm-modal"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="p-6 space-y-6 app-modal-body">

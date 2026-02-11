@@ -65,7 +65,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
                     )}
 
                     {technicalDetails && (
-                        <div className="mb-6 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+                        <div className="mb-6 border border-black/[0.05] dark:border-white/10 rounded-lg overflow-hidden">
                             <button
                                 onClick={() => setShowDetails(!showDetails)}
                                 className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"

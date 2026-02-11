@@ -102,7 +102,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 <div className="dropdown-menu absolute z-[100] w-full mt-1 max-h-60 flex flex-col app-searchableselect-dropdown">
                     {/* Content */}
                     <div className="app-selector-bg flex flex-col max-h-60 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200" >
-                        <div className="select-header p-2 border-b border-gray-100 dark:border-neutral-700 sticky top-0 group-[.retro]:bg-[#FFF8DC] group-[.retro]:border-[#808080] app-searchableselect-search-header">
+                        <div className="select-header p-2 border-b border-black/[0.05] dark:border-white/10 sticky top-0 group-[.retro]:bg-[#FFF8DC] group-[.retro]:border-[#808080] app-searchableselect-search-header">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 app-searchableselect-search-icon" />
                                 <input

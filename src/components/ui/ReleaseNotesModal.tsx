@@ -89,7 +89,7 @@ const ReleaseNotesModal: React.FC<ReleaseNotesModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-100 dark:border-neutral-800">
+                <div className="p-6 border-t border-black/[0.05] dark:border-white/10">
                     <Button 
                         onClick={onClose}
                         fullWidth
