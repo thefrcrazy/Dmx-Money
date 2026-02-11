@@ -1,10 +1,10 @@
 [package]
 name = "app"
 version = "0.7.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "DmxMoney"
+authors = ["Maxim Collignon"]
+license = "MIT"
+repository = "https://github.com/thefrcrazy/Dmx-Money"
 edition = "2021"
 rust-version = "1.77.2"
 
