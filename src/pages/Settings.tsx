@@ -32,10 +32,10 @@ const SettingsPage: React.FC = () => {
     const [isOfxImportModalOpen, setIsOfxImportModalOpen] = useState(false);
     const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
     const [importFile, setImportFile] = useState<{ name: string; content: string } | null>(null);
-    const [alertState, setAlertState] = useState<{ 
-        isOpen: boolean; 
-        title: string; 
-        message: string; 
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
         type: 'success' | 'error';
         technicalDetails?: string;
     }>({
@@ -59,18 +59,18 @@ const SettingsPage: React.FC = () => {
 
             if (filePath) {
                 await writeTextFile(filePath, encodedData);
-                setAlertState({ 
-                    isOpen: true, 
-                    title: 'Export réussi !', 
-                    message: 'Vos données ont été exportées avec succès.', 
-                    type: 'success' 
+                setAlertState({
+                    isOpen: true,
+                    title: 'Export réussi !',
+                    message: 'Vos données ont été exportées avec succès.',
+                    type: 'success'
                 });
             }
         } catch (error) {
-            setAlertState({ 
-                isOpen: true, 
-                title: 'Erreur d\'export', 
-                message: 'Une erreur est survenue lors de la création de votre sauvegarde.', 
+            setAlertState({
+                isOpen: true,
+                title: 'Erreur d\'export',
+                message: 'Une erreur est survenue lors de la création de votre sauvegarde.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -95,10 +95,10 @@ const SettingsPage: React.FC = () => {
             }
         } catch (error) {
             console.error('File selection failed:', error);
-            setAlertState({ 
-                isOpen: true, 
-                title: 'Erreur de lecture', 
-                message: 'Impossible de lire le fichier sélectionné.', 
+            setAlertState({
+                isOpen: true,
+                title: 'Erreur de lecture',
+                message: 'Impossible de lire le fichier sélectionné.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -117,18 +117,18 @@ const SettingsPage: React.FC = () => {
             if (mode === 'merge') await dbService.mergeData(data);
             else await dbService.importData(data);
 
-            setAlertState({ 
-                isOpen: true, 
-                title: 'Import réussi !', 
-                message: 'Vos données ont été restaurées. L\'application va redémarrer.', 
-                type: 'success' 
+            setAlertState({
+                isOpen: true,
+                title: 'Import réussi !',
+                message: 'Vos données ont été restaurées. L\'application va redémarrer.',
+                type: 'success'
             });
             setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
-            setAlertState({ 
-                isOpen: true, 
-                title: 'Erreur d\'import', 
-                message: 'Le fichier de sauvegarde semble invalide ou corrompu.', 
+            setAlertState({
+                isOpen: true,
+                title: 'Erreur d\'import',
+                message: 'Le fichier de sauvegarde semble invalide ou corrompu.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -145,17 +145,17 @@ const SettingsPage: React.FC = () => {
                 await addTransaction({ ...tx, accountId });
                 count++;
             }
-            setAlertState({ 
-                isOpen: true, 
-                title: 'Import réussi !', 
-                message: `${count} transactions ont été importées dans votre compte.`, 
-                type: 'success' 
+            setAlertState({
+                isOpen: true,
+                title: 'Import réussi !',
+                message: `${count} transactions ont été importées dans votre compte.`,
+                type: 'success'
             });
         } catch (error) {
-            setAlertState({ 
-                isOpen: true, 
-                title: 'Erreur d\'import', 
-                message: 'Certaines transactions n\'ont pas pu être importées.', 
+            setAlertState({
+                isOpen: true,
+                title: 'Erreur d\'import',
+                message: 'Certaines transactions n\'ont pas pu être importées.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -188,11 +188,10 @@ const SettingsPage: React.FC = () => {
                                 <button
                                     key={t.id}
                                     onClick={() => updateTheme(t.id as any)}
-                                    className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all ${
-                                        settings.theme === t.id 
-                                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10' 
+                                    className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all ${settings.theme === t.id
+                                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10'
                                         : 'border-gray-100 dark:border-neutral-700 hover:border-gray-200 dark:hover:border-gray-600'
-                                    }`}
+                                        }`}
                                 >
                                     <t.icon className={`w-6 h-6 mb-2 ${t.color}`} />
                                     <span className="text-sm font-medium">{t.name}</span>
@@ -206,24 +205,22 @@ const SettingsPage: React.FC = () => {
                         <div className="flex flex-wrap gap-3">
                             <button
                                 onClick={() => updatePrimaryColor('default')}
-                                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                                    settings.primaryColor === 'default' 
-                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10' 
+                                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${settings.primaryColor === 'default'
+                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
                                     : 'border-gray-100 dark:border-neutral-700'
-                                }`}
+                                    }`}
                             >
                                 Défaut
                             </button>
                             {[
-                                '#007AFF', '#AF52DE', '#FF2D55', '#FF3B30', '#FF9500', 
+                                '#007AFF', '#AF52DE', '#FF2D55', '#FF3B30', '#FF9500',
                                 '#FFCC00', '#34C759', '#5AC8FA', '#5856D6', '#8E8E93'
                             ].map(color => (
                                 <button
                                     key={color}
                                     onClick={() => updatePrimaryColor(color)}
-                                    className={`w-8 h-8 rounded-full border-2 transition-all ${
-                                        settings.primaryColor === color ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent hover:scale-110'
-                                    }`}
+                                    className={`w-8 h-8 rounded-full border-2 transition-all ${settings.primaryColor === color ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent hover:scale-110'
+                                        }`}
                                     style={{ backgroundColor: color }}
                                 />
                             ))}
@@ -263,15 +260,15 @@ const SettingsPage: React.FC = () => {
             <Card title="À propos & Mises à jour" subtitle="Informations sur l'application et gestion des versions.">
                 <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/50">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-gray-100 dark:border-neutral-700">
-                                                    <img src="/logo.svg" alt="DmxMoney Logo" className="w-full h-full object-contain" />
-                                                </div>
-                                                <div>                                <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-gray-100 dark:border-neutral-700">
+                                <img src="/logo-small.webp" alt="DmxMoney Logo" className="w-full h-full object-contain" />
+                            </div>
+                            <div>                                <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
                                 <div className="text-xs text-gray-500">Version {appVersion} — Créé avec ❤️</div>
                             </div>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => setIsReleaseNotesOpen(true)}
                             variant="secondary"
                             size="sm"
@@ -295,8 +292,8 @@ const SettingsPage: React.FC = () => {
                                 {updateAvailable ? "Une nouvelle version est prête." : "Vous utilisez la dernière version."}
                             </div>
                         </div>
-                        <Button 
-                            onClick={() => checkUpdate()} 
+                        <Button
+                            onClick={() => checkUpdate()}
                             isLoading={isChecking}
                             icon={RefreshCw}
                             variant={updateAvailable ? "primary" : "secondary"}
@@ -316,9 +313,9 @@ const SettingsPage: React.FC = () => {
                 type={alertState.type}
                 technicalDetails={alertState.technicalDetails}
             />
-            <ReleaseNotesModal 
-                isOpen={isReleaseNotesOpen} 
-                onClose={() => setIsReleaseNotesOpen(false)} 
+            <ReleaseNotesModal
+                isOpen={isReleaseNotesOpen}
+                onClose={() => setIsReleaseNotesOpen(false)}
             />
             <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleConfirmImport} fileName={importFile?.name || ''} />
             <CsvImportModal isOpen={isCsvImportModalOpen} onClose={() => setIsCsvImportModalOpen(false)} file={importFile} onImport={handleTransactionImport} />

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getCurrentWindow, PhysicalPosition, PhysicalSize, LogicalSize } from '@tauri-apps/api/window';
-import { Theme, Settings, SettingsContextType } from '../types';
+import { Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
 import { generatePalette, formatRgb } from '../utils/colors';
 import { LATEST_VERSION } from '../constants/changelog';
@@ -63,7 +63,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const updateWindowIcon = (isDark: boolean) => {
         loadIcon(isDark).then(icon => {
-            if (icon) getCurrentWindow().setIcon(icon).catch(() => {});
+            if (icon) getCurrentWindow().setIcon(icon).catch(() => { });
         });
     };
 
@@ -72,12 +72,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (palette) {
             document.documentElement.style.setProperty('--color-primary', color);
             document.documentElement.style.setProperty('--color-primary-custom', color);
-            
+
             // For legacy Safari (Catalina), we NEED commas for rgba() to work in Tailwind 3
             // But Tailwind 4 (Modern) also accepts them.
             const rgbStr = formatRgb(palette[500]);
             const rgbWithCommas = rgbStr.replace(/ /g, ', ');
-            
+
             document.documentElement.style.setProperty('--color-primary-rgb', rgbWithCommas);
             document.documentElement.style.setProperty('--color-primary-rgb-custom', rgbWithCommas);
 
@@ -125,13 +125,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             await appWindow.setResizable(true);
             await appWindow.setDecorations(true);
             await appWindow.setShadow(true);
-            
+
             if (currentSettings.windowSize && currentSettings.windowSize.width > 500) {
                 await appWindow.setSize(new PhysicalSize(currentSettings.windowSize.width, currentSettings.windowSize.height));
             } else {
                 await appWindow.setSize(new LogicalSize(1320, 790));
             }
-            
+
             if (currentSettings.windowPosition) {
                 await appWindow.setPosition(new PhysicalPosition(currentSettings.windowPosition.x, currentSettings.windowPosition.y));
             } else {
@@ -153,7 +153,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 applyVisualSettings(initial);
                 setSettings(initial);
                 isLoadedRef.current = true;
-                
+
                 setTimeout(() => {
                     setIsTransitioning(true);
                     setTimeout(() => {
@@ -224,7 +224,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         savePositionTimeoutRef.current = setTimeout(() => {
             setSettings(prev => {
                 const updated = { ...prev, windowPosition: { x, y } };
-                dbService.saveSettings(updated).catch(() => {});
+                dbService.saveSettings(updated).catch(() => { });
                 return updated;
             });
         }, 1000);
@@ -235,7 +235,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         saveSizeTimeoutRef.current = setTimeout(() => {
             setSettings(prev => {
                 const updated = { ...prev, windowSize: { width, height } };
-                dbService.saveSettings(updated).catch(() => {});
+                dbService.saveSettings(updated).catch(() => { });
                 return updated;
             });
         }, 1000);
@@ -248,7 +248,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 setSettings(prev => {
                     const next = { ...prev, theme };
                     applyVisualSettings(next);
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
@@ -256,21 +256,21 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 setSettings(prev => {
                     const next = { ...prev, primaryColor: color };
                     applyVisualSettings(next);
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateWindowPosition: async (x, y) => {
                 setSettings(prev => {
                     const next = { ...prev, windowPosition: { x, y } };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateWindowSize: async (width, height) => {
                 setSettings(prev => {
                     const next = { ...prev, windowSize: { width, height } };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
@@ -279,14 +279,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     const groups = { ...(prev.accountGroups || {}) };
                     if (group) groups[id] = group; else delete groups[id];
                     const next = { ...prev, accountGroups: groups };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateCustomGroups: async (groups) => {
                 setSettings(prev => {
                     const next = { ...prev, customGroups: groups };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
@@ -296,42 +296,42 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     const accountGroups = { ...(prev.accountGroups || {}) };
                     Object.keys(accountGroups).forEach(id => { if (accountGroups[id] === oldName) accountGroups[id] = newName; });
                     const next = { ...prev, customGroups, accountGroups };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateCustomGroupsOrder: async (order) => {
                 setSettings(prev => {
                     const next = { ...prev, customGroupsOrder: order };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateAccountsOrder: async (order) => {
                 setSettings(prev => {
                     const next = { ...prev, accountsOrder: order };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateComponentSpacing: async (spacing) => {
                 setSettings(prev => {
                     const next = { ...prev, componentSpacing: spacing };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateComponentPadding: async (padding) => {
                 setSettings(prev => {
                     const next = { ...prev, componentPadding: padding };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             },
             updateLastSeenVersion: async (version) => {
                 setSettings(prev => {
                     const next = { ...prev, lastSeenVersion: version };
-                    dbService.saveSettings(next).catch(() => {});
+                    dbService.saveSettings(next).catch(() => { });
                     return next;
                 });
             }
@@ -342,7 +342,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             {!isInitialLoadDone && (
                 <div className={`fixed inset-0 w-full h-full flex flex-col items-center justify-center z-[9999] transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100'} ${isSystemDark ? 'bg-black' : 'bg-white'} dark:bg-black`}>
                     <div className="flex flex-col items-center justify-center space-y-12">
-                        <img src="/logo.svg" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
+                        <img src="/logo-small.webp" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
                         <div className="w-10 h-10 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                     </div>
                 </div>
