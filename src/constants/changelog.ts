@@ -12,6 +12,41 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.7.1",
+        date: "2026-02-12",
+        title: "Configuration & Identité",
+        changes: [
+            "Officialisation du nom de projet 'dmxmoney'",
+            "Mise à jour des fichiers de configuration internes",
+            "Nettoyage des références à l'ancien nom de code"
+        ],
+        features: []
+    },
+    {
+        version: "0.7.0",
+        date: "2026-02-11",
+        title: "Saisie Intelligente & Calendrier",
+        changes: [
+            "Nouveau masque de saisie intelligent pour les dates (JJ/MM/AAAA) avec gestion du curseur",
+            "Support complet de la saisie manuelle au clavier en plus du sélecteur",
+            "Remplacement de Flatpickr par un calendrier natif optimisé pour la performance",
+            "Restoration du design des bordures arrondies sur les modales",
+            "Correction des couleurs de fond en mode compatibilité (Legacy)"
+        ],
+        features: []
+    },
+    {
+        version: "0.5.6",
+        date: "2026-02-11",
+        title: "Correctif Windows & Styles",
+        changes: [
+            "Correction critique du système de mise à jour sur Windows (support 7z)",
+            "Ajustements mineurs des styles globaux et des inputs",
+            "Amélioration de la stabilité du calendrier sur les anciens navigateurs"
+        ],
+        features: []
+    },
+    {
         version: "0.5.5",
         date: "2026-02-11",
         title: "Identité visuelle & Nettoyage",
@@ -86,6 +121,8 @@ export const CHANGELOG: VersionUpdate[] = [
     },
     {
         version: "0.4.7",
+        date: "2026-02-11",
+        title: "Splash Screen & Interface",
         changes: [
             "Splash screen repassé en 400x400 pour une transition plus stable",
             "Correction du bug d'interface écrasée après le démarrage",
@@ -333,4 +370,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.5.5";
+export const LATEST_VERSION = "0.7.1";

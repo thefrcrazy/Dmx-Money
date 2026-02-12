@@ -1,6 +1,6 @@
-# DmxMoney 2025 (Desktop Version)
+# DmxMoney (Desktop Version)
 
-DmxMoney 2025 est une application de gestion financière personnelle moderne, performante et sécurisée, conçue pour macOS et Windows. Elle repose sur une architecture hybride alliant la puissance de **Rust** et la flexibilité de **React**.
+DmxMoney est une application de gestion financière personnelle moderne, performante et sécurisée, conçue pour macOS et Windows. Elle repose sur une architecture hybride alliant la puissance de **Rust** et la flexibilité de **React**.
 
 ---
 

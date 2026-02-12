@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, LayoutDashboard, PieChart, TrendingUp, Settings, Receipt, CalendarClock, Tag, Calculator, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { Wallet, LayoutDashboard, PieChart, TrendingUp, Settings, Receipt, CalendarClock, Tag, Calculator, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBank } from '../context/BankContext';
 import { useUpdater } from '../hooks/useUpdater';
 import MultiSelect from '../components/ui/MultiSelect';
@@ -22,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
 
     React.useEffect(() => {
         import('@tauri-apps/api/app').then(app => {
-            app.getVersion().then(setAppVersion).catch(() => {});
+            app.getVersion().then(setAppVersion).catch(() => { });
         });
     }, []);
 
@@ -54,19 +54,19 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
     return (
         <div className="flex h-screen w-screen text-gray-900 dark:text-gray-100 font-sans overflow-hidden bg-[var(--color-bg-primary)] dark:bg-[var(--color-bg-primary)]">
             <TitleBar />
-            
+
             {/* Sidebar */}
             <aside className={`flex-shrink-0 flex flex-col bg-[var(--color-bg-secondary)] dark:bg-[var(--color-bg-secondary)] border-r border-black/[0.05] dark:border-white/10 z-20 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-56'}`}>
                 <div className="h-12 w-full flex-shrink-0 flex items-center justify-between px-4" data-tauri-drag-region>
                     <div className="mt-2" />
-                    <button 
+                    <button
                         onClick={() => setIsCollapsed(!isCollapsed)}
                         className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-900 text-gray-400 transition-colors mt-2"
                     >
                         {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                     </button>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide">
                     {navGroups.map((group, idx) => (
                         <div key={idx} className={idx > 0 ? "mt-6" : ""}>
@@ -84,11 +84,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                                             key={item.id}
                                             onClick={() => setActivePage(item.id)}
                                             title={isCollapsed ? item.label : ""}
-                                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
-                                                isActive
-                                                    ? 'bg-primary-500 text-white shadow-sm'
-                                                    : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
-                                            } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${isActive
+                                                ? 'bg-primary-500 text-white shadow-sm'
+                                                : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
+                                                } ${isCollapsed ? 'justify-center px-0' : ''}`}
                                         >
                                             <Icon className="w-4 h-4 shrink-0" />
                                             {!isCollapsed && <span className="truncate">{item.label}</span>}
@@ -105,9 +104,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                         <button
                             onClick={() => setActivePage('categories')}
                             title={isCollapsed ? "Catégories" : ""}
-                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
-                                activePage === 'categories' ? 'bg-primary-500 text-white' : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
-                            } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${activePage === 'categories' ? 'bg-primary-500 text-white' : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
+                                } ${isCollapsed ? 'justify-center px-0' : ''}`}
                         >
                             <Tag className="w-4 h-4 shrink-0" />
                             {!isCollapsed && <span>Catégories</span>}
@@ -115,9 +113,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                         <button
                             onClick={() => setActivePage('settings')}
                             title={isCollapsed ? "Paramètres" : ""}
-                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer relative ${
-                                activePage === 'settings' ? 'bg-primary-500 text-white' : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
-                            } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                            className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer relative ${activePage === 'settings' ? 'bg-primary-500 text-white' : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-900'
+                                } ${isCollapsed ? 'justify-center px-0' : ''}`}
                         >
                             <div className="relative">
                                 <Settings className="w-4 h-4 shrink-0" />
@@ -137,7 +134,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                     </div>
                     {!isCollapsed && (
                         <div className="mt-4 text-[9px] text-gray-400 text-center font-bold uppercase tracking-widest opacity-60 animate-in fade-in duration-500">
-                            DmxMoney 2025 • v{appVersion}
+                            DmxMoney • v{appVersion}
                         </div>
                     )}
                 </div>

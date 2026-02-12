@@ -21,7 +21,7 @@ pub fn run() {
 
             // Manual Window Creation for full control
             let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
-                .title("DmxMoney 2025")
+                .title("DmxMoney")
                 .inner_size(400.0, 400.0) // 400x400 square splash
                 .resizable(true)
                 .center();
