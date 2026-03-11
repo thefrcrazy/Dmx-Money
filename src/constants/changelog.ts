@@ -12,6 +12,22 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.7.3",
+        date: "2026-03-11",
+        title: "Correctif d'urgence (Données invisibles)",
+        changes: [
+            "Correction d'un problème critique où l'application pointait vers un mauvais dossier de données suite à la mise à jour 0.7.2.",
+            "Vos données n'ont pas été supprimées ! Cette mise à jour rétablit simplement le lien vers votre base de données existante."
+        ],
+        features: [
+            {
+                title: "Restauration des données",
+                description: "Correction de l'identifiant de l'application permettant de retrouver l'accès à vos comptes et transactions.",
+                icon: "AlertCircle"
+            }
+        ]
+    },
+    {
         version: "0.7.2",
         date: "2026-03-11",
         title: "Transactions & Transferts",
@@ -388,4 +404,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.7.2";
+export const LATEST_VERSION = "0.7.3";
