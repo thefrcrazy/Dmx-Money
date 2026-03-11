@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Plus, Search, Trash2, Edit2, CheckCircle2, ArrowRightLeft, Tag, Circle, Filter, LayoutGrid, AlertCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, CheckCircle2, ArrowRightLeft, Tag, Circle } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useBank } from '../context/BankContext';
 import { useToast } from '../context/ToastContext';
@@ -19,6 +19,7 @@ const Transactions: React.FC = () => {
         transactions,
         categories,
         addTransaction,
+        addTransfer,
         updateTransaction,
         deleteTransaction,
         toggleTransactionCheck,
@@ -47,6 +48,7 @@ const Transactions: React.FC = () => {
         type: 'expense' as any,
         categoryId: '',
         accountId: '',
+        toAccountId: '',
         isTransfer: false
     });
 
@@ -81,13 +83,32 @@ const Transactions: React.FC = () => {
     const handleOpenModal = (transaction?: Transaction) => {
         if (transaction) {
             setEditingTransaction(transaction);
+            
+            let toAccountId = '';
+            let type = transaction.type;
+            
+            if (transaction.category === 'transfer' && transaction.linkedTransactionId) {
+                type = 'transfer' as any;
+                const linkedTx = transactions.find(t => t.id === transaction.linkedTransactionId);
+                if (linkedTx) {
+                    if (transaction.type === 'expense') {
+                        toAccountId = linkedTx.accountId;
+                    } else {
+                        toAccountId = transaction.accountId;
+                    }
+                }
+            }
+
             setFormData({
                 date: transaction.date,
                 description: transaction.description,
                 amount: transaction.amount.toString(),
-                type: transaction.type,
+                type: type,
                 categoryId: transaction.category,
-                accountId: transaction.accountId,
+                accountId: transaction.type === 'income' && transaction.category === 'transfer' && transaction.linkedTransactionId 
+                    ? (transactions.find(t => t.id === transaction.linkedTransactionId)?.accountId || transaction.accountId) 
+                    : transaction.accountId,
+                toAccountId: toAccountId,
                 isTransfer: !!transaction.linkedTransactionId
             });
         } else {
@@ -99,6 +120,7 @@ const Transactions: React.FC = () => {
                 type: 'expense',
                 categoryId: '',
                 accountId: filterAccount.length === 1 ? filterAccount[0] : accounts[0]?.id || '',
+                toAccountId: '',
                 isTransfer: false
             });
         }
@@ -166,7 +188,7 @@ const Transactions: React.FC = () => {
         }
     };
 
-    const handleCellUpdate = async (transaction: Transaction, accessor: keyof Transaction, newValue: any) => {
+    const handleCellUpdate = async (transaction: any, accessor: any, newValue: any) => {
         try {
             let updatedValue = newValue;
             
@@ -388,21 +410,51 @@ const Transactions: React.FC = () => {
                 <form onSubmit={async (e) => {
                     e.preventDefault();
                     try {
-                        const transactionData = {
-                            date: formData.date,
-                            amount: parseFloat(formData.amount),
-                            description: formData.description,
-                            category: formData.categoryId,
-                            accountId: formData.accountId,
-                            type: formData.type as 'income' | 'expense',
-                            checked: false
-                        };
+                        const amount = parseFloat(formData.amount);
+                        const isTransfer = formData.type === 'transfer';
                         if (editingTransaction) {
+                            const transactionData = {
+                                date: formData.date,
+                                amount,
+                                description: formData.description,
+                                category: isTransfer ? 'transfer' : formData.categoryId,
+                                accountId: editingTransaction.type === 'income' && isTransfer ? (formData.toAccountId || formData.accountId) : formData.accountId,
+                                type: isTransfer ? editingTransaction.type : formData.type as 'income' | 'expense',
+                            };
                             await updateTransaction({ ...editingTransaction, ...transactionData });
+                            
+                            // Mettre à jour la transaction liée si elle existe
+                            if (isTransfer && editingTransaction.linkedTransactionId) {
+                                const linkedTx = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
+                                if (linkedTx) {
+                                    await updateTransaction({
+                                        ...linkedTx,
+                                        date: formData.date,
+                                        amount,
+                                        description: formData.description,
+                                        accountId: formData.toAccountId || linkedTx.accountId,
+                                    });
+                                }
+                            }
+                            
                             showToast("Transaction mise à jour", "success");
                         } else {
-                            await addTransaction(transactionData);
-                            showToast("Transaction ajoutée", "success");
+                            if (isTransfer && formData.toAccountId) {
+                                await addTransfer(formData.accountId, formData.toAccountId, amount, formData.date, formData.description);
+                                showToast("Virement ajouté", "success");
+                            } else {
+                                const transactionData = {
+                                    date: formData.date,
+                                    amount,
+                                    description: formData.description,
+                                    category: formData.categoryId,
+                                    accountId: formData.accountId,
+                                    type: formData.type as 'income' | 'expense',
+                                    checked: false
+                                };
+                                await addTransaction(transactionData);
+                                showToast("Transaction ajoutée", "success");
+                            }
                         }
                         setIsModalOpen(false);
                     } catch (err) {
@@ -411,12 +463,71 @@ const Transactions: React.FC = () => {
                 }} className="p-6 space-y-6">
                     <h3 className="text-lg font-semibold">{editingTransaction ? "Modifier" : "Nouvelle"} transaction</h3>
                     <div className="space-y-4">
-                        <Input label="Description" required value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                        <Input label="Description" required value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Ex: Loyer" />
+                        
                         <div className="grid grid-cols-2 gap-4">
-                            <Input label="Montant" type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} rightElement="€" />
+                            <Input label="Montant" type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} rightElement="€" placeholder="0.00" />
+                            <SearchableSelect
+                                label="Type"
+                                value={formData.type}
+                                onChange={(value) => setFormData({ ...formData, type: value })}
+                                options={[
+                                    { id: 'expense', label: 'Dépense', icon: 'TrendingDown', color: '#ef4444' },
+                                    { id: 'income', label: 'Revenu', icon: 'TrendingUp', color: '#10b981' },
+                                    { id: 'transfer', label: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' }
+                                ]}
+                                placeholder="Sélectionner un type"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    {formData.type === 'transfer' ? 'Compte source' : 'Compte'}
+                                </label>
+                                <SearchableSelect
+                                    value={formData.accountId}
+                                    onChange={(value) => setFormData({ ...formData, accountId: value })}
+                                    options={accounts.map(acc => ({
+                                        id: acc.id,
+                                        label: acc.name,
+                                        icon: acc.icon || 'Wallet',
+                                        color: acc.color
+                                    }))}
+                                    placeholder="Sélectionner un compte"
+                                />
+                            </div>
                             <Input label="Date" type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                         </div>
-                        <SearchableSelect label="Catégorie" value={formData.categoryId} onChange={val => setFormData({ ...formData, categoryId: val })} options={categories.map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color }))} />
+
+                        <div>
+                            {formData.type === 'transfer' ? (
+                                <>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Compte destination</label>
+                                    <SearchableSelect
+                                        value={formData.toAccountId || ''}
+                                        onChange={(value) => setFormData({ ...formData, toAccountId: value })}
+                                        options={accounts
+                                            .filter(acc => acc.id !== formData.accountId)
+                                            .map(acc => ({
+                                                id: acc.id,
+                                                label: acc.name,
+                                                icon: acc.icon || 'Wallet',
+                                                color: acc.color
+                                            }))}
+                                        placeholder="Sélectionner un compte"
+                                    />
+                                </>
+                            ) : (
+                                <SearchableSelect 
+                                    label="Catégorie" 
+                                    value={formData.categoryId} 
+                                    onChange={val => setFormData({ ...formData, categoryId: val })} 
+                                    options={categories.filter(c => c.id !== 'transfer').map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color }))} 
+                                />
+                            )}
+                        </div>
+
                         <div className="flex gap-3 pt-4">
                             <Button type="button" variant="secondary" fullWidth onClick={() => setIsModalOpen(false)}>Annuler</Button>
                             <Button type="submit" fullWidth>Enregistrer</Button>

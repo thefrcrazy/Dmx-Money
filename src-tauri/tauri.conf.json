@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DmxMoney",
-  "version": "0.7.1",
-  "identifier": "com.dmxmoney.desktop",
+  "productName": "DMXMoney",
+  "version": "0.7.2",
+  "identifier": "com.dmxmoney.dev",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",

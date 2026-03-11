@@ -12,6 +12,24 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "0.7.2",
+        date: "2026-03-11",
+        title: "Transactions & Transferts",
+        changes: [
+            "Ajout du support complet des virements entre comptes depuis le Journal",
+            "Nouveau sélecteur de type de transaction (Dépense, Revenu, Virement) dans le Journal",
+            "Amélioration du formulaire d'ajout manuel avec sélection du compte source/destination",
+            "Harmonisation de l'interface de saisie entre l'Échéancier et le Journal"
+        ],
+        features: [
+            {
+                title: "Virements facilités",
+                description: "Gérez directement les virements entre vos différents comptes depuis la page Journal avec création automatique des deux transactions liées.",
+                icon: "ArrowRightLeft"
+            }
+        ]
+    },
+    {
         version: "0.7.1",
         date: "2026-02-12",
         title: "Configuration & Identité",
@@ -370,4 +388,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.7.1";
+export const LATEST_VERSION = "0.7.2";
