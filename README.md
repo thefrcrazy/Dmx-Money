@@ -99,7 +99,9 @@ Pour l'installer correctement :
 4. Copiez et collez la commande suivante, puis appuyez sur Entrée :
 
    ```bash
+
    xattr -cr "/Applications/DmxMoney.app"
+
    ```
 
 5. Vous pouvez maintenant lancer l'application normalement.
