@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, Monitor, Download, Upload, RefreshCw, Sparkles } from 'lucide-react';
+import { Moon, Sun, Monitor, Download, Upload, RefreshCw, ChevronRight, Palette, HardDrive, Info } from 'lucide-react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
@@ -11,9 +11,7 @@ import ImportModal from '../features/import/ImportModal';
 import CsvImportModal from '../features/import/CsvImportModal';
 import QifImportModal from '../features/import/QifImportModal';
 import OfxImportModal from '../features/import/OfxImportModal';
-import Button from '../components/ui/Button';
 import AlertModal from '../components/ui/AlertModal';
-import Card from '../components/ui/Card';
 import ReleaseNotesModal from '../components/ui/ReleaseNotesModal';
 
 const SettingsPage: React.FC = () => {
@@ -23,7 +21,7 @@ const SettingsPage: React.FC = () => {
     const [appVersion, setAppVersion] = useState('0.0.0');
 
     useEffect(() => {
-        getVersion().then(setAppVersion).catch(() => setAppVersion('0.2.6'));
+        getVersion().then(setAppVersion).catch(() => setAppVersion('1.0.1'));
     }, []);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -61,7 +59,7 @@ const SettingsPage: React.FC = () => {
                 await writeTextFile(filePath, encodedData);
                 setAlertState({
                     isOpen: true,
-                    title: 'Export réussi !',
+                    title: 'Export réussi',
                     message: 'Vos données ont été exportées avec succès.',
                     type: 'success'
                 });
@@ -70,7 +68,7 @@ const SettingsPage: React.FC = () => {
             setAlertState({
                 isOpen: true,
                 title: 'Erreur d\'export',
-                message: 'Une erreur est survenue lors de la création de votre sauvegarde.',
+                message: 'Impossible de créer la sauvegarde.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -98,7 +96,7 @@ const SettingsPage: React.FC = () => {
             setAlertState({
                 isOpen: true,
                 title: 'Erreur de lecture',
-                message: 'Impossible de lire le fichier sélectionné.',
+                message: 'Le fichier n\'a pas pu être lu.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -119,16 +117,16 @@ const SettingsPage: React.FC = () => {
 
             setAlertState({
                 isOpen: true,
-                title: 'Import réussi !',
-                message: 'Vos données ont été restaurées. L\'application va redémarrer.',
+                title: 'Import réussi',
+                message: 'Les données ont été restaurées. Redémarrage...',
                 type: 'success'
             });
             setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
             setAlertState({
                 isOpen: true,
-                title: 'Erreur d\'import',
-                message: 'Le fichier de sauvegarde semble invalide ou corrompu.',
+                title: 'Fichier invalide',
+                message: 'Le fichier de sauvegarde est corrompu.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -140,22 +138,20 @@ const SettingsPage: React.FC = () => {
 
     const handleTransactionImport = async (transactions: any[], accountId: string) => {
         try {
-            let count = 0;
             for (const tx of transactions) {
                 await addTransaction({ ...tx, accountId });
-                count++;
             }
             setAlertState({
                 isOpen: true,
-                title: 'Import réussi !',
-                message: `${count} transactions ont été importées dans votre compte.`,
+                title: 'Import terminé',
+                message: `${transactions.length} transactions importées.`,
                 type: 'success'
             });
         } catch (error) {
             setAlertState({
                 isOpen: true,
                 title: 'Erreur d\'import',
-                message: 'Certaines transactions n\'ont pas pu être importées.',
+                message: 'Certaines transactions ont échoué.',
                 type: 'error',
                 technicalDetails: error instanceof Error ? error.message : String(error)
             });
@@ -167,143 +163,180 @@ const SettingsPage: React.FC = () => {
         }
     };
 
+    const colors = [
+        '#007AFF', '#AF52DE', '#FF2D55', '#FF3B30', '#FF9500',
+        '#FFCC00', '#34C759', '#5AC8FA', '#5856D6', '#8E8E93'
+    ];
+
     return (
-        <div className="space-y-6 max-w-4xl">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Paramètres</h2>
-                <p className="text-sm text-gray-500 mt-1">Gérez vos préférences et vos données.</p>
-            </div>
+        <div className="max-w-3xl mx-auto pb-20 animate-in fade-in duration-300">
+            <header className="mb-10 px-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Paramètres</h1>
+            </header>
 
-            {/* Apparence */}
-            <Card title="Apparence" subtitle="Personnalisez le look de votre application.">
-                <div className="space-y-6">
-                    <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 block">Thème</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {[
-                                { id: 'light', name: 'Clair', icon: Sun, color: 'text-amber-500' },
-                                { id: 'dark', name: 'Sombre', icon: Moon, color: 'text-primary-500' },
-                                { id: 'system', name: 'Système', icon: Monitor, color: 'text-gray-500' }
-                            ].map(t => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => updateTheme(t.id as any)}
-                                    className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all ${settings.theme === t.id
-                                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10'
-                                        : 'border-black/[0.05] dark:border-white/10 hover:border-gray-200 dark:hover:border-gray-600'
-                                        }`}
-                                >
-                                    <t.icon className={`w-6 h-6 mb-2 ${t.color}`} />
-                                    <span className="text-sm font-medium">{t.name}</span>
-                                </button>
-                            ))}
-                        </div>
+            <div className="space-y-10">
+                {/* SECTION APPARENCE */}
+                <section>
+                    <div className="flex items-center gap-2 mb-3 px-2">
+                        <Palette className="w-4 h-4 text-gray-400" />
+                        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Apparence</h2>
                     </div>
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-black/[0.05] dark:border-white/[0.05] shadow-sm overflow-hidden divide-y divide-black/[0.05] dark:divide-white/[0.05]">
+                        
+                        {/* Thème */}
+                        <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">Thème de l'interface</h3>
+                                <p className="text-[13px] text-gray-500 mt-0.5">Choisissez l'aspect visuel de l'application</p>
+                            </div>
+                            <div className="flex bg-gray-100 dark:bg-black/50 p-1 rounded-xl">
+                                {[
+                                    { id: 'light', icon: Sun },
+                                    { id: 'dark', icon: Moon },
+                                    { id: 'system', icon: Monitor }
+                                ].map(t => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => updateTheme(t.id as any)}
+                                        className={`px-4 py-1.5 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                                            settings.theme === t.id 
+                                            ? 'bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' 
+                                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                        }`}
+                                    >
+                                        <t.icon className="w-4 h-4" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                    <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 block">Couleur d'accentuation</label>
-                        <div className="flex flex-wrap gap-3">
-                            <button
-                                onClick={() => updatePrimaryColor('default')}
-                                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${settings.primaryColor === 'default'
-                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
-                                    : 'border-black/[0.05] dark:border-white/10'
+                        {/* Couleurs */}
+                        <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">Couleur d'accentuation</h3>
+                                <p className="text-[13px] text-gray-500 mt-0.5">Personnalisez la couleur principale</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    onClick={() => updatePrimaryColor('default')}
+                                    className={`w-7 h-7 rounded-full border-2 transition-transform duration-200 flex items-center justify-center text-[10px] font-bold ${
+                                        settings.primaryColor === 'default' 
+                                        ? 'border-gray-900 dark:border-white scale-110 text-gray-900 dark:text-white' 
+                                        : 'border-gray-200 dark:border-gray-700 text-gray-400 hover:scale-110'
                                     }`}
-                            >
-                                Défaut
-                            </button>
-                            {[
-                                '#007AFF', '#AF52DE', '#FF2D55', '#FF3B30', '#FF9500',
-                                '#FFCC00', '#34C759', '#5AC8FA', '#5856D6', '#8E8E93'
-                            ].map(color => (
-                                <button
-                                    key={color}
-                                    onClick={() => updatePrimaryColor(color)}
-                                    className={`w-8 h-8 rounded-full border-2 transition-all ${settings.primaryColor === color ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent hover:scale-110'
+                                >
+                                    Def
+                                </button>
+                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-800 mx-1"></div>
+                                {colors.map(color => (
+                                    <button
+                                        key={color}
+                                        onClick={() => updatePrimaryColor(color)}
+                                        className={`w-7 h-7 rounded-full border-2 transition-all duration-200 ${
+                                            settings.primaryColor === color 
+                                            ? 'border-gray-900 dark:border-white scale-110' 
+                                            : 'border-transparent hover:scale-110'
                                         }`}
-                                    style={{ backgroundColor: color }}
-                                />
-                            ))}
+                                        style={{ backgroundColor: color }}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-            </Card>
+                </section>
 
-            {/* Données */}
-            <Card title="Gestion des données" subtitle="Sauvegardez ou restaurez vos informations financières.">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
-                                <Download className="w-5 h-5" />
-                            </div>
-                            <span className="font-semibold">Exporter</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-4">Créez une sauvegarde sécurisée de toutes vos transactions et comptes.</p>
-                        <Button variant="secondary" size="sm" fullWidth onClick={handleExportData}>Générer un backup (.dmx)</Button>
+                {/* SECTION DONNÉES */}
+                <section>
+                    <div className="flex items-center gap-2 mb-3 px-2">
+                        <HardDrive className="w-4 h-4 text-gray-400" />
+                        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Données & Stockage</h2>
                     </div>
-
-                    <div className="p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
-                                <Upload className="w-5 h-5" />
-                            </div>
-                            <span className="font-semibold">Importer</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-4">Restaurez un backup ou importez des fichiers CSV/OFX de votre banque.</p>
-                        <Button variant="secondary" size="sm" fullWidth onClick={handleImportClick}>Choisir un fichier</Button>
-                    </div>
-                </div>
-            </Card>
-
-            {/* À propos & Mises à jour */}
-            <Card title="À propos & Mises à jour" subtitle="Informations sur l'application et gestion des versions.">
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 p-2 border border-black/[0.05] dark:border-white/10">
-                                <img src="/logo.png" alt="DmxMoney Logo" className="w-full h-full object-contain" />
-                            </div>
-                            <div>                                <div className="font-bold text-gray-900 dark:text-gray-100">DmxMoney</div>
-                                <div className="text-xs text-gray-500">Version {appVersion} — Créé avec ❤️</div>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={() => setIsReleaseNotesOpen(true)}
-                            variant="secondary"
-                            size="sm"
-                            icon={Sparkles}
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-black/[0.05] dark:border-white/[0.05] shadow-sm overflow-hidden divide-y divide-black/[0.05] dark:divide-white/[0.05]">
+                        
+                        <button 
+                            onClick={handleExportData}
+                            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50 transition-colors text-left"
                         >
-                            Nouveautés
-                        </Button>
-                    </div>
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-gray-100 dark:bg-black/50 rounded-lg text-gray-600 dark:text-gray-400">
+                                    <Download className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">Exporter les données</h3>
+                                    <p className="text-[13px] text-gray-500 mt-0.5">Créer une sauvegarde sécurisée (.dmx)</p>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-gray-300 dark:text-gray-600" />
+                        </button>
 
-                    <div className="flex items-center justify-between p-4 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50/50 dark:bg-neutral-800/50">
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <div className="font-semibold text-gray-900 dark:text-gray-100">Mise à jour</div>
-                                {updateAvailable && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 animate-pulse">
-                                        Disponible
+                        <button 
+                            onClick={handleImportClick}
+                            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50 transition-colors text-left"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-gray-100 dark:bg-black/50 rounded-lg text-gray-600 dark:text-gray-400">
+                                    <Upload className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">Importer ou Restaurer</h3>
+                                    <p className="text-[13px] text-gray-500 mt-0.5">Depuis un backup ou un fichier CSV/OFX/QIF</p>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-gray-300 dark:text-gray-600" />
+                        </button>
+                    </div>
+                </section>
+
+                {/* SECTION A PROPOS */}
+                <section>
+                    <div className="flex items-center gap-2 mb-3 px-2">
+                        <Info className="w-4 h-4 text-gray-400" />
+                        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">À propos</h2>
+                    </div>
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-black/[0.05] dark:border-white/[0.05] shadow-sm overflow-hidden divide-y divide-black/[0.05] dark:divide-white/[0.05]">
+                        
+                        <div className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl" />
+                                <div>
+                                    <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">DmxMoney</h3>
+                                    <p className="text-[13px] text-gray-500 mt-0.5">Version {appVersion}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsReleaseNotesOpen(true)}
+                                className="text-[13px] font-medium text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 bg-primary-50 dark:bg-primary-500/10 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                Nouveautés
+                            </button>
+                        </div>
+
+                        <div className="p-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">Mise à jour logicielle</h3>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[13px] text-gray-500">
+                                        {updateAvailable ? "Nouvelle version disponible" : "L'application est à jour"}
                                     </span>
-                                )}
+                                    {updateAvailable && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                                </div>
                             </div>
-                            <div className="text-xs text-gray-500">
-                                {updateAvailable ? "Une nouvelle version est prête." : "Vous utilisez la dernière version."}
-                            </div>
+                            <button
+                                onClick={() => checkUpdate()}
+                                disabled={isChecking}
+                                className={`flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-xl transition-all ${
+                                    updateAvailable 
+                                    ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm' 
+                                    : 'bg-gray-100 dark:bg-black/50 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-black/70'
+                                }`}
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+                                {updateAvailable ? "Installer" : "Vérifier"}
+                            </button>
                         </div>
-                        <Button
-                            onClick={() => checkUpdate()}
-                            isLoading={isChecking}
-                            icon={RefreshCw}
-                            variant={updateAvailable ? "primary" : "secondary"}
-                            size="sm"
-                        >
-                            {updateAvailable ? "Installer" : "Vérifier"}
-                        </Button>
                     </div>
-                </div>
-            </Card>
+                </section>
+            </div>
 
             <AlertModal
                 isOpen={alertState.isOpen}

@@ -18,7 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
   const { currentBalance, checkedBalance } = useFinancialMetrics();
   const { updateAvailable } = useUpdater();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.0.0');
+  const [appVersion, setAppVersion] = useState('1.0.1');
   const [sidebarTooltip, setSidebarTooltip] = useState<{ label: string; top: number } | null>(null);
 
   React.useEffect(() => {

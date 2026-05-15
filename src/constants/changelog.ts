@@ -12,6 +12,23 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.1",
+        date: "2026-05-15",
+        title: "UX/UI et Refonte des Paramètres",
+        changes: [
+            "Refonte complète de la page Paramètres avec un design natif iOS/macOS (Inset Grouped Lists).",
+            "Mise à jour des couleurs et contrôles pour la sélection des thèmes et des couleurs d'accentuation.",
+            "Ajout de micro-animations fluides dans l'interface de paramétrage."
+        ],
+        features: [
+            {
+                title: "Paramètres Premium",
+                description: "Une toute nouvelle page de paramètres, aérée, épurée et très réactive, pensée comme une interface macOS native.",
+                icon: "Settings"
+            }
+        ]
+    },
+    {
         version: "1.0.0",
         date: "2026-05-15",
         title: "Version 1.0 — Budget, Échéancier et Prévisions",
@@ -438,4 +455,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "1.0.0";
+export const LATEST_VERSION = "1.0.1";
