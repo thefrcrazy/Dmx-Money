@@ -2,7 +2,7 @@ mod commands;
 mod db;
 mod models;
 
-use tauri::{Manager, WebviewWindowBuilder};
+use tauri::{LogicalPosition, Manager, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,7 +30,8 @@ pub fn run() {
             {
                 window_builder = window_builder
                     .hidden_title(true)
-                    .title_bar_style(tauri::TitleBarStyle::Overlay);
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .traffic_light_position(LogicalPosition::new(12.0, 34.0));
             }
 
             let window = window_builder.build().expect("failed to build window");
@@ -58,6 +59,10 @@ pub fn run() {
             commands::add_category,
             commands::update_category,
             commands::delete_category,
+            commands::get_budgets,
+            commands::add_budget,
+            commands::update_budget,
+            commands::delete_budget,
             commands::get_scheduled,
             commands::add_scheduled,
             commands::update_scheduled,

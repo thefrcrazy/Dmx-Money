@@ -33,6 +33,9 @@ interface TableProps<T> {
     onSelectRow?: (id: string | number) => void;
     onSelectAll?: () => void;
     isAllSelected?: boolean;
+    virtualized?: boolean;
+    rowHeight?: number;
+    overscan?: number;
 }
 
 const TruncatedTooltip: React.FC<{ 
@@ -96,9 +99,15 @@ function Table<T>({
     onSelectRow,
     onSelectAll,
     isAllSelected,
+    virtualized = true,
+    rowHeight = 52,
+    overscan = 8,
 }: TableProps<T>) {
     const [editingCell, setEditingCell] = React.useState<{ rowId: string | number, accessor: keyof T } | null>(null);
     const [editValue, setEditValue] = React.useState<any>("");
+    const bodyRef = React.useRef<HTMLDivElement>(null);
+    const [scrollTop, setScrollTop] = React.useState(0);
+    const [viewportHeight, setViewportHeight] = React.useState(0);
     
     // Calcul de la grille avec support du min-width + colonne selection
     const gridTemplateColumns = `${onSelectRow ? '48px ' : ''}${columns.map(col => {
@@ -125,6 +134,127 @@ function Table<T>({
     const handleKeyDown = (e: React.KeyboardEvent, item: T) => {
         if (e.key === 'Enter') handleCommitEdit(item);
         if (e.key === 'Escape') setEditingCell(null);
+    };
+
+    React.useEffect(() => {
+        const element = bodyRef.current;
+        if (!element) return;
+
+        const updateViewportHeight = () => setViewportHeight(element.clientHeight);
+        updateViewportHeight();
+
+        const resizeObserver = new ResizeObserver(updateViewportHeight);
+        resizeObserver.observe(element);
+
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    React.useEffect(() => {
+        setScrollTop(bodyRef.current?.scrollTop || 0);
+    }, [data.length]);
+
+    const totalHeight = data.length * rowHeight;
+    const shouldVirtualize = virtualized && data.length > 0;
+    const visibleRange = React.useMemo(() => {
+        if (!shouldVirtualize) {
+            return { startIndex: 0, endIndex: data.length };
+        }
+
+        const visibleCount = Math.ceil(viewportHeight / rowHeight);
+        const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+        const endIndex = Math.min(data.length, startIndex + visibleCount + overscan * 2);
+
+        return { startIndex, endIndex };
+    }, [data.length, overscan, rowHeight, scrollTop, shouldVirtualize, viewportHeight]);
+
+    const renderRow = (item: T, index: number) => {
+        const id = keyExtractor(item);
+        const isSelected = selectedIds?.has(id);
+
+        return (
+            <div
+                key={id}
+                onClick={() => onRowClick && onRowClick(item)}
+                className={cn(
+                    "grid items-center hover:bg-gray-100 dark:hover:bg-neutral-800/40 transition-colors group relative border-b border-gray-100 dark:border-neutral-800 last:border-b-0",
+                    isSelected && "bg-primary-50/50 dark:bg-primary-900/10",
+                    onRowClick && "cursor-pointer",
+                    rowClassName && rowClassName(item)
+                )}
+                style={{
+                    gridTemplateColumns,
+                    ...(shouldVirtualize
+                        ? {
+                            height: `${rowHeight}px`,
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            transform: `translateY(${index * rowHeight}px)`
+                        }
+                        : { minHeight: `${rowHeight}px` })
+                }}
+            >
+                {onSelectRow && (
+                    <div
+                        className="px-4 py-2 flex items-center justify-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-gray-300 dark:border-neutral-700 text-primary-600 focus:ring-primary-500 cursor-pointer bg-white dark:bg-neutral-900"
+                            checked={isSelected}
+                            onChange={() => onSelectRow(id)}
+                        />
+                    </div>
+                )}
+                {columns.map((col, colIndex) => {
+                    const isEditing = editingCell?.rowId === id && editingCell?.accessor === col.accessor;
+                    const content = col.render ? col.render(item) : (col.accessor ? (item[col.accessor] as React.ReactNode) : null);
+                    const rawValue = col.accessor ? item[col.accessor] : null;
+
+                    let tooltipText = "";
+                    if (col.truncate && !isEditing) {
+                        if (col.accessor && item[col.accessor]) tooltipText = String(item[col.accessor]);
+                        else if (typeof content === 'string') tooltipText = content;
+                    }
+
+                    return (
+                        <div
+                            key={colIndex}
+                            className={cn(
+                                "px-4 py-2 text-[13px] flex items-center min-w-0 h-full relative overflow-hidden",
+                                col.align === 'right' ? 'justify-end text-right' : col.align === 'center' ? 'justify-center text-center' : 'justify-start text-left',
+                                col.className,
+                                col.editable && "hover:bg-primary-500/5 cursor-text"
+                            )}
+                            onClick={(e) => col.editable && handleStartEdit(e, id, col, rawValue)}
+                        >
+                            {isEditing ? (
+                                <input
+                                    autoFocus
+                                    type={col.editType || 'text'}
+                                    className="w-full bg-white dark:bg-neutral-900 border border-primary-500 rounded px-2 py-1 outline-none shadow-sm text-[13px]"
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onBlur={() => handleCommitEdit(item)}
+                                    onKeyDown={(e) => handleKeyDown(e, item)}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            ) : col.truncate && tooltipText ? (
+                                <TruncatedTooltip tooltipText={tooltipText} align={col.align}>
+                                    {content}
+                                </TruncatedTooltip>
+                            ) : (
+                                <div className="w-full min-w-0">
+                                    {content}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
     };
 
     return (
@@ -162,90 +292,24 @@ function Table<T>({
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin">
+            <div
+                ref={bodyRef}
+                className="flex-1 overflow-y-auto min-h-0 scrollbar-thin"
+                onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+            >
                 {data.length > 0 ? (
-                    <div className="divide-y divide-gray-100 dark:divide-neutral-800">
-                        {data.map((item) => {
-                            const id = keyExtractor(item);
-                            const isSelected = selectedIds?.has(id);
-
-                            return (
-                                <div
-                                    key={id}
-                                    onClick={() => onRowClick && onRowClick(item)}
-                                    className={cn(
-                                        "grid items-center hover:bg-gray-100 dark:hover:bg-neutral-800/40 transition-colors group min-h-[48px] relative",
-                                        isSelected && "bg-primary-50/50 dark:bg-primary-900/10",
-                                        onRowClick && "cursor-pointer",
-                                        rowClassName && rowClassName(item)
-                                    )}
-                                    style={{ gridTemplateColumns }}
-                                >
-                                    {onSelectRow && (
-                                        <div 
-                                            className="px-4 py-2 flex items-center justify-center"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                className="w-4 h-4 rounded border-gray-300 dark:border-neutral-700 text-primary-600 focus:ring-primary-500 cursor-pointer bg-white dark:bg-neutral-900"
-                                                checked={isSelected}
-                                                onChange={() => onSelectRow(id)}
-                                            />
-                                        </div>
-                                    )}
-                                    {columns.map((col, colIndex) => {
-                                        const isEditing = editingCell?.rowId === id && editingCell?.accessor === col.accessor;
-                                        const content = col.render ? col.render(item) : (col.accessor ? (item[col.accessor] as React.ReactNode) : null);
-                                        const rawValue = col.accessor ? item[col.accessor] : null;
-                                        
-                                        let tooltipText = "";
-                                        if (col.truncate && !isEditing) {
-                                            if (col.accessor && item[col.accessor]) tooltipText = String(item[col.accessor]);
-                                            else if (typeof content === 'string') tooltipText = content;
-                                        }
-
-                                        return (
-                                            <div
-                                                key={colIndex}
-                                                className={cn(
-                                                    "px-4 py-2 text-[13px] flex items-center min-w-0 h-full relative",
-                                                    col.align === 'right' ? 'justify-end text-right' : col.align === 'center' ? 'justify-center text-center' : 'justify-start text-left',
-                                                    col.className,
-                                                    col.editable && "hover:bg-primary-500/5 cursor-text"
-                                                )}
-                                                onClick={(e) => col.editable && handleStartEdit(e, id, col, rawValue)}
-                                            >
-                                                {isEditing ? (
-                                                    <input
-                                                        autoFocus
-                                                        type={col.editType || 'text'}
-                                                        className="w-full bg-white dark:bg-neutral-900 border border-primary-500 rounded px-2 py-1 outline-none shadow-sm text-[13px]"
-                                                        value={editValue}
-                                                        onChange={(e) => setEditValue(e.target.value)}
-                                                        onBlur={() => handleCommitEdit(item)}
-                                                        onKeyDown={(e) => handleKeyDown(e, item)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                ) : col.truncate && tooltipText ? (
-                                                    <TruncatedTooltip tooltipText={tooltipText} align={col.align}>
-                                                        {content}
-                                                    </TruncatedTooltip>
-                                                ) : (
-                                                    <div className="w-full min-w-0">
-                                                        {content}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            );
-                        })}
+                    <div
+                        className={cn(shouldVirtualize && "relative")}
+                        style={shouldVirtualize ? { height: `${totalHeight}px` } : undefined}
+                    >
+                        {shouldVirtualize
+                            ? data.slice(visibleRange.startIndex, visibleRange.endIndex).map((item, offset) => renderRow(item, visibleRange.startIndex + offset))
+                            : data.map((item, index) => renderRow(item, index))
+                        }
                     </div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 p-12">
-                        <span className="text-sm">{emptyMessage}</span>
+                        {React.isValidElement(emptyMessage) ? emptyMessage : <span className="text-sm">{emptyMessage}</span>}
                     </div>
                 )}
             </div>

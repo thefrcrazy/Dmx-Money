@@ -1,6 +1,6 @@
 use crate::db::DbPool;
 use crate::models::{
-    Account, AppData, Category, ScheduledTransaction, Settings, Transaction, WindowPosition,
+    Account, AppData, Budget, Category, ScheduledTransaction, Settings, Transaction, WindowPosition,
     WindowSize,
 };
 use tauri::{command, State};
@@ -84,6 +84,12 @@ pub async fn delete_account(pool: State<'_, DbPool>, id: String) -> Result<(), S
         .await
         .map_err(|e| map_db_error(e, "suppression des échéances liées"))?;
 
+    sqlx::query("UPDATE budgets SET \"accountId\" = NULL WHERE \"accountId\" = $1")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| map_db_error(e, "déliaison des budgets liés"))?;
+
     sqlx::query("DELETE FROM accounts WHERE id = $1")
         .bind(&id)
         .execute(&mut *tx)
@@ -98,7 +104,7 @@ pub async fn delete_account(pool: State<'_, DbPool>, id: String) -> Result<(), S
 #[command]
 pub async fn get_transactions(pool: State<'_, DbPool>) -> Result<Vec<Transaction>, String> {
     log::debug!("Invoked get_transactions");
-    sqlx::query_as::<_, Transaction>("SELECT * FROM transactions ORDER BY date DESC")
+    sqlx::query_as::<_, Transaction>("SELECT * FROM transactions ORDER BY date DESC, rowid DESC")
         .fetch_all(&*pool)
         .await
         .map_err(|e| map_db_error(e, "récupération des transactions"))
@@ -214,6 +220,71 @@ pub async fn delete_category(pool: State<'_, DbPool>, id: String) -> Result<(), 
     Ok(())
 }
 
+// --- Budgets ---
+#[command]
+pub async fn get_budgets(pool: State<'_, DbPool>) -> Result<Vec<Budget>, String> {
+    log::debug!("Invoked get_budgets");
+    sqlx::query_as::<_, Budget>("SELECT * FROM budgets ORDER BY rowid DESC")
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| map_db_error(e, "récupération des budgets"))
+}
+
+#[command]
+pub async fn add_budget(pool: State<'_, DbPool>, budget: Budget) -> Result<(), String> {
+    log::debug!("Invoked add_budget: {budget:?}");
+    sqlx::query(
+        "INSERT INTO budgets (id, name, amount, category, \"accountId\") VALUES ($1, $2, $3, $4, $5)"
+    )
+    .bind(budget.id)
+    .bind(budget.name)
+    .bind(budget.amount)
+    .bind(budget.category)
+    .bind(budget.account_id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| map_db_error(e, "ajout de budget"))?;
+    Ok(())
+}
+
+#[command]
+pub async fn update_budget(pool: State<'_, DbPool>, budget: Budget) -> Result<(), String> {
+    log::debug!("Invoked update_budget: {budget:?}");
+    sqlx::query(
+        "UPDATE budgets SET name = $1, amount = $2, category = $3, \"accountId\" = $4 WHERE id = $5"
+    )
+    .bind(budget.name)
+    .bind(budget.amount)
+    .bind(budget.category)
+    .bind(budget.account_id)
+    .bind(budget.id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| map_db_error(e, "mise à jour de budget"))?;
+    Ok(())
+}
+
+#[command]
+pub async fn delete_budget(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
+    log::debug!("Invoked delete_budget: {id}");
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+
+    sqlx::query("UPDATE scheduled_transactions SET \"budgetId\" = NULL, \"includeInForecast\" = 0 WHERE \"budgetId\" = $1")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| map_db_error(e, "déliaison des échéances du budget"))?;
+
+    sqlx::query("DELETE FROM budgets WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| map_db_error(e, "suppression de budget"))?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // --- Scheduled Transactions ---
 #[command]
 pub async fn get_scheduled(pool: State<'_, DbPool>) -> Result<Vec<ScheduledTransaction>, String> {
@@ -231,7 +302,7 @@ pub async fn add_scheduled(
 ) -> Result<(), String> {
     log::debug!("Invoked add_scheduled: {scheduled:?}");
     sqlx::query(
-        "INSERT INTO scheduled_transactions (id, description, amount, \"type\", frequency, \"accountId\", \"nextDate\", category, \"toAccountId\", \"includeInForecast\", \"endDate\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
+        "INSERT INTO scheduled_transactions (id, description, amount, \"type\", frequency, \"accountId\", \"nextDate\", category, \"toAccountId\", \"includeInForecast\", \"budgetId\", \"endDate\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"
     )
     .bind(scheduled.id)
     .bind(scheduled.description)
@@ -243,6 +314,7 @@ pub async fn add_scheduled(
     .bind(scheduled.category)
     .bind(scheduled.to_account_id)
     .bind(scheduled.include_in_forecast)
+    .bind(scheduled.budget_id)
     .bind(scheduled.end_date)
     .execute(&*pool)
     .await
@@ -257,7 +329,7 @@ pub async fn update_scheduled(
 ) -> Result<(), String> {
     log::debug!("Invoked update_scheduled: {scheduled:?}");
     sqlx::query(
-        "UPDATE scheduled_transactions SET description = $1, amount = $2, \"type\" = $3, frequency = $4, \"accountId\" = $5, \"nextDate\" = $6, category = $7, \"toAccountId\" = $8, \"includeInForecast\" = $9, \"endDate\" = $10 WHERE id = $11"
+        "UPDATE scheduled_transactions SET description = $1, amount = $2, \"type\" = $3, frequency = $4, \"accountId\" = $5, \"nextDate\" = $6, category = $7, \"toAccountId\" = $8, \"includeInForecast\" = $9, \"budgetId\" = $10, \"endDate\" = $11 WHERE id = $12"
     )
     .bind(scheduled.description)
     .bind(scheduled.amount)
@@ -268,6 +340,7 @@ pub async fn update_scheduled(
     .bind(scheduled.category)
     .bind(scheduled.to_account_id)
     .bind(scheduled.include_in_forecast)
+    .bind(scheduled.budget_id)
     .bind(scheduled.end_date)
     .bind(scheduled.id)
     .execute(&*pool)
@@ -305,6 +378,11 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
         .execute(&mut *tx)
         .await
         .map_err(|e| map_db_error(e, "nettoyage des échéances"))?;
+
+    sqlx::query("DELETE FROM budgets")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| map_db_error(e, "nettoyage des budgets"))?;
     
     sqlx::query("DELETE FROM accounts")
         .execute(&mut *tx)
@@ -343,6 +421,20 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
             .map_err(|e| map_db_error(e, "import de catégorie"))?;
     }
 
+    for budget in data.budgets {
+        sqlx::query(
+            "INSERT INTO budgets (id, name, amount, category, \"accountId\") VALUES ($1, $2, $3, $4, $5)"
+        )
+        .bind(budget.id)
+        .bind(budget.name)
+        .bind(budget.amount)
+        .bind(budget.category)
+        .bind(budget.account_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| map_db_error(e, "import de budget"))?;
+    }
+
     for t in data.transactions {
         sqlx::query(
             "INSERT INTO transactions (id, date, \"accountId\", \"type\", amount, category, description, checked, \"isTransfer\", \"linkedTransactionId\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
@@ -364,7 +456,7 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
 
     for s in data.scheduled {
         sqlx::query(
-            "INSERT INTO scheduled_transactions (id, description, amount, \"type\", frequency, \"accountId\", \"nextDate\", category, \"toAccountId\", \"includeInForecast\", \"endDate\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
+            "INSERT INTO scheduled_transactions (id, description, amount, \"type\", frequency, \"accountId\", \"nextDate\", category, \"toAccountId\", \"includeInForecast\", \"budgetId\", \"endDate\") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"
         )
         .bind(s.id)
         .bind(s.description)
@@ -376,6 +468,7 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
         .bind(s.category)
         .bind(s.to_account_id)
         .bind(s.include_in_forecast)
+        .bind(s.budget_id)
         .bind(s.end_date)
         .execute(&mut *tx)
         .await

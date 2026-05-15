@@ -1,14 +1,81 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
 import CategoryPieChart from '../features/analytics/CategoryPieChart';
 import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { useBank } from '../context/BankContext';
-import { format, subMonths, eachMonthOfInterval, isSameMonth, subWeeks, subYears, isWithinInterval } from 'date-fns';
+import { format, subMonths, eachMonthOfInterval, subWeeks, subYears, isWithinInterval, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
 
-type TimeRange = 'week' | 'month' | '3months' | '6months' | '9months' | 'year' | 'custom';
+type TimeRange = 'week' | 'month' | '2months' | '3months' | '6months' | '9months' | 'year' | 'custom';
+
+const ANALYTICS_TIME_RANGE_STORAGE_KEY = 'dmxmoney.analytics.timeRange';
+const ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY = 'dmxmoney.analytics.customStartDate';
+const ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY = 'dmxmoney.analytics.customEndDate';
+const ANALYTICS_MONTH_START_STORAGE_KEY = 'dmxmoney.analytics.monthStartsOnFirst';
+const ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY = 'dmxmoney.analytics.hiddenExpenseCategories';
+const ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY = 'dmxmoney.analytics.hiddenIncomeCategories';
+
+const ANALYTICS_TIME_RANGES: TimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
+
+const ANALYTICS_TIME_RANGE_LABELS: Record<TimeRange, string> = {
+    week: 'Semaine',
+    month: 'Mois',
+    '2months': '2 Mois',
+    '3months': '3 Mois',
+    '6months': '6 Mois',
+    '9months': '9 Mois',
+    year: '1 An',
+    custom: 'Personnalisé'
+};
+
+const getDefaultCustomStartDate = () => format(subMonths(new Date(), 1), 'yyyy-MM-dd');
+const getDefaultCustomEndDate = () => format(new Date(), 'yyyy-MM-dd');
+
+const getStoredAnalyticsTimeRange = (): TimeRange => {
+    try {
+        const stored = localStorage.getItem(ANALYTICS_TIME_RANGE_STORAGE_KEY) as TimeRange | null;
+        return stored && ANALYTICS_TIME_RANGES.includes(stored) ? stored : 'year';
+    } catch {
+        return 'year';
+    }
+};
+
+const getStoredAnalyticsCustomStartDate = () => {
+    try {
+        return localStorage.getItem(ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY) || getDefaultCustomStartDate();
+    } catch {
+        return getDefaultCustomStartDate();
+    }
+};
+
+const getStoredAnalyticsCustomEndDate = () => {
+    try {
+        return localStorage.getItem(ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY) || getDefaultCustomEndDate();
+    } catch {
+        return getDefaultCustomEndDate();
+    }
+};
+
+const getStoredAnalyticsMonthStartsOnFirst = () => {
+    try {
+        const stored = localStorage.getItem(ANALYTICS_MONTH_START_STORAGE_KEY);
+        return stored === null ? true : stored === 'true';
+    } catch {
+        return true;
+    }
+};
+
+const getStoredStringArray = (key: string) => {
+    try {
+        const stored = localStorage.getItem(key);
+        const parsed = stored ? JSON.parse(stored) : [];
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return [];
+    }
+};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -46,11 +113,36 @@ const Analytics: React.FC = () => {
         filterAccount.length === 0 ? allAccounts : allAccounts.filter(a => filterAccount.includes(a.id)),
         [allAccounts, filterAccount]);
 
-    const [timeRange, setTimeRange] = useState<TimeRange>('year');
-    const [customStartDate, setCustomStartDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
-    const [customEndDate, setCustomEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [hiddenExpenseCategories, setHiddenExpenseCategories] = useState<string[]>([]);
-    const [hiddenIncomeCategories, setHiddenIncomeCategories] = useState<string[]>([]);
+    const [timeRange, setTimeRange] = useState<TimeRange>(getStoredAnalyticsTimeRange);
+    const [customStartDate, setCustomStartDate] = useState(getStoredAnalyticsCustomStartDate);
+    const [customEndDate, setCustomEndDate] = useState(getStoredAnalyticsCustomEndDate);
+    const [monthStartsOnFirst, setMonthStartsOnFirst] = useState(getStoredAnalyticsMonthStartsOnFirst);
+    const [hiddenExpenseCategories, setHiddenExpenseCategories] = useState<string[]>(() => getStoredStringArray(ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY));
+    const [hiddenIncomeCategories, setHiddenIncomeCategories] = useState<string[]>(() => getStoredStringArray(ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY));
+
+    useEffect(() => {
+        localStorage.setItem(ANALYTICS_TIME_RANGE_STORAGE_KEY, timeRange);
+    }, [timeRange]);
+
+    useEffect(() => {
+        localStorage.setItem(ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY, customStartDate);
+    }, [customStartDate]);
+
+    useEffect(() => {
+        localStorage.setItem(ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY, customEndDate);
+    }, [customEndDate]);
+
+    useEffect(() => {
+        localStorage.setItem(ANALYTICS_MONTH_START_STORAGE_KEY, String(monthStartsOnFirst));
+    }, [monthStartsOnFirst]);
+
+    useEffect(() => {
+        localStorage.setItem(ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY, JSON.stringify(hiddenExpenseCategories));
+    }, [hiddenExpenseCategories]);
+
+    useEffect(() => {
+        localStorage.setItem(ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY, JSON.stringify(hiddenIncomeCategories));
+    }, [hiddenIncomeCategories]);
 
     const dateRange = useMemo(() => {
         const today = new Date();
@@ -59,22 +151,25 @@ const Analytics: React.FC = () => {
 
         switch (timeRange) {
             case 'week':
-                start = subWeeks(today, 1);
+                start = monthStartsOnFirst ? startOfMonth(subWeeks(today, 1)) : subWeeks(today, 1);
                 break;
             case 'month':
-                start = subMonths(today, 1);
+                start = monthStartsOnFirst ? startOfMonth(today) : subMonths(today, 1);
+                break;
+            case '2months':
+                start = monthStartsOnFirst ? startOfMonth(subMonths(today, 2)) : subMonths(today, 2);
                 break;
             case '3months':
-                start = subMonths(today, 3);
+                start = monthStartsOnFirst ? startOfMonth(subMonths(today, 3)) : subMonths(today, 3);
                 break;
             case '6months':
-                start = subMonths(today, 6);
+                start = monthStartsOnFirst ? startOfMonth(subMonths(today, 6)) : subMonths(today, 6);
                 break;
             case '9months':
-                start = subMonths(today, 9);
+                start = monthStartsOnFirst ? startOfMonth(subMonths(today, 9)) : subMonths(today, 9);
                 break;
             case 'year':
-                start = subYears(today, 1);
+                start = monthStartsOnFirst ? startOfMonth(subYears(today, 1)) : subYears(today, 1);
                 break;
             case 'custom':
                 start = new Date(customStartDate);
@@ -83,7 +178,7 @@ const Analytics: React.FC = () => {
                 break;
         }
         return { start, end };
-    }, [timeRange, customStartDate, customEndDate]);
+    }, [timeRange, customStartDate, customEndDate, monthStartsOnFirst]);
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(t => {
@@ -249,7 +344,7 @@ const Analytics: React.FC = () => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Analyses Financières</h2>
 
                 <div className="flex flex-wrap gap-2 period-selector justify-end">
-                    {(['week', 'month', '3months', '6months', '9months', 'year', 'custom'] as const).map((range) => (
+                    {ANALYTICS_TIME_RANGES.map((range) => (
                         <Button
                             key={range}
                             onClick={() => setTimeRange(range)}
@@ -260,19 +355,13 @@ const Analytics: React.FC = () => {
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                                 }`}
                         >
-                            {range === 'week' && 'Semaine'}
-                            {range === 'month' && 'Mois'}
-                            {range === '3months' && '3 Mois'}
-                            {range === '6months' && '6 Mois'}
-                            {range === '9months' && '9 Mois'}
-                            {range === 'year' && '1 An'}
-                            {range === 'custom' && 'Personnalisé'}
+                            {ANALYTICS_TIME_RANGE_LABELS[range]}
                         </Button>
                     ))}
                 </div>
             </div>
 
-            <div className={`transition-all duration-300 ease-in-out ${timeRange === 'custom' ? 'max-h-48 opacity-100 mt-4' : 'max-h-0 opacity-0 mt-0'}`}>
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${timeRange === 'custom' ? 'max-h-48 opacity-100 mt-4 pointer-events-auto' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
                 <div className="flex gap-4 app-card p-4 w-fit ml-auto shadow-none">
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Du</label>
@@ -297,7 +386,20 @@ const Analytics: React.FC = () => {
 
             {/* Balance History Area Chart */}
             <div className="app-card p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Évolution du Solde</h3>
+                <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200">Évolution du Solde</h3>
+                    {timeRange !== 'custom' && (
+                        <label className="flex w-fit items-center gap-3 rounded-lg border border-gray-200 dark:border-neutral-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={monthStartsOnFirst}
+                                onChange={(event) => setMonthStartsOnFirst(event.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-neutral-600"
+                            />
+                            Démarrer au 1er du mois
+                        </label>
+                    )}
+                </div>
                 <div className="h-80" style={{ minHeight: '320px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={balanceHistory}>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Settings as SettingsIcon, Trash2, Edit2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, Settings as SettingsIcon, Trash2, Edit2, Search } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -28,9 +28,15 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import ColorPicker from '../components/ui/ColorPicker';
 import SearchableSelect from '../components/ui/SearchableSelect';
+import MultiSelect from '../components/ui/MultiSelect';
 import SortableGroupItem from '../features/accounts/SortableGroupItem';
 import AccountCard from '../features/accounts/AccountCard';
 import { COLORS } from '../constants/icons';
+
+const normalizeSearchValue = (value: unknown) => String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 const dropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
@@ -53,12 +59,11 @@ const Accounts: React.FC = () => {
     const { accounts: allAccounts, addAccount, updateAccount, deleteAccount, transactions } = useBank();
     const { settings, updateAccountGroup, updateCustomGroups, renameCustomGroup, updateCustomGroupsOrder, updateAccountsOrder } = useSettings();
 
-    // Afficher tous les comptes sans filtrage sur cette page
-    const accounts = allAccounts;
-
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterTypes, setFilterTypes] = useState<string[]>([]);
     const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; accountId: string | null }>({
         isOpen: false,
         accountId: null
@@ -83,6 +88,31 @@ const Accounts: React.FC = () => {
 
     const [activeId, setActiveId] = useState<string | null>(null);
     const [activeType, setActiveType] = useState<'group' | 'account' | null>(null);
+
+    const accounts = useMemo(() => {
+        const searchTokens = normalizeSearchValue(searchTerm).split(/\s+/).filter(Boolean);
+
+        return allAccounts.filter(account => {
+            if (filterTypes.length > 0 && !filterTypes.includes(account.type)) return false;
+            if (searchTokens.length === 0) return true;
+
+            const groupName = settings.accountGroups?.[account.id] || 'Non groupés';
+            const accountBalance = account.initialBalance + transactions
+                .filter(transaction => transaction.accountId === account.id)
+                .reduce((sum, transaction) => sum + (transaction.type === 'income' ? transaction.amount : -transaction.amount), 0);
+            const searchableText = [
+                account.name,
+                account.type,
+                account.initialBalance,
+                accountBalance,
+                account.color,
+                account.icon,
+                groupName
+            ].map(normalizeSearchValue).join(' ');
+
+            return searchTokens.every(token => searchableText.includes(token));
+        });
+    }, [allAccounts, filterTypes, searchTerm, settings.accountGroups, transactions]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -385,78 +415,105 @@ const Accounts: React.FC = () => {
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Mes Comptes</h2>
                 <div className="flex gap-2">
-                    <Button onClick={() => setIsGroupModalOpen(true)} variant="secondary" icon={SettingsIcon}>
+                    <Button onClick={() => setIsGroupModalOpen(true)} variant="secondary" size="sm" icon={SettingsIcon}>
                         Gérer les groupes
                     </Button>
-                    <Button onClick={() => handleOpenModal()} icon={Plus}>
-                        Nouveau Compte
+                    <Button onClick={() => handleOpenModal()} size="sm" icon={Plus}>
+                        Nouveau compte
                     </Button>
                 </div>
             </div>
 
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-            >
-                <div className="space-y-8">
-                    <SortableContext
-                        items={orderedGroups.filter(g => g !== 'Non groupés')}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        {orderedGroups.map(groupName => {
-                            const groupAccounts = groupedAccounts[groupName] || [];
-                            if (groupAccounts.length === 0 && groupName === 'Non groupés' && !settings.customGroups?.includes(groupName)) return null;
-
-                            return (
-                                <SortableGroupItem
-                                    key={groupName}
-                                    groupName={groupName}
-                                    accounts={groupAccounts}
-                                    transactions={transactions}
-                                    onEditAccount={handleOpenModal}
-                                    onDeleteAccount={handleDelete}
-                                />
-                            );
-                        })}
-                    </SortableContext>
+            <div className="flex flex-col lg:flex-row gap-3 px-1">
+                <div className="w-full lg:max-w-sm">
+                    <Input
+                        placeholder="Rechercher un compte..."
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        icon={Search}
+                    />
                 </div>
+                <MultiSelect
+                    value={filterTypes}
+                    onChange={setFilterTypes}
+                    options={ACCOUNT_TYPES}
+                    placeholder="Tous les types"
+                    className="w-full sm:w-56"
+                />
+            </div>
 
-                <DragOverlay dropAnimation={dropAnimation}>
-                    {activeId && activeType === 'account' ? (
-                        <AccountCard
-                            account={accounts.find(a => a.id === activeId)!}
-                            transactions={transactions}
-                            onEdit={() => { }}
-                            onDelete={() => { }}
-                            isDragOverlay
-                        />
-                    ) : activeId && activeType === 'group' ? (
-                        <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-xl border border-indigo-500/50">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
-                                <span className="text-sm font-normal text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
-                                    {groupedAccounts[activeId]?.length || 0}
-                                </span>
-                                {activeId}
-                            </h3>
-                        </div>
-                    ) : null}
-                </DragOverlay>
-            </DndContext>
+            {accounts.length > 0 ? (
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragEnd={handleDragEnd}
+                >
+                    <div className="space-y-8">
+                        <SortableContext
+                            items={orderedGroups.filter(g => g !== 'Non groupés')}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {orderedGroups.map(groupName => {
+                                const groupAccounts = groupedAccounts[groupName] || [];
+                                if (groupAccounts.length === 0 && groupName === 'Non groupés' && !settings.customGroups?.includes(groupName)) return null;
 
-            {accounts.length === 0 && (
+                                return (
+                                    <SortableGroupItem
+                                        key={groupName}
+                                        groupName={groupName}
+                                        accounts={groupAccounts}
+                                        transactions={transactions}
+                                        onEditAccount={handleOpenModal}
+                                        onDeleteAccount={handleDelete}
+                                    />
+                                );
+                            })}
+                        </SortableContext>
+                    </div>
+
+                    <DragOverlay dropAnimation={dropAnimation}>
+                        {activeId && activeType === 'account' ? (
+                            <AccountCard
+                                account={accounts.find(a => a.id === activeId)!}
+                                transactions={transactions}
+                                onEdit={() => { }}
+                                onDelete={() => { }}
+                                isDragOverlay
+                            />
+                        ) : activeId && activeType === 'group' ? (
+                            <div className="bg-white dark:bg-[#121212] p-4 rounded-xl shadow-xl border border-indigo-500/50">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
+                                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
+                                        {groupedAccounts[activeId]?.length || 0}
+                                    </span>
+                                    {activeId}
+                                </h3>
+                            </div>
+                        ) : null}
+                    </DragOverlay>
+                </DndContext>
+            ) : (
                 <div className="text-center py-12 app-card border-dashed">
-                    <SettingsIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                    <p className="text-gray-500 dark:text-gray-400">Aucun compte configuré</p>
-                    <Button
-                        variant="ghost"
-                        onClick={() => handleOpenModal()}
-                        className="mt-2"
-                    >
-                        Créer votre premier compte
-                    </Button>
+                    {allAccounts.length === 0 ? (
+                        <>
+                            <SettingsIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                            <p className="text-gray-500 dark:text-gray-400">Aucun compte configuré</p>
+                            <Button
+                                variant="ghost"
+                                onClick={() => handleOpenModal()}
+                                className="mt-2"
+                            >
+                                Créer votre premier compte
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Search className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                            <p className="text-gray-500 dark:text-gray-400">Aucun compte ne correspond aux filtres.</p>
+                        </>
+                    )}
                 </div>
             )}
 

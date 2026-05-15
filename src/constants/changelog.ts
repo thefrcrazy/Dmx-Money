@@ -12,6 +12,40 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.0",
+        date: "2026-05-15",
+        title: "Version 1.0 — Budget, Échéancier et Prévisions",
+        changes: [
+            "Refonte complète de la page Budget avec budgets indépendants, suivi par catégorie, détails minimalistes et intégration des échéances liées.",
+            "Ajout de suggestions de budget et d'échéancier basées sur les opérations récurrentes du Journal, avec ajout et suppression des suggestions.",
+            "Amélioration du Journal : tri stable des transactions à date identique, recherche sur toutes les colonnes, filtres multi-catégories et affichage du budget restant.",
+            "Évolution de l'Échéancier : liaison explicite à un budget configuré, filtres améliorés et meilleure cohérence des formulaires.",
+            "Ajout du scroll virtuel sur les tableaux pour améliorer les performances avec de gros volumes de données.",
+            "Amélioration des pages Analyses et Prédictions avec filtre 2 mois, mémorisation des périodes, option de démarrage au 1er du mois et affichage journalier cohérent.",
+            "Ajout d'un seuil d'alerte configurable dans Prédictions, avec alertes orange pour le seuil personnalisé et rouge pour les soldes négatifs.",
+            "Uniformisation des boutons, des filtres et des états visuels sur les pages principales.",
+            "Amélioration de l'intégration macOS : position des traffic lights, sidebar réduite, chevron, tooltips et titres de groupes.",
+            "Mises à jour backend et base de données pour supporter les budgets autonomes, les liaisons budget-échéance et les nouveaux états de l'application."
+        ],
+        features: [
+            {
+                title: "Budget exploitable",
+                description: "Les budgets peuvent maintenant vivre seuls ou être liés à des échéances, avec un suivi clair du prévu, dépensé et restant.",
+                icon: "Target"
+            },
+            {
+                title: "Prévisions plus lisibles",
+                description: "Les projections affichent les jours, les seuils configurables et les alertes visuelles sans confondre seuil personnalisé et solde négatif.",
+                icon: "TrendingUp"
+            },
+            {
+                title: "Interface stabilisée",
+                description: "Les tableaux, filtres, boutons et la sidebar macOS ont été harmonisés pour une utilisation plus fluide au quotidien.",
+                icon: "Settings"
+            }
+        ]
+    },
+    {
         version: "0.7.3",
         date: "2026-03-11",
         title: "Correctif d'urgence (Données invisibles)",
@@ -404,4 +438,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "0.7.3";
+export const LATEST_VERSION = "1.0.0";

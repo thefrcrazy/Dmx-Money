@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Plus, Search, Trash2, Edit2, CheckCircle2, ArrowRightLeft, Tag, Circle } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useBank } from '../context/BankContext';
@@ -6,12 +6,39 @@ import { useToast } from '../context/ToastContext';
 import FormPopup from '../components/ui/FormPopup';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import SearchableSelect from '../components/ui/SearchableSelect';
+import MultiSelect from '../components/ui/MultiSelect';
 import { Transaction } from '../types';
 import { ICONS } from '../constants/icons';
 import Table from '../components/ui/Table';
 import Input from '../components/ui/Input';
 import { useFinancialMetrics } from '../hooks/useFinancialMetrics';
 import { formatCurrency, formatDate } from '../utils/format';
+
+type TransactionWithBalance = Transaction & { balance: number };
+
+const normalizeSearchValue = (value: unknown) => String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+const getMonthKey = (date: string) => date.slice(0, 7);
+const getBudgetSpendKey = (category: string, accountId: string | undefined, monthKey: string) => `${category}|${accountId || 'all'}|${monthKey}`;
+
+const TRANSACTION_TYPE_FILTER_OPTIONS = [
+    { id: 'expense', label: 'Dépenses', icon: 'TrendingDown', color: '#ef4444' },
+    { id: 'income', label: 'Revenus', icon: 'TrendingUp', color: '#10b981' },
+    { id: 'transfer', label: 'Virements', icon: 'ArrowRightLeft', color: '#6366f1' }
+];
+
+const TRANSACTION_STATUS_FILTER_OPTIONS = [
+    { id: 'checked', label: 'Pointées', icon: 'CheckCircle2', color: '#10b981' },
+    { id: 'unchecked', label: 'Non pointées', icon: 'Circle', color: '#94a3b8' }
+];
+
+const TRANSACTION_BUDGET_FILTER_OPTIONS = [
+    { id: 'budgeted', label: 'Avec budget', icon: 'Tag', color: '#6366f1' },
+    { id: 'unbudgeted', label: 'Hors budget', icon: 'Tag', color: '#94a3b8' }
+];
 
 const Transactions: React.FC = () => {
     const {
@@ -23,15 +50,19 @@ const Transactions: React.FC = () => {
         updateTransaction,
         deleteTransaction,
         toggleTransactionCheck,
+        processDueScheduledTransactions,
         filterAccount,
-        scheduled
+        budgets
     } = useBank();
 
     const { showToast } = useToast();
     const { relevantTransactions } = useFinancialMetrics();
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterCategory, setFilterCategory] = useState('all');
+    const [filterCategories, setFilterCategories] = useState<string[]>([]);
+    const [filterTypes, setFilterTypes] = useState<string[]>([]);
+    const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+    const [filterBudgets, setFilterBudgets] = useState<string[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -52,20 +83,76 @@ const Transactions: React.FC = () => {
         isTransfer: false
     });
 
-    const displayTransactions = useMemo(() => {
-        let filtered = relevantTransactions;
-        if (searchTerm) {
-            const lowerSearch = searchTerm.toLowerCase();
-            filtered = filtered.filter(t => t.description.toLowerCase().includes(lowerSearch) || t.amount.toString().includes(lowerSearch));
-        }
-        if (filterCategory !== 'all') {
-            filtered = filtered.filter(t => t.category === filterCategory);
-        }
-        return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [relevantTransactions, searchTerm, filterCategory]);
+    useEffect(() => {
+        processDueScheduledTransactions();
+    }, [processDueScheduledTransactions]);
 
-    const transactionsWithBalance = useMemo(() => {
-        const allSorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const accountMap = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
+    const categoryMap = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);
+
+    const getCategoryDetails = useCallback((id: string) => {
+        if (id === 'transfer') return { name: 'Virement', color: '#6366f1', icon: 'ArrowRightLeft' };
+        return categoryMap.get(id) || { name: 'Inconnu', color: '#9ca3af', icon: 'Tag' };
+    }, [categoryMap]);
+
+    const budgetSpentByScope = useMemo(() => {
+        return transactions.reduce((acc, transaction) => {
+            if (transaction.type !== 'expense' || transaction.category === 'transfer') return acc;
+
+            const monthKey = getMonthKey(transaction.date);
+            const categoryKey = getBudgetSpendKey(transaction.category, undefined, monthKey);
+            const accountKey = getBudgetSpendKey(transaction.category, transaction.accountId, monthKey);
+
+            acc.set(categoryKey, (acc.get(categoryKey) || 0) + transaction.amount);
+            acc.set(accountKey, (acc.get(accountKey) || 0) + transaction.amount);
+            return acc;
+        }, new Map<string, number>());
+    }, [transactions]);
+
+    const getApplicableBudget = useCallback((transaction: Transaction) => {
+        if (transaction.type !== 'expense' || transaction.category === 'transfer') return undefined;
+
+        const matchingBudgets = budgets.filter(budget => (
+            budget.category === transaction.category && (!budget.accountId || budget.accountId === transaction.accountId)
+        ));
+
+        return matchingBudgets.find(budget => budget.accountId === transaction.accountId)
+            || matchingBudgets.find(budget => !budget.accountId);
+    }, [budgets]);
+
+    const getTransactionBudgetRemaining = useCallback((transaction: Transaction) => {
+        const budget = getApplicableBudget(transaction);
+        if (!budget) return null;
+
+        const monthKey = getMonthKey(transaction.date);
+        const spent = budgetSpentByScope.get(getBudgetSpendKey(budget.category, budget.accountId, monthKey)) || 0;
+
+        return {
+            budget,
+            remaining: budget.amount - spent
+        };
+    }, [budgetSpentByScope, getApplicableBudget]);
+
+    const isTransactionBudgeted = useCallback((transaction: Transaction) => (
+        !!getApplicableBudget(transaction)
+    ), [getApplicableBudget]);
+
+    const categoryFilterOptions = useMemo(() => [
+        { id: 'transfer', label: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' },
+        ...categories
+            .filter(category => category.id !== 'transfer')
+            .map(category => ({ id: category.id, label: category.name, icon: category.icon, color: category.color }))
+    ], [categories]);
+
+    const transactionsWithBalance = useMemo<TransactionWithBalance[]>(() => {
+        const allSorted = transactions
+            .map((transaction, index) => ({ transaction, index }))
+            .sort((a, b) => {
+                const dateDiff = new Date(a.transaction.date).getTime() - new Date(b.transaction.date).getTime();
+                return dateDiff || b.index - a.index;
+            })
+            .map(({ transaction }) => transaction);
+
         const accountBalances: Record<string, number> = {};
         accounts.forEach(acc => accountBalances[acc.id] = acc.initialBalance);
 
@@ -76,9 +163,74 @@ const Transactions: React.FC = () => {
             return { ...t, balance: newBal };
         });
 
-        const displayIds = new Set(displayTransactions.map(ft => ft.id));
-        return withBalance.reverse().filter(t => displayIds.has(t.id));
-    }, [transactions, accounts, displayTransactions]);
+        return withBalance.reverse();
+    }, [transactions, accounts]);
+
+    const displayTransactions = useMemo(() => {
+        const relevantIds = new Set(relevantTransactions.map(transaction => transaction.id));
+        const searchTokens = normalizeSearchValue(searchTerm).split(/\s+/).filter(Boolean);
+
+        return transactionsWithBalance.filter(transaction => {
+            if (!relevantIds.has(transaction.id)) return false;
+            if (filterCategories.length > 0 && !filterCategories.includes(transaction.category)) return false;
+
+            const transactionType = transaction.category === 'transfer' ? 'transfer' : transaction.type;
+            if (filterTypes.length > 0 && !filterTypes.includes(transactionType)) return false;
+
+            const transactionStatus = transaction.checked ? 'checked' : 'unchecked';
+            if (filterStatuses.length > 0 && !filterStatuses.includes(transactionStatus)) return false;
+
+            const transactionBudgetStatus = isTransactionBudgeted(transaction) ? 'budgeted' : 'unbudgeted';
+            if (filterBudgets.length > 0 && !filterBudgets.includes(transactionBudgetStatus)) return false;
+
+            if (searchTokens.length === 0) return true;
+
+            const account = accountMap.get(transaction.accountId);
+            const category = getCategoryDetails(transaction.category);
+            const typeLabel = transaction.category === 'transfer'
+                ? 'Virement'
+                : transaction.type === 'income'
+                    ? 'Revenu'
+                    : 'Dépense';
+            const amountPrefix = transaction.type === 'income' ? '+' : '-';
+            const checkedLabel = transaction.checked ? 'Pointé coché validé' : 'Non pointé non coché actuel';
+            const budgetRemaining = getTransactionBudgetRemaining(transaction);
+            const budgetLabel = budgetRemaining
+                ? `Budget budgété prévu ${budgetRemaining.budget.name} ${formatCurrency(budgetRemaining.remaining)} restant`
+                : 'Hors budget non budgété';
+            const searchableText = [
+                account?.name,
+                account?.type,
+                transaction.date,
+                formatDate(transaction.date),
+                formatDate(transaction.date, 'dd MMM'),
+                category.name,
+                typeLabel,
+                transaction.description,
+                transaction.amount,
+                formatCurrency(transaction.amount),
+                `${amountPrefix}${formatCurrency(transaction.amount)}`,
+                checkedLabel,
+                budgetLabel,
+                transaction.balance,
+                formatCurrency(transaction.balance)
+            ].map(normalizeSearchValue).join(' ');
+
+            return searchTokens.every(token => searchableText.includes(token));
+        });
+    }, [
+        relevantTransactions,
+        transactionsWithBalance,
+        filterCategories,
+        filterTypes,
+        filterStatuses,
+        filterBudgets,
+        searchTerm,
+        accountMap,
+        getCategoryDetails,
+        isTransactionBudgeted,
+        getTransactionBudgetRemaining
+    ]);
 
     const handleOpenModal = (transaction?: Transaction) => {
         if (transaction) {
@@ -210,11 +362,6 @@ const Transactions: React.FC = () => {
         }
     };
 
-    const getCategoryDetails = (id: string) => {
-        if (id === 'transfer') return { name: 'Virement', color: '#6366f1', icon: 'ArrowRightLeft' };
-        return categories.find(c => c.id === id) || { name: 'Inconnu', color: '#9ca3af', icon: 'Tag' };
-    };
-
     const renderCategoryIcon = (iconName: string, className: string = "w-4 h-4") => {
         if (iconName === 'ArrowRightLeft') return <ArrowRightLeft className={className} />;
         const Icon = ICONS[iconName] || Tag;
@@ -223,26 +370,49 @@ const Transactions: React.FC = () => {
 
     return (
         <div className="flex-1 flex flex-col min-h-0 space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-1 flex-none">
-                <div className="w-full sm:w-96">
-                    <Input 
-                        placeholder="Rechercher une description ou un montant..." 
-                        value={searchTerm} 
-                        onChange={(e) => setSearchTerm(e.target.value)} 
-                        icon={Search} 
+            <div className="flex items-center justify-between gap-4 px-1 flex-none">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Journal</h2>
+                <Button onClick={() => handleOpenModal()} size="sm" icon={Plus}>Nouvelle</Button>
+            </div>
+
+            <div className="flex flex-col xl:flex-row gap-3 px-1 flex-none">
+                <div className="w-full xl:max-w-sm xl:flex-none">
+                    <Input
+                        placeholder="Rechercher dans toutes les colonnes..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        icon={Search}
                     />
                 </div>
-                <div className="flex gap-3 w-full sm:w-auto">
-                    <SearchableSelect 
-                        value={filterCategory} 
-                        onChange={setFilterCategory} 
-                        options={[
-                            { id: 'all', label: 'Toutes les catégories', icon: 'Filter' }, 
-                            ...categories.map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color }))
-                        ]} 
-                        className="w-56" 
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 w-full xl:flex-1 min-w-0">
+                    <MultiSelect
+                        value={filterCategories}
+                        onChange={setFilterCategories}
+                        options={categoryFilterOptions}
+                        placeholder="Toutes les catégories"
+                        className="w-full min-w-0"
                     />
-                    <Button onClick={() => handleOpenModal()} icon={Plus}>Nouvelle</Button>
+                    <MultiSelect
+                        value={filterTypes}
+                        onChange={setFilterTypes}
+                        options={TRANSACTION_TYPE_FILTER_OPTIONS}
+                        placeholder="Tous les types"
+                        className="w-full min-w-0"
+                    />
+                    <MultiSelect
+                        value={filterStatuses}
+                        onChange={setFilterStatuses}
+                        options={TRANSACTION_STATUS_FILTER_OPTIONS}
+                        placeholder="Tous les états"
+                        className="w-full min-w-0"
+                    />
+                    <MultiSelect
+                        value={filterBudgets}
+                        onChange={setFilterBudgets}
+                        options={TRANSACTION_BUDGET_FILTER_OPTIONS}
+                        placeholder="Tous les budgets"
+                        className="w-full min-w-0"
+                    />
                 </div>
             </div>
 
@@ -284,7 +454,7 @@ const Transactions: React.FC = () => {
 
             <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
                 <Table
-                    data={transactionsWithBalance}
+                    data={displayTransactions}
                     keyExtractor={(t) => t.id}
                     selectedIds={selectedIds as any}
                     onSelectRow={handleToggleSelect}
@@ -299,13 +469,13 @@ const Transactions: React.FC = () => {
                             <div>
                                 <p className="text-gray-900 dark:text-gray-100 font-bold text-lg">Aucune transaction</p>
                                 <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs">
-                                    {searchTerm || filterCategory !== 'all' 
-                                        ? "Aucun résultat pour vos filtres actuels." 
+                                    {searchTerm || filterCategories.length > 0 || filterTypes.length > 0 || filterStatuses.length > 0 || filterBudgets.length > 0
+                                        ? "Aucun résultat pour vos filtres actuels."
                                         : "Commencez par ajouter une transaction ou importez un relevé bancaire."}
                                 </p>
                             </div>
-                            {!searchTerm && filterCategory === 'all' && (
-                                <Button onClick={() => handleOpenModal()} icon={Plus}>Ajouter une transaction</Button>
+                            {!searchTerm && filterCategories.length === 0 && filterTypes.length === 0 && filterStatuses.length === 0 && filterBudgets.length === 0 && (
+                                <Button onClick={() => handleOpenModal()} size="sm" icon={Plus}>Ajouter une transaction</Button>
                             )}
                         </div>
                     }
@@ -366,12 +536,19 @@ const Transactions: React.FC = () => {
                             )
                         },
                         {
-                            header: 'Budget',
-                            width: '80px',
-                            align: 'center',
+                            header: 'Budget restant',
+                            width: '140px',
+                            align: 'right',
+                            className: "tabular-nums",
                             render: (t) => {
-                                const isBudgeted = scheduled.some(s => s.category === t.category && s.type === 'expense');
-                                return isBudgeted ? <span className="text-[10px] font-bold text-indigo-500/70 border border-indigo-500/20 px-1.5 py-0.5 rounded">PRÉVU</span> : null;
+                                const budgetRemaining = getTransactionBudgetRemaining(t);
+                                if (!budgetRemaining) return null;
+
+                                return (
+                                    <span className="inline-flex items-center justify-end px-2 py-0.5 rounded text-[10px] font-bold text-indigo-500/70 border border-indigo-500/20 bg-indigo-500/[0.03] whitespace-nowrap">
+                                        {formatCurrency(budgetRemaining.remaining)}
+                                    </span>
+                                );
                             }
                         },
                         {
@@ -389,7 +566,7 @@ const Transactions: React.FC = () => {
                             width: '120px',
                             align: 'right',
                             className: "tabular-nums text-gray-400 opacity-60",
-                            render: (t) => <span>{formatCurrency((t as any).balance)}</span>
+                            render: (t) => <span>{formatCurrency(t.balance)}</span>
                         },
                         {
                             header: '',

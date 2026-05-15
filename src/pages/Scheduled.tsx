@@ -1,29 +1,364 @@
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Calendar, Trash2, Edit2, Clock, X, Tag } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Calendar, Trash2, Edit2, Clock, X, Tag, Sparkles, Search } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useBank } from '../context/BankContext';
+import { useToast } from '../context/ToastContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import FormPopup from '../components/ui/FormPopup';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import SearchableSelect, { SelectOption } from '../components/ui/SearchableSelect';
-import { ScheduledTransaction, TransactionType, Periodicity } from '../types';
+import MultiSelect from '../components/ui/MultiSelect';
+import { ScheduledTransaction, Transaction, TransactionType, Periodicity } from '../types';
 import { ICONS } from '../constants/icons';
 import Table from '../components/ui/Table';
 import Input from '../components/ui/Input';
 
+type RecurrenceIdentityInput = {
+    description: string;
+    type: TransactionType;
+    category: string;
+    accountId: string;
+    toAccountId?: string;
+};
+
+type SuggestionBase = Pick<ScheduledTransaction, 'description' | 'amount' | 'type' | 'category' | 'accountId' | 'toAccountId'>;
+
+interface SuggestionGroup {
+    identity: string;
+    base: SuggestionBase;
+    records: Transaction[];
+}
+
+interface MonthlySuggestion extends Omit<ScheduledTransaction, 'id'> {
+    suggestionKey: string;
+    occurrenceCount: number;
+}
+
+type ScheduledDueRange = 'all' | 'month' | '2months' | '3months' | '6months' | 'year';
+
+const DISMISSED_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedScheduledSuggestions';
+const SCHEDULED_DUE_RANGE_STORAGE_KEY = 'dmxmoney.scheduled.dueRange';
+
+const SCHEDULED_DUE_RANGES: ScheduledDueRange[] = ['all', 'month', '2months', '3months', '6months', 'year'];
+
+const SCHEDULED_DUE_RANGE_LABELS: Record<ScheduledDueRange, string> = {
+    all: 'Toutes',
+    month: 'Mois',
+    '2months': '2 Mois',
+    '3months': '3 Mois',
+    '6months': '6 Mois',
+    year: '1 An'
+};
+
+const SCHEDULED_DUE_RANGE_MONTHS: Record<Exclude<ScheduledDueRange, 'all'>, number> = {
+    month: 1,
+    '2months': 2,
+    '3months': 3,
+    '6months': 6,
+    year: 12
+};
+
+const normalizeDescription = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+const normalizeSearchValue = (value: unknown) => String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+const FREQUENCY_LABELS: Record<Periodicity, string> = {
+    once: 'Une seule fois',
+    daily: 'Journalier',
+    weekly: 'Hebdomadaire',
+    biweekly: 'Toutes les 2 semaines',
+    bimonthly: 'Bimensuel',
+    fourweekly: 'Toutes les 4 semaines',
+    monthly: 'Mensuel',
+    bimestrial: 'Bimestriel',
+    quarterly: 'Trimestriel',
+    fourmonthly: 'Tous les 4 mois',
+    semiannual: 'Semestriel',
+    annual: 'Annuel',
+    biennial: 'Bisannuel'
+};
+
+const parseLocalDate = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, (month || 1) - 1, day || 1);
+};
+
+const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const addMonthsSafely = (date: Date, months: number) => {
+    const targetMonth = date.getMonth() + months;
+    const daysInTargetMonth = new Date(date.getFullYear(), targetMonth + 1, 0).getDate();
+    return new Date(date.getFullYear(), targetMonth, Math.min(date.getDate(), daysInTargetMonth));
+};
+
+const getStoredScheduledDueRange = (): ScheduledDueRange => {
+    try {
+        const stored = localStorage.getItem(SCHEDULED_DUE_RANGE_STORAGE_KEY) as ScheduledDueRange | null;
+        return stored && SCHEDULED_DUE_RANGES.includes(stored) ? stored : 'all';
+    } catch {
+        return 'all';
+    }
+};
+
+const getMonthIndex = (date: string) => {
+    const parsedDate = parseLocalDate(date);
+    return parsedDate.getFullYear() * 12 + parsedDate.getMonth();
+};
+
+const getAmountKey = (amount: number) => Math.round(amount * 100).toString();
+
+const getRecurrenceIdentity = (item: RecurrenceIdentityInput) => [
+    item.accountId,
+    item.toAccountId || '',
+    item.type,
+    item.category,
+    normalizeDescription(item.description)
+].join('|');
+
 const Scheduled: React.FC = () => {
-    const { accounts, scheduled, categories, addScheduled, updateScheduled, deleteScheduled, filterAccount } = useBank();
+    const { accounts, transactions, scheduled, categories, budgets, addScheduled, updateScheduled, deleteScheduled, filterAccount } = useBank();
+    const { showToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<ScheduledTransaction | null>(null);
+    const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dueRange, setDueRange] = useState<ScheduledDueRange>(getStoredScheduledDueRange);
+    const [filterCategories, setFilterCategories] = useState<string[]>([]);
+    const [filterFrequencies, setFilterFrequencies] = useState<string[]>([]);
+    const suggestionPopupRef = useRef<HTMLDivElement>(null);
+    const [dismissedSuggestionKeys, setDismissedSuggestionKeys] = useState<Set<string>>(() => {
+        try {
+            const stored = localStorage.getItem(DISMISSED_SUGGESTIONS_STORAGE_KEY);
+            return new Set(stored ? JSON.parse(stored) : []);
+        } catch {
+            return new Set();
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem(DISMISSED_SUGGESTIONS_STORAGE_KEY, JSON.stringify(Array.from(dismissedSuggestionKeys)));
+    }, [dismissedSuggestionKeys]);
+
+    useEffect(() => {
+        localStorage.setItem(SCHEDULED_DUE_RANGE_STORAGE_KEY, dueRange);
+    }, [dueRange]);
+
+    useEffect(() => {
+        if (!isSuggestionsOpen) return;
+
+        const handleOutsideClick = (event: MouseEvent) => {
+            if (!suggestionPopupRef.current?.contains(event.target as Node)) {
+                setIsSuggestionsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }, [isSuggestionsOpen]);
+
+    const accountMap = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
+    const categoryMap = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);
+    const budgetMap = useMemo(() => new Map(budgets.map(budget => [budget.id, budget])), [budgets]);
 
     const scheduledTransactions = useMemo(() => {
-        const filtered = filterAccount.length === 0
+        let filtered = filterAccount.length === 0
             ? scheduled
             : scheduled.filter(t => filterAccount.includes(t.accountId));
+
+        if (dueRange !== 'all') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const endDate = addMonthsSafely(today, SCHEDULED_DUE_RANGE_MONTHS[dueRange]);
+            endDate.setHours(23, 59, 59, 999);
+
+            filtered = filtered.filter(transaction => {
+                const dueDate = parseLocalDate(transaction.nextDate);
+                return dueDate >= today && dueDate <= endDate;
+            });
+        }
+
+        if (filterCategories.length > 0) {
+            filtered = filtered.filter(transaction => filterCategories.includes(transaction.category));
+        }
+
+        if (filterFrequencies.length > 0) {
+            filtered = filtered.filter(transaction => filterFrequencies.includes(transaction.frequency));
+        }
+
+        const searchTokens = normalizeSearchValue(searchTerm).split(/\s+/).filter(Boolean);
+        if (searchTokens.length > 0) {
+            filtered = filtered.filter(transaction => {
+                const account = accountMap.get(transaction.accountId);
+                const toAccount = transaction.toAccountId ? accountMap.get(transaction.toAccountId) : undefined;
+                const category = transaction.type === 'transfer'
+                    ? { name: 'Virement' }
+                    : categoryMap.get(transaction.category);
+                const typeLabel = transaction.type === 'income'
+                    ? 'Revenu'
+                    : transaction.type === 'transfer'
+                        ? 'Virement'
+                        : 'Dépense';
+                const amountPrefix = transaction.type === 'income' ? '+' : transaction.type === 'transfer' ? '' : '-';
+                const budgetLabel = transaction.budgetId ? budgetMap.get(transaction.budgetId)?.name || 'Budget lié' : 'Hors budget';
+                const statusLabel = transaction.endDate && new Date(transaction.endDate) < new Date() ? 'Terminé' : 'Actif';
+                const searchableText = [
+                    account?.name,
+                    toAccount?.name,
+                    format(parseLocalDate(transaction.nextDate), 'dd MMM yyyy', { locale: fr }),
+                    transaction.nextDate,
+                    transaction.endDate,
+                    transaction.endDate ? format(parseLocalDate(transaction.endDate), 'dd MMM yyyy', { locale: fr }) : '',
+                    FREQUENCY_LABELS[transaction.frequency],
+                    category?.name,
+                    typeLabel,
+                    transaction.description,
+                    transaction.amount,
+                    `${amountPrefix}${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(transaction.amount)} €`,
+                    budgetLabel,
+                    statusLabel
+                ].map(normalizeSearchValue).join(' ');
+
+                return searchTokens.every(token => searchableText.includes(token));
+            });
+        }
+
         return [...filtered].sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime());
-    }, [scheduled, filterAccount]);
+    }, [
+        scheduled,
+        filterAccount,
+        dueRange,
+        filterCategories,
+        filterFrequencies,
+        searchTerm,
+        accountMap,
+        categoryMap,
+        budgetMap
+    ]);
+
+    const monthlySuggestions = useMemo<MonthlySuggestion[]>(() => {
+        const transactionById = new Map(transactions.map(transaction => [transaction.id, transaction]));
+        const scheduledIdentities = new Set(scheduled.map(item => getRecurrenceIdentity({
+            description: item.description,
+            type: item.type,
+            category: item.category,
+            accountId: item.accountId,
+            toAccountId: item.toAccountId
+        })));
+
+        const groups = new Map<string, SuggestionGroup>();
+
+        transactions.forEach(transaction => {
+            if (filterAccount.length > 0 && !filterAccount.includes(transaction.accountId)) return;
+
+            const description = (transaction.description || '').trim();
+            if (!description || transaction.amount <= 0) return;
+
+            const isTransfer = transaction.category === 'transfer' || transaction.isTransfer;
+            let type = transaction.type;
+            let category = transaction.category;
+            let toAccountId: string | undefined;
+
+            if (isTransfer) {
+                if (transaction.type !== 'expense') return;
+                const linkedTransaction = transaction.linkedTransactionId ? transactionById.get(transaction.linkedTransactionId) : undefined;
+                toAccountId = linkedTransaction?.accountId;
+                if (!toAccountId) return;
+                type = 'transfer';
+                category = 'transfer';
+            }
+
+            const identity = getRecurrenceIdentity({
+                description,
+                type,
+                category,
+                accountId: transaction.accountId,
+                toAccountId
+            });
+
+            if (scheduledIdentities.has(identity)) return;
+
+            const groupKey = `${identity}|${getAmountKey(transaction.amount)}`;
+            const group = groups.get(groupKey);
+
+            if (group) {
+                group.records.push(transaction);
+            } else {
+                groups.set(groupKey, {
+                    identity,
+                    base: {
+                        description,
+                        amount: transaction.amount,
+                        type,
+                        category,
+                        accountId: transaction.accountId,
+                        toAccountId
+                    },
+                    records: [transaction]
+                });
+            }
+        });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return Array.from(groups.values())
+            .reduce<MonthlySuggestion[]>((suggestions, group) => {
+                const monthIndexes = Array.from(new Set(group.records.map(record => getMonthIndex(record.date))))
+                    .sort((a, b) => a - b);
+
+                if (monthIndexes.length < 2) return suggestions;
+
+                let currentRun = 1;
+                let longestRun = 1;
+                for (let index = 1; index < monthIndexes.length; index++) {
+                    currentRun = monthIndexes[index] === monthIndexes[index - 1] + 1 ? currentRun + 1 : 1;
+                    longestRun = Math.max(longestRun, currentRun);
+                }
+
+                if (longestRun < 2) return suggestions;
+
+                const latestRecord = group.records.reduce((latest, record) => (
+                    parseLocalDate(record.date).getTime() > parseLocalDate(latest.date).getTime() ? record : latest
+                ), group.records[0]);
+
+                let nextDate = addMonthsSafely(parseLocalDate(latestRecord.date), 1);
+                while (nextDate <= today) {
+                    nextDate = addMonthsSafely(nextDate, 1);
+                }
+
+                suggestions.push({
+                    ...group.base,
+                    amount: latestRecord.amount,
+                    frequency: 'monthly',
+                    nextDate: formatLocalDate(nextDate),
+                    includeInForecast: false,
+                    suggestionKey: `${group.identity}|${getAmountKey(latestRecord.amount)}`,
+                    occurrenceCount: monthIndexes.length
+                });
+
+                return suggestions;
+            }, [])
+            .sort((a, b) => {
+                const dateDiff = new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime();
+                return dateDiff || a.description.localeCompare(b.description, 'fr');
+            })
+            .filter(suggestion => !dismissedSuggestionKeys.has(suggestion.suggestionKey));
+    }, [transactions, scheduled, filterAccount, dismissedSuggestionKeys]);
+
+    useEffect(() => {
+        if (monthlySuggestions.length === 0) {
+            setIsSuggestionsOpen(false);
+        }
+    }, [monthlySuggestions.length]);
 
     // Delete Confirmation State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -39,6 +374,8 @@ const Scheduled: React.FC = () => {
         frequency: 'monthly' as Periodicity,
         nextDate: new Date().toISOString().split('T')[0],
         includeInForecast: false,
+        linkToBudget: false,
+        budgetId: '',
         endDate: ''
     });
 
@@ -54,7 +391,9 @@ const Scheduled: React.FC = () => {
                 toAccountId: transaction.toAccountId || '',
                 frequency: transaction.frequency,
                 nextDate: transaction.nextDate,
-                includeInForecast: transaction.includeInForecast ?? false,
+                includeInForecast: !!transaction.budgetId,
+                linkToBudget: !!transaction.budgetId,
+                budgetId: transaction.budgetId || '',
                 endDate: transaction.endDate || ''
             });
         } else {
@@ -69,6 +408,8 @@ const Scheduled: React.FC = () => {
                 frequency: 'monthly',
                 nextDate: new Date().toISOString().split('T')[0],
                 includeInForecast: false,
+                linkToBudget: false,
+                budgetId: '',
                 endDate: ''
             });
         }
@@ -86,7 +427,8 @@ const Scheduled: React.FC = () => {
             toAccountId: formData.toAccountId || undefined,
             frequency: formData.frequency,
             nextDate: formData.nextDate,
-            includeInForecast: formData.includeInForecast,
+            includeInForecast: formData.type === 'expense' && formData.linkToBudget && !!formData.budgetId,
+            budgetId: formData.type === 'expense' && formData.linkToBudget ? formData.budgetId || undefined : undefined,
             endDate: formData.endDate || undefined
         };
 
@@ -121,6 +463,35 @@ const Scheduled: React.FC = () => {
         return <Icon className={className} />;
     };
 
+    const handleAddSuggestion = async (suggestion: MonthlySuggestion) => {
+        try {
+            await addScheduled({
+                description: suggestion.description,
+                amount: suggestion.amount,
+                type: suggestion.type,
+                frequency: suggestion.frequency,
+                accountId: suggestion.accountId,
+                toAccountId: suggestion.toAccountId,
+                nextDate: suggestion.nextDate,
+                category: suggestion.category,
+                includeInForecast: suggestion.includeInForecast,
+                endDate: suggestion.endDate
+            });
+            showToast("Suggestion ajoutée à l'échéancier", "success");
+        } catch {
+            showToast("Erreur lors de l'ajout de la suggestion", "error");
+        }
+    };
+
+    const handleDismissSuggestion = (suggestion: MonthlySuggestion) => {
+        setDismissedSuggestionKeys(prev => {
+            const next = new Set(prev);
+            next.add(suggestion.suggestionKey);
+            return next;
+        });
+        showToast("Suggestion supprimée", "success");
+    };
+
     const categoryOptions: SelectOption[] = categories.map(c => ({
         id: c.id,
         label: c.name,
@@ -128,23 +499,200 @@ const Scheduled: React.FC = () => {
         color: c.color
     }));
 
+    const categoryFilterOptions: SelectOption[] = [
+        { id: 'transfer', label: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' },
+        ...categories
+            .filter(category => category.id !== 'transfer')
+            .map(category => ({ id: category.id, label: category.name, icon: category.icon, color: category.color }))
+    ];
+
+    const frequencyFilterOptions: SelectOption[] = (Object.entries(FREQUENCY_LABELS) as Array<[Periodicity, string]>).map(([id, label]) => ({
+        id,
+        label,
+        icon: 'Clock'
+    }));
+
+    const budgetOptions: SelectOption[] = budgets.map(budget => {
+        const category = getCategoryDetails(budget.category);
+        return {
+            id: budget.id,
+            label: `${budget.name} · ${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(budget.amount)} €`,
+            icon: category.icon,
+            color: category.color
+        };
+    });
+
+    const getBudgetFormPatch = (budgetId: string) => {
+        const budget = budgets.find(item => item.id === budgetId);
+        if (!budget) return { budgetId };
+
+        return {
+            budgetId,
+            categoryId: budget.category,
+            accountId: budget.accountId || formData.accountId
+        };
+    };
+
     return (
         <div className="flex flex-col space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Transactions Récurrentes</h2>
-                <Button
-                    onClick={() => handleOpenModal()}
-                    icon={Plus}
-                >
-                    Nouvelle transaction
-                </Button>
+                <div className="flex items-center gap-2">
+                    {monthlySuggestions.length > 0 && (
+                        <div className="relative" ref={suggestionPopupRef}>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setIsSuggestionsOpen(prev => !prev)}
+                                icon={Sparkles}
+                            >
+                                Suggestions ({monthlySuggestions.length})
+                            </Button>
+
+                            {isSuggestionsOpen && (
+                                <div className="absolute right-0 top-full z-40 mt-2 w-[calc(100vw-3rem)] max-w-[760px] rounded-xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#121212] shadow-2xl">
+                                    <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] dark:border-white/10 px-4 py-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Sparkles className="w-4 h-4 text-primary-500 flex-none" />
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-200 truncate">Suggestions du journal</h3>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            icon={X}
+                                            onClick={() => setIsSuggestionsOpen(false)}
+                                            className="h-8 w-8 p-0"
+                                        />
+                                    </div>
+                                    <div className="max-h-[420px] overflow-y-auto p-3 space-y-2">
+                                        {monthlySuggestions.map(suggestion => {
+                                            const account = accounts.find(a => a.id === suggestion.accountId);
+                                            const category = getCategoryDetails(suggestion.category);
+
+                                            return (
+                                                <div
+                                                    key={suggestion.suggestionKey}
+                                                    className="rounded-lg border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-neutral-900/60 p-3 flex flex-col sm:flex-row sm:items-center gap-3 min-w-0"
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0 flex-1 w-full">
+                                                        <div className="w-1 h-10 rounded-full flex-none" style={{ backgroundColor: account?.color || '#3b82f6' }} />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{suggestion.description}</span>
+                                                                <span
+                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight flex-none max-w-[8rem] min-w-0"
+                                                                    style={{ backgroundColor: `${category.color}15`, color: category.color }}
+                                                                >
+                                                                    {renderCategoryIcon(category.icon, "w-3 h-3 flex-none")}
+                                                                    <span className="truncate">{category.name}</span>
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1 min-w-0">
+                                                                <span className="truncate">{account?.name || 'Compte inconnu'}</span>
+                                                                <span className="text-gray-300 dark:text-gray-700">•</span>
+                                                                <span className="whitespace-nowrap">{format(parseLocalDate(suggestion.nextDate), 'dd MMM yyyy', { locale: fr })}</span>
+                                                                <span className="text-gray-300 dark:text-gray-700">•</span>
+                                                                <span className="whitespace-nowrap">{suggestion.occurrenceCount} mois</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto flex-none">
+                                                        <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${suggestion.type === 'income' ? 'text-emerald-600' :
+                                                            suggestion.type === 'transfer' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600'
+                                                            }`}>
+                                                            {suggestion.type === 'income' ? '+' : suggestion.type === 'transfer' ? '' : '-'}{new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(suggestion.amount)} €
+                                                        </span>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            icon={Plus}
+                                                            onClick={() => handleAddSuggestion(suggestion)}
+                                                        >
+                                                            Ajouter
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            icon={Trash2}
+                                                            onClick={() => handleDismissSuggestion(suggestion)}
+                                                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                                        >
+                                                            Supprimer
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <Button
+                        onClick={() => handleOpenModal()}
+                        size="sm"
+                        icon={Plus}
+                    >
+                        Nouvelle transaction
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-3 px-1 flex-none">
+                <div className="flex flex-wrap gap-2 period-selector">
+                    {SCHEDULED_DUE_RANGES.map(range => (
+                        <Button
+                            key={range}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDueRange(range)}
+                            className={`transition-colors ${dueRange === range
+                                ? 'bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            {SCHEDULED_DUE_RANGE_LABELS[range]}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex flex-col lg:flex-row gap-3 px-1 flex-none">
+                <div className="w-full lg:max-w-sm">
+                    <Input
+                        placeholder="Rechercher dans l'échéancier..."
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        icon={Search}
+                    />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto">
+                    <MultiSelect
+                        value={filterCategories}
+                        onChange={setFilterCategories}
+                        options={categoryFilterOptions}
+                        placeholder="Toutes les catégories"
+                        className="w-full sm:w-56"
+                    />
+                    <MultiSelect
+                        value={filterFrequencies}
+                        onChange={setFilterFrequencies}
+                        options={frequencyFilterOptions}
+                        placeholder="Toutes les fréquences"
+                        className="w-full sm:w-56"
+                    />
+                </div>
             </div>
 
             <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
                 <Table
                     data={scheduledTransactions}
                     keyExtractor={(t) => t.id}
-                    emptyMessage="Aucune transaction récurrente configurée"
+                    rowHeight={64}
+                    emptyMessage={searchTerm || dueRange !== 'all' || filterCategories.length > 0 || filterFrequencies.length > 0
+                        ? "Aucune transaction récurrente ne correspond aux filtres."
+                        : "Aucune transaction récurrente configurée"
+                    }
                     columns={[
                         {
                             header: 'Compte',
@@ -178,9 +726,9 @@ const Scheduled: React.FC = () => {
                                             </span>
                                         )}
                                     </div>
-                                    {transaction.includeInForecast && (!transaction.endDate || new Date(transaction.endDate) >= new Date()) && (
+                                    {transaction.budgetId && (!transaction.endDate || new Date(transaction.endDate) >= new Date()) && (
                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mt-1">
-                                            Prévu
+                                            Budget
                                         </span>
                                     )}
                                     {transaction.endDate && new Date(transaction.endDate) < new Date() && (
@@ -198,24 +746,7 @@ const Scheduled: React.FC = () => {
                             render: (transaction) => (
                                 <div className="flex items-center gap-2">
                                     <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500 group-[.retro]:text-black" />
-                                    {(() => {
-                                        const labels: Record<string, string> = {
-                                            'once': 'Une seule fois',
-                                            'daily': 'Journalier',
-                                            'weekly': 'Hebdomadaire',
-                                            'biweekly': 'Toutes les 2 semaines',
-                                            'bimonthly': 'Bimensuel',
-                                            'fourweekly': 'Toutes les 4 semaines',
-                                            'monthly': 'Mensuel',
-                                            'bimestrial': 'Bimestriel',
-                                            'quarterly': 'Trimestriel',
-                                            'fourmonthly': 'Tous les 4 mois',
-                                            'semiannual': 'Semestriel',
-                                            'annual': 'Annuel',
-                                            'biennial': 'Bisannuel'
-                                        };
-                                        return labels[transaction.frequency] || transaction.frequency;
-                                    })()}
+                                    {FREQUENCY_LABELS[transaction.frequency] || transaction.frequency}
                                 </div>
                             ),
                             className: "text-gray-500 dark:text-gray-400 group-[.retro]:text-black whitespace-nowrap"
@@ -249,10 +780,10 @@ const Scheduled: React.FC = () => {
                             render: (transaction) => (
                                 <div className="flex flex-col">
                                     <span>{transaction.description}</span>
-                                    {(transaction.includeInForecast === true) && (
+                                    {transaction.budgetId && (
                                         <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                             <Tag className="w-3 h-3" />
-                                            Prévu
+                                            {budgetMap.get(transaction.budgetId)?.name || 'Budget lié'}
                                         </span>
                                     )}
                                 </div>
@@ -397,7 +928,12 @@ const Scheduled: React.FC = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                                 <SearchableSelect
                                     value={formData.type}
-                                    onChange={(value) => setFormData({ ...formData, type: value as TransactionType })}
+                                    onChange={(value) => setFormData({
+                                        ...formData,
+                                        type: value as TransactionType,
+                                        linkToBudget: value === 'expense' ? formData.linkToBudget : false,
+                                        budgetId: value === 'expense' ? formData.budgetId : ''
+                                    })}
                                     options={[
                                         { id: 'expense', label: 'Dépense', icon: 'TrendingDown', color: '#ef4444' },
                                         { id: 'income', label: 'Revenu', icon: 'TrendingUp', color: '#10b981' },
@@ -451,24 +987,51 @@ const Scheduled: React.FC = () => {
                                             onChange={(value) => setFormData({ ...formData, categoryId: value })}
                                             options={categoryOptions}
                                             placeholder="Sélectionner une catégorie"
+                                            disabled={formData.linkToBudget && !!formData.budgetId}
                                         />
                                     </>
                                 )}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="includeInForecast"
-                                checked={formData.includeInForecast}
-                                onChange={e => setFormData({ ...formData, includeInForecast: e.target.checked })}
-                                className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                            />
-                            <label htmlFor="includeInForecast" className="text-sm text-gray-700 dark:text-gray-300">
-                                Inclure dans le "Budget" du mois
-                            </label>
-                        </div>
+                        {formData.type === 'expense' && (
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="linkToBudget"
+                                        checked={formData.linkToBudget}
+                                        onChange={e => {
+                                            const nextBudgetId = e.target.checked ? (formData.budgetId || budgetOptions[0]?.id || '') : '';
+                                            setFormData({
+                                                ...formData,
+                                                ...(e.target.checked ? getBudgetFormPatch(nextBudgetId) : { budgetId: '' }),
+                                                linkToBudget: e.target.checked
+                                            });
+                                        }}
+                                        className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                    />
+                                    <label htmlFor="linkToBudget" className="text-sm text-gray-700 dark:text-gray-300">
+                                        Lier à un budget
+                                    </label>
+                                </div>
+
+                                {formData.linkToBudget && (
+                                    budgetOptions.length > 0 ? (
+                                        <SearchableSelect
+                                            value={formData.budgetId}
+                                            onChange={(value) => setFormData({ ...formData, ...getBudgetFormPatch(value) })}
+                                            options={budgetOptions}
+                                            placeholder="Sélectionner un budget"
+                                        />
+                                    ) : (
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-900 border border-black/[0.05] dark:border-white/10 rounded-lg p-3">
+                                            Aucun budget configuré. Crée un budget depuis la page Budget pour pouvoir le lier.
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
 
                         <div className="pt-4 flex gap-3">
                             <Button

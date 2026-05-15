@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Account, Transaction, Category, ScheduledTransaction, Settings } from '../types';
+import { Account, Transaction, Category, ScheduledTransaction, Settings, Budget } from '../types';
 
 export class DatabaseService {
     async init(): Promise<void> {
@@ -58,6 +58,23 @@ export class DatabaseService {
 
     async deleteCategory(id: string): Promise<void> {
         await invoke('delete_category', { id });
+    }
+
+    // Budgets
+    async getBudgets(): Promise<Budget[]> {
+        return invoke<Budget[]>('get_budgets');
+    }
+
+    async addBudget(budget: Budget): Promise<void> {
+        await invoke('add_budget', { budget });
+    }
+
+    async updateBudget(budget: Budget): Promise<void> {
+        await invoke('update_budget', { budget });
+    }
+
+    async deleteBudget(id: string): Promise<void> {
+        await invoke('delete_budget', { id });
     }
 
     // Scheduled
@@ -119,18 +136,19 @@ export class DatabaseService {
 
     // --- Data Management ---
     async exportData(): Promise<any> {
-        const [accounts, transactions, categories, scheduled, settings] = await Promise.all([
+        const [accounts, transactions, categories, scheduled, budgets, settings] = await Promise.all([
             this.getAccounts(),
             this.getTransactions(),
             this.getCategories(),
             this.getScheduled(),
+            this.getBudgets(),
             this.getSettings()
         ]);
 
         return {
             version: 1,
             timestamp: new Date().toISOString(),
-            data: { accounts, transactions, categories, scheduled, settings }
+            data: { accounts, transactions, categories, scheduled, budgets, settings }
         };
     }
 
@@ -143,7 +161,8 @@ export class DatabaseService {
             accounts: backupData.data.accounts || [],
             transactions: backupData.data.transactions || [],
             categories: backupData.data.categories || [],
-            scheduled: backupData.data.scheduled || []
+            scheduled: backupData.data.scheduled || [],
+            budgets: backupData.data.budgets || []
         };
 
         await invoke('import_data', { data: importPayload });
@@ -172,11 +191,12 @@ export class DatabaseService {
             throw new Error('Invalid backup data format');
         }
 
-        const [currentAccounts, currentTransactions, currentCategories, currentScheduled] = await Promise.all([
+        const [currentAccounts, currentTransactions, currentCategories, currentScheduled, currentBudgets] = await Promise.all([
             this.getAccounts(),
             this.getTransactions(),
             this.getCategories(),
-            this.getScheduled()
+            this.getScheduled(),
+            this.getBudgets()
         ]);
 
         const mergeArrays = (current: any[], incoming: any[]) => {
@@ -191,7 +211,8 @@ export class DatabaseService {
             accounts: mergeArrays(currentAccounts, backupData.data.accounts || []),
             transactions: mergeArrays(currentTransactions, backupData.data.transactions || []),
             categories: mergeArrays(currentCategories, backupData.data.categories || []),
-            scheduled: mergeArrays(currentScheduled, backupData.data.scheduled || [])
+            scheduled: mergeArrays(currentScheduled, backupData.data.scheduled || []),
+            budgets: mergeArrays(currentBudgets, backupData.data.budgets || [])
         };
 
         await invoke('import_data', { data: importPayload });

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Tag, ArrowRightLeft, Wallet, Receipt, Plus, CalendarClock, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { useBank } from '../context/BankContext';
 import { useNavigation } from '../context/NavigationContext';
-import { format } from 'date-fns';
+import { format, isSameMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import FormPopup from '../components/ui/FormPopup';
@@ -15,7 +15,7 @@ import { useFinancialMetrics } from '../hooks/useFinancialMetrics';
 import { formatCurrency } from '../utils/format';
 
 const Dashboard: React.FC = () => {
-    const { accounts, scheduled, categories, addAccount } = useBank();
+    const { accounts, scheduled, categories, budgets, filterAccount, addAccount } = useBank();
     const { setActivePage } = useNavigation();
     const { monthlyIncome, monthlyExpenses, monthlySaved, relevantTransactions, currentBalance } = useFinancialMetrics();
     
@@ -63,14 +63,29 @@ const Dashboard: React.FC = () => {
     }, [relevantTransactions, categories, monthlyExpenses]);
 
     // Budget Logic
-    const { totalBudgeted, budgetRemaining, budgetProgress } = useMemo(() => {
-        const total = scheduled.filter(s => s.includeInForecast).reduce((sum, s) => sum + s.amount, 0);
+    const { totalBudgeted, budgetRemaining, budgetProgress, budgetExpenses } = useMemo(() => {
+        const visibleBudgets = filterAccount.length === 0
+            ? budgets
+            : budgets.filter(budget => !budget.accountId || filterAccount.includes(budget.accountId));
+        const total = visibleBudgets.reduce((sum, budget) => sum + budget.amount, 0);
+        const expenses = relevantTransactions
+            .filter(transaction => {
+                if (transaction.type !== 'expense' || transaction.category === 'transfer') return false;
+                try {
+                    return isSameMonth(new Date(transaction.date), new Date());
+                } catch {
+                    return false;
+                }
+            })
+            .reduce((sum, transaction) => sum + transaction.amount, 0);
+
         return {
             totalBudgeted: total,
-            budgetRemaining: total - monthlyExpenses,
-            budgetProgress: total > 0 ? Math.min((monthlyExpenses / total) * 100, 100) : 0
+            budgetRemaining: total - expenses,
+            budgetProgress: total > 0 ? Math.min((expenses / total) * 100, 100) : 0,
+            budgetExpenses: expenses
         };
-    }, [scheduled, monthlyExpenses]);
+    }, [budgets, filterAccount, relevantTransactions]);
 
     // Upcoming Scheduled
     const upcomingScheduled = useMemo(() => scheduled
@@ -255,12 +270,12 @@ const Dashboard: React.FC = () => {
                 </Card>
 
                 {/* 6. Budget */}
-                <Card title="Budget" icon={DollarSign} action={<span className="text-[10px] bg-gray-100 dark:bg-neutral-700 px-2 py-0.5 rounded-full text-gray-500">Depuis le 01 fév..</span>}>
+                <Card title="Budget" icon={DollarSign} action={<span className="text-[10px] bg-gray-100 dark:bg-neutral-700 px-2 py-0.5 rounded-full text-gray-500">Ce mois-ci</span>}>
                     <div className="min-h-[200px] flex flex-col items-center justify-center">
                         <div className="relative w-28 h-28 flex items-center justify-center mb-4">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={[{ value: monthlyExpenses }, { value: Math.max(0, totalBudgeted - monthlyExpenses) }]} innerRadius={35} outerRadius={45} startAngle={90} endAngle={-270} dataKey="value" stroke="none">
+                                    <Pie data={[{ value: budgetExpenses }, { value: Math.max(0, totalBudgeted - budgetExpenses) }]} innerRadius={35} outerRadius={45} startAngle={90} endAngle={-270} dataKey="value" stroke="none">
                                         <Cell fill={budgetRemaining >= 0 ? "#10b981" : "#ef4444"} />
                                         <Cell fill="var(--color-border)" opacity={0.2} />
                                     </Pie>
@@ -278,7 +293,7 @@ const Dashboard: React.FC = () => {
                             </div>
                             <div>
                                 <div className="text-[9px] text-gray-400 uppercase font-bold">Dépenses</div>
-                                <div className="text-xs font-bold text-emerald-600">{Math.round(monthlyExpenses)} €</div>
+                                <div className="text-xs font-bold text-emerald-600">{Math.round(budgetExpenses)} €</div>
                             </div>
                             <div>
                                 <div className="text-[9px] text-gray-400 uppercase font-bold">Prévu</div>

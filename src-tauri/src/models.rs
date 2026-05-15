@@ -84,9 +84,23 @@ pub struct ScheduledTransaction {
     #[sqlx(rename = "includeInForecast")]
     #[serde(rename = "includeInForecast")]
     pub include_in_forecast: Option<bool>,
+    #[sqlx(rename = "budgetId")]
+    #[serde(rename = "budgetId")]
+    pub budget_id: Option<String>,
     #[sqlx(rename = "endDate")]
     #[serde(rename = "endDate")]
     pub end_date: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Budget {
+    pub id: String,
+    pub name: String,
+    pub amount: f64,
+    pub category: String,
+    #[sqlx(rename = "accountId")]
+    #[serde(rename = "accountId")]
+    pub account_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -95,6 +109,8 @@ pub struct AppData {
     pub transactions: Vec<Transaction>,
     pub categories: Vec<Category>,
     pub scheduled: Vec<ScheduledTransaction>,
+    #[serde(default)]
+    pub budgets: Vec<Budget>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

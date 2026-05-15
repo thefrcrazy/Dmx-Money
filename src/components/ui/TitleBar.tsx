@@ -1,14 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { platform } from '@tauri-apps/plugin-os';
+import React from 'react';
 
 const TitleBar: React.FC = () => {
-    const [currentPlatform, setCurrentPlatform] = useState<string>('');
-
-    useEffect(() => {
-        setCurrentPlatform(platform());
-    }, []);
-
     return (
         <div
             data-tauri-drag-region

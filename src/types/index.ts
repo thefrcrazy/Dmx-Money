@@ -47,7 +47,16 @@ export interface ScheduledTransaction {
     nextDate: string;
     category: string;
     includeInForecast?: boolean;
+    budgetId?: string;
     endDate?: string;
+}
+
+export interface Budget {
+    id: string;
+    name: string;
+    amount: number;
+    category: string;
+    accountId?: string;
 }
 
 export interface Category {
@@ -62,6 +71,7 @@ export interface AppData {
     transactions: Transaction[];
     categories: Category[];
     scheduled: ScheduledTransaction[];
+    budgets: Budget[];
 }
 
 export interface BankContextType {
@@ -69,6 +79,7 @@ export interface BankContextType {
     transactions: Transaction[];
     categories: Category[];
     scheduled: ScheduledTransaction[];
+    budgets: Budget[];
     addAccount: (account: Omit<Account, 'id'>) => Promise<string>;
     updateAccount: (account: Account) => Promise<void>;
     deleteAccount: (id: string) => Promise<void>;
@@ -83,6 +94,10 @@ export interface BankContextType {
     addScheduled: (scheduled: Omit<ScheduledTransaction, 'id'>) => Promise<void>;
     updateScheduled: (scheduled: ScheduledTransaction) => Promise<void>;
     deleteScheduled: (id: string) => Promise<void>;
+    processDueScheduledTransactions: () => Promise<number>;
+    addBudget: (budget: Omit<Budget, 'id'>) => Promise<string>;
+    updateBudget: (budget: Budget) => Promise<void>;
+    deleteBudget: (id: string) => Promise<void>;
     filterAccount: string[];
     setFilterAccount: (ids: string[]) => void;
     isLoading: boolean;

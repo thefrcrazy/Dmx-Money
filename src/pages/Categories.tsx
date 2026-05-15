@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit2, Tag } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Trash2, Edit2, Tag, Search } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import ColorPicker from '../components/ui/ColorPicker';
@@ -9,10 +9,16 @@ import ConfirmModal from '../components/ui/ConfirmModal';
 import { Category } from '../types';
 import { ICONS, COLORS } from '../constants/icons';
 
+const normalizeSearchValue = (value: unknown) => String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
 const Categories: React.FC = () => {
     const { categories, addCategory, updateCategory, deleteCategory } = useBank();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Delete Confirmation State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -102,54 +108,87 @@ const Categories: React.FC = () => {
         return <Icon className={className} />;
     };
 
+    const filteredCategories = useMemo(() => {
+        const searchTokens = normalizeSearchValue(searchTerm).split(/\s+/).filter(Boolean);
+        if (searchTokens.length === 0) return categories;
+
+        return categories.filter(category => {
+            const searchableText = [
+                category.name,
+                category.icon,
+                category.color,
+                category.id
+            ].map(normalizeSearchValue).join(' ');
+
+            return searchTokens.every(token => searchableText.includes(token));
+        });
+    }, [categories, searchTerm]);
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Gestion des Catégories</h2>
                 <Button
                     onClick={() => handleOpenModal()}
+                    size="sm"
                     icon={Plus}
                 >
-                    Nouvelle Catégorie
+                    Nouvelle catégorie
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categories.map((category) => (
-                    <div key={category.id} className="app-card p-4 flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                            <div
-                                className="p-2 rounded-lg text-white"
-                                style={{ backgroundColor: category.color }}
-                            >
-                                {renderIcon(category.icon)}
-                            </div>
-                            <span className="font-medium text-gray-900 dark:text-gray-200">{category.name}</span>
-                        </div>
-
-                        <div className="flex gap-2">
-                            {category.id !== 'transfer' && (
-                                <>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleOpenModal(category)}
-                                        className="text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                        icon={Edit2}
-                                    />
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteClick(category.id, category.name)}
-                                        className="text-gray-400 hover:text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                        icon={Trash2}
-                                    />
-                                </>
-                            )}
-                        </div>
-                    </div>
-                ))}
+            <div className="w-full sm:max-w-sm px-1">
+                <Input
+                    placeholder="Rechercher une catégorie..."
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    icon={Search}
+                />
             </div>
+
+            {filteredCategories.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredCategories.map((category) => (
+                        <div key={category.id} className="app-card p-4 flex items-center justify-between group">
+                            <div className="flex items-center gap-3">
+                                <div
+                                    className="p-2 rounded-lg text-white"
+                                    style={{ backgroundColor: category.color }}
+                                >
+                                    {renderIcon(category.icon)}
+                                </div>
+                                <span className="font-medium text-gray-900 dark:text-gray-200">{category.name}</span>
+                            </div>
+
+                            <div className="flex gap-2">
+                                {category.id !== 'transfer' && (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleOpenModal(category)}
+                                            className="text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            icon={Edit2}
+                                        />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDeleteClick(category.id, category.name)}
+                                            className="text-gray-400 hover:text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            icon={Trash2}
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-12 app-card border-dashed">
+                    <Search className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400">Aucune catégorie ne correspond à la recherche.</p>
+                </div>
+            )}
 
             <FormPopup
                 isOpen={isModalOpen}

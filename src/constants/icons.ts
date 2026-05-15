@@ -9,7 +9,7 @@ import {
     Tv, Laptop, Speaker,
     Stethoscope, Pill, Dumbbell, User, Users, Baby,
     Star, Bell, Key, Lock, Shield,
-    Search, Filter, Settings, Menu, X, Plus, Minus, Trash2, Edit2, Check, ChevronDown, ArrowRightLeft, Clock, Calendar
+    Search, Filter, Settings, Menu, X, Plus, Minus, Trash2, Edit2, Check, CheckCircle2, Circle, ChevronDown, ArrowRightLeft, Clock, Calendar
 } from 'lucide-react';
 
 export const ICONS: Record<string, React.ElementType> = {
@@ -29,7 +29,7 @@ export const ICONS: Record<string, React.ElementType> = {
     // Misc
     Tag, Book, Gift, Smile, Frown, Meh, Sun, Moon, Cloud, Umbrella, Snowflake, Star, Bell, Key, Lock, Shield,
     // UI
-    Search, Filter, Settings, Menu, X, Plus, Minus, Trash2, Edit2, Check, ChevronDown, ArrowRightLeft, Clock, Calendar
+    Search, Filter, Settings, Menu, X, Plus, Minus, Trash2, Edit2, Check, CheckCircle2, Circle, ChevronDown, ArrowRightLeft, Clock, Calendar
 };
 
 // 12 Families: Gray, Red, Orange, Amber, Lime, Green, Teal, Cyan, Blue, Indigo, Purple, Pink

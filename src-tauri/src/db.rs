@@ -94,6 +94,19 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
     .await?;
 
     sqlx::query(
+        "CREATE TABLE IF NOT EXISTS budgets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            \"accountId\" TEXT,
+            FOREIGN KEY(\"accountId\") REFERENCES accounts(id)
+        )",
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
         "CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             theme TEXT NOT NULL DEFAULT 'system',
@@ -118,6 +131,12 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         .execute(&mut *tx)
         .await?;
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_scheduled_account_id ON scheduled_transactions(\"accountId\")")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_budgets_account_id ON budgets(\"accountId\")")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category)")
         .execute(&mut *tx)
         .await?;
 
@@ -280,6 +299,22 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
     if !has_end_date {
         log::info!("Migrating scheduled_transactions table: adding endDate column");
         sqlx::query("ALTER TABLE scheduled_transactions ADD COLUMN \"endDate\" TEXT")
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // Migration: Add budgetId to scheduled_transactions
+    let has_budget_id: bool = sqlx::query_scalar(
+        "SELECT count(*) FROM pragma_table_info('scheduled_transactions') WHERE name='budgetId'",
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(0)
+        > 0;
+
+    if !has_budget_id {
+        log::info!("Migrating scheduled_transactions table: adding budgetId column");
+        sqlx::query("ALTER TABLE scheduled_transactions ADD COLUMN \"budgetId\" TEXT")
             .execute(&mut *tx)
             .await?;
     }

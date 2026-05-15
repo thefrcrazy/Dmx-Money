@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Account, Transaction, Category, ScheduledTransaction, BankContextType, AppData } from '../types';
+import { Account, Transaction, Category, ScheduledTransaction, BankContextType, AppData, Budget } from '../types';
 import { dbService } from '../services/db';
 
 const BankContext = createContext<BankContextType | undefined>(undefined);
@@ -55,7 +55,154 @@ const DEFAULT_DATA: AppData = {
         
         { id: 'transfer', name: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' }
     ],
-    scheduled: []
+    scheduled: [],
+    budgets: []
+};
+
+interface ScheduledProcessingResult {
+    processedScheduled: ScheduledTransaction[];
+    newTransactions: Transaction[];
+    hasScheduledChanges: boolean;
+}
+
+const addMonths = (date: Date, months: number) => {
+    const nextDate = new Date(date);
+    nextDate.setMonth(nextDate.getMonth() + months);
+    return nextDate;
+};
+
+const getNextScheduledDate = (date: Date, frequency: ScheduledTransaction['frequency']) => {
+    const currentDate = new Date(date);
+
+    switch (frequency) {
+        case 'once':
+            return new Date(currentDate.setFullYear(currentDate.getFullYear() + 100));
+        case 'daily':
+            return new Date(currentDate.setDate(currentDate.getDate() + 1));
+        case 'weekly':
+            return new Date(currentDate.setDate(currentDate.getDate() + 7));
+        case 'biweekly':
+            return new Date(currentDate.setDate(currentDate.getDate() + 14));
+        case 'bimonthly':
+            return new Date(currentDate.setDate(currentDate.getDate() + 15));
+        case 'fourweekly':
+            return new Date(currentDate.setDate(currentDate.getDate() + 28));
+        case 'monthly':
+            return addMonths(currentDate, 1);
+        case 'bimestrial':
+            return addMonths(currentDate, 2);
+        case 'quarterly':
+            return addMonths(currentDate, 3);
+        case 'fourmonthly':
+            return addMonths(currentDate, 4);
+        case 'semiannual':
+            return addMonths(currentDate, 6);
+        case 'annual':
+            return new Date(currentDate.setFullYear(currentDate.getFullYear() + 1));
+        case 'biennial':
+            return new Date(currentDate.setFullYear(currentDate.getFullYear() + 2));
+        default:
+            return addMonths(currentDate, 1);
+    }
+};
+
+const processDueScheduledItems = async (sourceScheduled: ScheduledTransaction[]): Promise<ScheduledProcessingResult> => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const processedScheduled = sourceScheduled.map(scheduledTx => ({ ...scheduledTx }));
+    const newTransactions: Transaction[] = [];
+    let hasScheduledChanges = false;
+
+    for (let i = 0; i < processedScheduled.length; i++) {
+        const scheduledTx = processedScheduled[i];
+        let nextDate = new Date(scheduledTx.nextDate);
+        nextDate.setHours(0, 0, 0, 0);
+
+        let modified = false;
+
+        while (nextDate <= today) {
+            modified = true;
+
+            if (scheduledTx.endDate) {
+                const endDate = new Date(scheduledTx.endDate);
+                endDate.setHours(0, 0, 0, 0);
+                if (nextDate > endDate) {
+                    break;
+                }
+            }
+
+            const txId = uuidv4();
+
+            if (scheduledTx.type === 'transfer' && scheduledTx.toAccountId) {
+                const linkedId = uuidv4();
+
+                const sourceTx: Transaction = {
+                    id: txId,
+                    date: scheduledTx.nextDate,
+                    accountId: scheduledTx.accountId,
+                    type: 'expense',
+                    amount: scheduledTx.amount,
+                    category: 'transfer',
+                    description: scheduledTx.description,
+                    checked: false,
+                    isTransfer: true,
+                    linkedTransactionId: linkedId
+                };
+
+                const destTx: Transaction = {
+                    id: linkedId,
+                    date: scheduledTx.nextDate,
+                    accountId: scheduledTx.toAccountId,
+                    type: 'income',
+                    amount: scheduledTx.amount,
+                    category: 'transfer',
+                    description: scheduledTx.description,
+                    checked: false,
+                    isTransfer: true,
+                    linkedTransactionId: txId
+                };
+
+                newTransactions.push(sourceTx, destTx);
+                await Promise.all([
+                    dbService.addTransaction(sourceTx),
+                    dbService.addTransaction(destTx)
+                ]);
+            } else {
+                const newTx: Transaction = {
+                    id: txId,
+                    date: scheduledTx.nextDate,
+                    accountId: scheduledTx.accountId,
+                    type: scheduledTx.type,
+                    amount: scheduledTx.amount,
+                    category: scheduledTx.category,
+                    description: scheduledTx.description,
+                    checked: false
+                };
+
+                newTransactions.push(newTx);
+                await dbService.addTransaction(newTx);
+            }
+
+            const newDate = getNextScheduledDate(new Date(scheduledTx.nextDate), scheduledTx.frequency);
+            scheduledTx.nextDate = newDate.toISOString().split('T')[0];
+            nextDate = new Date(scheduledTx.nextDate);
+            nextDate.setHours(0, 0, 0, 0);
+        }
+
+        if (modified) {
+            hasScheduledChanges = true;
+            if (scheduledTx.frequency === 'once') {
+                await dbService.deleteScheduled(scheduledTx.id);
+                processedScheduled.splice(i, 1);
+                i--;
+            } else {
+                await dbService.updateScheduled(scheduledTx);
+            }
+        }
+    }
+
+    return { processedScheduled, newTransactions, hasScheduledChanges };
 };
 
 export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -63,36 +210,42 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [scheduled, setScheduled] = useState<ScheduledTransaction[]>([]);
+    const [budgets, setBudgets] = useState<Budget[]>([]);
     const [filterAccount, setFilterAccount] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const isProcessingScheduledRef = useRef(false);
 
     // Initialize DB and load data
     useEffect(() => {
         const init = async () => {
             try {
                 await dbService.init();
-                const [loadedAccounts, loadedTransactions, loadedCategories, loadedScheduled] = await Promise.all([
+                const [loadedAccounts, loadedTransactions, loadedCategories, loadedScheduled, loadedBudgets] = await Promise.all([
                     dbService.getAccounts(),
                     dbService.getTransactions(),
                     dbService.getCategories(),
-                    dbService.getScheduled()
+                    dbService.getScheduled(),
+                    dbService.getBudgets()
                 ]);
 
                 let currentAccounts = loadedAccounts;
                 let currentTransactions = loadedTransactions;
                 let currentCategories = loadedCategories;
                 let currentScheduled = loadedScheduled;
+                let currentBudgets = loadedBudgets;
 
-                if (loadedAccounts.length === 0 && loadedTransactions.length === 0 && loadedCategories.length === 0 && loadedScheduled.length === 0) {
+                if (loadedAccounts.length === 0 && loadedTransactions.length === 0 && loadedCategories.length === 0 && loadedScheduled.length === 0 && loadedBudgets.length === 0) {
                     // If no data loaded, use default data and save it
                     currentAccounts = DEFAULT_DATA.accounts;
                     currentTransactions = DEFAULT_DATA.transactions;
                     currentCategories = DEFAULT_DATA.categories;
                     currentScheduled = DEFAULT_DATA.scheduled;
+                    currentBudgets = DEFAULT_DATA.budgets;
 
                     await Promise.all([
                         ...DEFAULT_DATA.accounts.map(acc => dbService.addAccount(acc)),
-                        ...DEFAULT_DATA.categories.map(cat => dbService.addCategory(cat))
+                        ...DEFAULT_DATA.categories.map(cat => dbService.addCategory(cat)),
+                        ...DEFAULT_DATA.budgets.map(budget => dbService.addBudget(budget))
                     ]);
                 } else {
                     // Check if 'transfer' category exists, if not add it (migration)
@@ -104,173 +257,38 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                 }
 
-                // Process scheduled transactions
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
+                const migratedScheduled = [...currentScheduled];
+                const migratedBudgets = [...currentBudgets];
+                const legacyScheduledToMigrate = migratedScheduled.filter(item => item.includeInForecast && !item.budgetId && item.type === 'expense' && item.category !== 'transfer');
 
-                const processedScheduled = [...currentScheduled];
-                const newTransactions: Transaction[] = [];
-
-                for (let i = 0; i < processedScheduled.length; i++) {
-                    const scheduledTx = processedScheduled[i];
-                    let nextDate = new Date(scheduledTx.nextDate);
-                    nextDate.setHours(0, 0, 0, 0);
-
-                    let modified = false;
-
-                    while (nextDate <= today) {
-                        modified = true;
-
-                        // Create transaction(s)
-                        // Check if we passed the end date
-                        if (scheduledTx.endDate) {
-                            const endDate = new Date(scheduledTx.endDate);
-                            endDate.setHours(0, 0, 0, 0);
-                            if (nextDate > endDate) {
-                                // Stop generating and don't update nextDate anymore (or maybe we should to keep it "done")
-                                // Actually, if we are here, it means nextDate <= today, so we should generate IF it is <= endDate
-                                // If nextDate > endDate, we should stop.
-                                break;
-                            }
-                        }
-
-                        const txId = uuidv4();
-
-                        if (scheduledTx.type === 'transfer' && scheduledTx.toAccountId) {
-                            // Transfer: Create two linked transactions
-                            const linkedId = uuidv4();
-
-                            // Outgoing transaction (Expense from source)
-                            const sourceTx: Transaction = {
-                                id: txId,
-                                date: scheduledTx.nextDate,
-                                accountId: scheduledTx.accountId,
-                                type: 'expense',
-                                amount: scheduledTx.amount,
-                                category: 'transfer',
-                                description: scheduledTx.description,
-                                checked: false,
-                                isTransfer: true,
-                                linkedTransactionId: linkedId
-                            };
-
-                            // Incoming transaction (Income to destination)
-                            const destTx: Transaction = {
-                                id: linkedId,
-                                date: scheduledTx.nextDate,
-                                accountId: scheduledTx.toAccountId,
-                                type: 'income',
-                                amount: scheduledTx.amount,
-                                category: 'transfer',
-                                description: scheduledTx.description,
-                                checked: false,
-                                isTransfer: true,
-                                linkedTransactionId: txId
-                            };
-
-                            newTransactions.push(sourceTx, destTx);
-                            await Promise.all([
-                                dbService.addTransaction(sourceTx),
-                                dbService.addTransaction(destTx)
-                            ]);
-                        } else {
-                            // Standard transaction
-                            const newTx: Transaction = {
-                                id: txId,
-                                date: scheduledTx.nextDate,
-                                accountId: scheduledTx.accountId,
-                                type: scheduledTx.type,
-                                amount: scheduledTx.amount,
-                                category: scheduledTx.category,
-                                description: scheduledTx.description,
-                                checked: false
-                            };
-                            newTransactions.push(newTx);
-                            await dbService.addTransaction(newTx);
-                        }
-
-                        // Advance date based on frequency
-                        const currentDate = new Date(scheduledTx.nextDate);
-                        let newDate: Date;
-
-                        // Helper to add months safely
-                        const addMonths = (date: Date, months: number) => {
-                            const d = new Date(date);
-                            d.setMonth(d.getMonth() + months);
-                            return d;
+                if (legacyScheduledToMigrate.length > 0) {
+                    for (const scheduledTx of legacyScheduledToMigrate) {
+                        const newBudget: Budget = {
+                            id: uuidv4(),
+                            name: scheduledTx.description,
+                            amount: scheduledTx.amount,
+                            category: scheduledTx.category,
+                            accountId: scheduledTx.accountId
                         };
 
-                        switch (scheduledTx.frequency) {
-                            case 'once':
-                                // For 'once', we don't advance, we should probably delete or mark as done
-                                // For now, let's push it far into the future to stop processing
-                                newDate = new Date(currentDate.setFullYear(currentDate.getFullYear() + 100));
-                                break;
-                            case 'daily':
-                                newDate = new Date(currentDate.setDate(currentDate.getDate() + 1));
-                                break;
-                            case 'weekly':
-                                newDate = new Date(currentDate.setDate(currentDate.getDate() + 7));
-                                break;
-                            case 'biweekly': // Every 2 weeks
-                                newDate = new Date(currentDate.setDate(currentDate.getDate() + 14));
-                                break;
-                            case 'bimonthly': // Twice a month (approx every 15 days)
-                                newDate = new Date(currentDate.setDate(currentDate.getDate() + 15));
-                                break;
-                            case 'fourweekly': // Every 4 weeks
-                                newDate = new Date(currentDate.setDate(currentDate.getDate() + 28));
-                                break;
-                            case 'monthly':
-                                newDate = addMonths(currentDate, 1);
-                                break;
-                            case 'bimestrial': // Every 2 months
-                                newDate = addMonths(currentDate, 2);
-                                break;
-                            case 'quarterly': // Every 3 months
-                                newDate = addMonths(currentDate, 3);
-                                break;
-                            case 'fourmonthly': // Every 4 months
-                                newDate = addMonths(currentDate, 4);
-                                break;
-                            case 'semiannual': // Every 6 months
-                                newDate = addMonths(currentDate, 6);
-                                break;
-                            case 'annual':
-                                newDate = new Date(currentDate.setFullYear(currentDate.getFullYear() + 1));
-                                break;
-                            case 'biennial': // Every 2 years
-                                newDate = new Date(currentDate.setFullYear(currentDate.getFullYear() + 2));
-                                break;
-                            default:
-                                newDate = addMonths(currentDate, 1); // Default to monthly
-                        }
+                        scheduledTx.budgetId = newBudget.id;
+                        scheduledTx.includeInForecast = true;
+                        migratedBudgets.push(newBudget);
 
-                        scheduledTx.nextDate = newDate.toISOString().split('T')[0];
-                        nextDate = new Date(scheduledTx.nextDate);
-                        nextDate.setHours(0, 0, 0, 0);
-
-                        // If it was 'once', we might want to remove it from scheduled list
-                        if (scheduledTx.frequency === 'once') {
-                            // Logic to remove could be here, but for safety we just pushed date
-                        }
+                        await dbService.addBudget(newBudget);
+                        await dbService.updateScheduled(scheduledTx);
                     }
-
-                    if (modified) {
-                        if (scheduledTx.frequency === 'once') {
-                            await dbService.deleteScheduled(scheduledTx.id);
-                            processedScheduled.splice(i, 1);
-                            i--; // Adjust index since we removed an item
-                        } else {
-                            await dbService.updateScheduled(scheduledTx);
-                        }
-                    }
+                    currentScheduled = migratedScheduled;
+                    currentBudgets = migratedBudgets;
                 }
+
+                const { processedScheduled, newTransactions } = await processDueScheduledItems(currentScheduled);
 
                 setAccounts(currentAccounts);
                 setTransactions([...newTransactions, ...currentTransactions]);
                 setCategories(currentCategories);
                 setScheduled(processedScheduled);
+                setBudgets(currentBudgets);
 
             } catch (error) {
                 console.error("Failed to initialize database:", error);
@@ -314,6 +332,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAccounts(prev => prev.filter(a => a.id !== id));
         setTransactions(prev => prev.filter(t => t.accountId !== id));
         setScheduled(prev => prev.filter(s => s.accountId !== id));
+        setBudgets(prev => prev.map(b => b.accountId === id ? { ...b, accountId: undefined } : b));
         setFilterAccount(prev => prev.includes(id) ? prev.filter(a => a !== id) : prev);
     }, []);
 
@@ -367,6 +386,29 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }, []);
 
+    const processDueScheduledTransactions = useCallback(async () => {
+        if (isLoading || isProcessingScheduledRef.current) return 0;
+
+        isProcessingScheduledRef.current = true;
+        try {
+            const { processedScheduled, newTransactions, hasScheduledChanges } = await processDueScheduledItems(scheduled);
+
+            if (newTransactions.length > 0) {
+                setTransactions(prev => [...newTransactions, ...prev]);
+            }
+            if (hasScheduledChanges) {
+                setScheduled(processedScheduled);
+            }
+
+            return newTransactions.length;
+        } catch (error) {
+            console.error("Failed to process scheduled transactions:", error);
+            return 0;
+        } finally {
+            isProcessingScheduledRef.current = false;
+        }
+    }, [isLoading, scheduled]);
+
     // --- Categories ---
     const addCategory = useCallback(async (category: Omit<Category, 'id'>) => {
         const newCategory: Category = { ...category, id: uuidv4() };
@@ -402,11 +444,31 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setScheduled(prev => prev.filter(s => s.id !== id));
     }, []);
 
+    // --- Budgets ---
+    const addBudget = useCallback(async (budget: Omit<Budget, 'id'>) => {
+        const newBudget: Budget = { ...budget, id: uuidv4() };
+        await dbService.addBudget(newBudget);
+        setBudgets(prev => [newBudget, ...prev]);
+        return newBudget.id;
+    }, []);
+
+    const updateBudget = useCallback(async (budget: Budget) => {
+        await dbService.updateBudget(budget);
+        setBudgets(prev => prev.map(b => b.id === budget.id ? budget : b));
+    }, []);
+
+    const deleteBudget = useCallback(async (id: string) => {
+        await dbService.deleteBudget(id);
+        setBudgets(prev => prev.filter(b => b.id !== id));
+        setScheduled(prev => prev.map(s => s.budgetId === id ? { ...s, budgetId: undefined, includeInForecast: false } : s));
+    }, []);
+
     const contextValue = useMemo(() => ({
         accounts,
         transactions,
         categories,
         scheduled,
+        budgets,
         addAccount,
         updateAccount,
         deleteAccount,
@@ -421,15 +483,20 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addScheduled,
         updateScheduled,
         deleteScheduled,
+        processDueScheduledTransactions,
+        addBudget,
+        updateBudget,
+        deleteBudget,
         filterAccount,
         setFilterAccount,
         isLoading
     }), [
-        accounts, transactions, categories, scheduled, filterAccount, isLoading,
+        accounts, transactions, categories, scheduled, budgets, filterAccount, isLoading,
         addAccount, updateAccount, deleteAccount,
         addTransaction, addTransfer, updateTransaction, deleteTransaction, toggleTransactionCheck,
         addCategory, updateCategory, deleteCategory,
-        addScheduled, updateScheduled, deleteScheduled
+        addScheduled, updateScheduled, deleteScheduled, processDueScheduledTransactions,
+        addBudget, updateBudget, deleteBudget
     ]);
 
     return (
