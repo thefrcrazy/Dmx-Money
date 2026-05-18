@@ -12,6 +12,24 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.4",
+        date: "2026-05-18",
+        title: "Correctif CSP Mac Intel",
+        changes: [
+            "Correction du blocage CSP qui empêchait le bundle legacy Mac Intel/Catalina de charger `tauri://assets/...`.",
+            "Autorisation explicite du protocole Tauri dans les directives scripts, styles, images et polices.",
+            "Conservation des styles et scripts inline nécessaires au bootstrap legacy SystemJS.",
+            "Désactivation ciblée de la réécriture CSP Tauri pour `script-src` et `style-src`."
+        ],
+        features: [
+            {
+                title: "Legacy Intel débloqué",
+                description: "Le vieux WebKit peut charger le bundle legacy sans rejet CSP.",
+                icon: "Shield"
+            }
+        ]
+    },
+    {
         version: "1.0.3",
         date: "2026-05-18",
         title: "Correctifs Mac Intel & imports",

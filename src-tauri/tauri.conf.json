@@ -11,7 +11,11 @@
   },
   "app": {
     "security": {
-      "csp": "default-src 'self' asset: http://asset.localhost; script-src 'self' 'unsafe-inline' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline' asset: http://asset.localhost; img-src 'self' data: asset: http://asset.localhost; font-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost http://localhost:5173 ws://localhost:5173 https://github.com https://objects.githubusercontent.com"
+      "csp": "default-src 'self' tauri: asset: http://asset.localhost http://tauri.localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: tauri: asset: http://asset.localhost http://tauri.localhost; style-src 'self' 'unsafe-inline' data: tauri: asset: http://asset.localhost http://tauri.localhost; img-src 'self' data: tauri: asset: http://asset.localhost http://tauri.localhost; font-src 'self' data: tauri: asset: http://asset.localhost http://tauri.localhost; connect-src 'self' ipc: http://ipc.localhost http://localhost:5173 ws://localhost:5173 https://github.com https://objects.githubusercontent.com",
+      "dangerousDisableAssetCspModification": [
+        "script-src",
+        "style-src"
+      ]
     }
   },
   "plugins": {

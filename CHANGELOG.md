@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 - 2026-05-18
+
+- Correction du blocage CSP sur Mac Intel/Catalina.
+- Autorisation explicite des assets `tauri://assets/...` dans la politique de sécurité.
+- Conservation de l'inline CSS/JS nécessaire au bootstrap legacy SystemJS.
+- Désactivation ciblée de la réécriture CSP Tauri sur `script-src` et `style-src`.
+
 ## 1.0.3 - 2026-05-18
 
 - Correction du démarrage Mac Intel/Catalina avec assets Tauri/Vite en chemins relatifs.
