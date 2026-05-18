@@ -1,119 +1,220 @@
-# DmxMoney (Desktop Version)
+# DmxMoney
 
-DmxMoney est une application de gestion financière personnelle moderne, performante et sécurisée, conçue pour macOS et Windows. Elle repose sur une architecture hybride alliant la puissance de **Rust** et la flexibilité de **React**.
+DmxMoney est une application desktop de gestion financière personnelle, construite avec Tauri, Rust, React et SQLite. Elle stocke les données en local, propose un journal de transactions complet, des budgets, un échéancier, des analyses et un système de mise à jour signé via GitHub Releases.
 
----
+Version actuelle du projet : `1.0.5`.
 
-## 🛠️ Stack Technologique
+## Points Forts
 
-- **Runtime & Package Manager** : [Bun](https://bun.sh) (vitesse d'exécution et d'installation).
-- **Core (Backend)** : [Tauri v2](https://tauri.app) (Rust) pour la gestion des fenêtres, du système de fichiers et des mises à jour.
-- **Base de Données** : [SQLite](https://www.sqlite.org) via `sqlx` (Rust), garantissant performance et intégrité des données locales.
-- **Frontend** :
-  - [React 19](https://react.dev) (Composants fonctionnels).
-  - [Vite](https://vitejs.dev) (Bundler ultra-rapide).
-  - [TypeScript](https://www.typescriptlang.org) (Sécurité du typage).
-- **Styling** :
-  - [Tailwind CSS v4](https://tailwindcss.com) (Mode Modern) avec support natif des thèmes.
-  - Support Legacy (Tailwind v3) pour compatibilité macOS Catalina.
-  - [Lucide React](https://lucide.dev) pour l'iconographie.
+- Gestion multi-comptes avec groupes, ordre personnalisé, icônes et couleurs.
+- Journal des transactions avec revenus, dépenses, virements liés, pointage, filtres, recherche et suivi du budget restant.
+- Budgets mensuels par catégorie, éventuellement liés à un compte ou à des échéances.
+- Échéancier avec fréquences avancées, date de fin, virements récurrents et génération automatique des opérations dues.
+- Tableaux de bord, analyses par catégorie et prévisions de solde.
+- Import CSV, QIF et OFX avec mapping, aperçu, création de compte et détection de doublons simples.
+- Export/import `.dmx` pour sauvegarde locale ou fusion de données.
+- Thèmes clair/sombre/système, couleur d'accent personnalisée et restauration de la fenêtre.
+- Auto-update Tauri v2 avec signatures et artefacts séparés par plateforme.
 
----
+## Plateformes
 
-## 🏗️ Architecture du Code
+| Plateforme | Build | Notes |
+| --- | --- | --- |
+| macOS Apple Silicon | Modern | Vite/Rolldown, React 19, Tailwind CSS v4. |
+| macOS Intel / Catalina | Legacy | Target macOS `10.15`, bundle SystemJS legacy, Tailwind CSS v3, polyfills Safari 13. |
+| Windows x64 | Modern | Update via setup NSIS signé, pas via archive MSI zip. |
+| Linux x64 | Modern | AppImage publié dans les releases. |
 
-### Backend (Rust - `src-tauri/`)
+## Installation
 
-Le backend est responsable de la logique critique, de la persistance et de la sécurité.
+Télécharge la dernière version depuis les [GitHub Releases](https://github.com/thefrcrazy/Dmx-Money/releases).
 
-- **`main.rs` & `lib.rs`** : Point d'entrée. Initialise les plugins (`updater`, `fs`, `dialog`), configure la fenêtre (avec gestion spécifique des Traffic Lights sur macOS) et lance le runtime.
-- **`db.rs`** : Gestionnaire de base de données.
-  - Initialise le fichier SQLite `dmxmoney2025.db` dans le dossier utilisateur.
-  - Gère les **migrations automatiques** au démarrage (création de tables, ajout de colonnes).
-  - Utilise des **transactions SQL** pour garantir l'atomicité des opérations critiques (import, suppression de compte).
-- **`commands.rs`** : Interface API exposée au frontend.
-  - Chaque fonction (`add_transaction`, `get_settings`, etc.) est une commande Tauri asynchrone.
-  - Renvoie des erreurs structurées et traduites pour une meilleure expérience utilisateur.
-- **`models.rs`** : Définitions des structures de données (Structs) mappées sur les tables SQL.
+### macOS
 
-### Frontend (React - `src/`)
+1. Télécharge le `.dmg` correspondant à ton architecture.
+2. Glisse `DmxMoney.app` dans `Applications`.
+3. Si macOS indique que l'app est endommagée ou vient d'un développeur non identifié, lance :
 
-L'interface est construite autour de Contextes pour la gestion d'état globale.
+```bash
+xattr -cr "/Applications/DmxMoney.app"
+```
 
-- **Contextes (`src/context/`)** :
-  - `BankContext` : Gère les données métiers (comptes, transactions, budget).
-  - `SettingsContext` : Gère le thème (Clair/Sombre), la couleur d'accentuation (avec génération dynamique des nuances), et la position de la fenêtre.
-  - `ToastContext` : Système de notification global non-bloquant.
-- **Pages (`src/pages/`)** :
-  - `Dashboard` : KPIs, graphiques récapitulatifs.
-  - `Transactions` : Tableau de bord principal avec **édition inline**, **multi-sélection** et filtres avancés.
-  - `Analytics` : Graphiques de dépenses et d'évolution du solde (optimisés pour le rendu instantané).
-- **Composants UI (`src/components/ui/`)** : Bibliothèque de composants réutilisables (Table, Button, Modal, Input) stylisés avec Tailwind.
+4. Ouvre ensuite l'application normalement.
 
----
+Pour un vieux Mac Intel sous Catalina, prends l'artefact Intel/x64. Les builds Apple Silicon restent modern et ne sont pas destinés à ces machines.
 
-## ✨ Fonctionnalités Clés
+### Windows
 
-### 1. Gestion Financière Complète
+Télécharge le setup `.exe` et lance l'installation. Si SmartScreen bloque l'ouverture, clique sur `Informations complémentaires`, puis `Exécuter quand même`.
 
-- **Transactions** : Ajout, modification (inline), suppression, pointage.
-- **Multi-comptes** : Filtrage global par compte ou vue agrégée.
-- **Catégories** : Gestion personnalisable avec couleurs et icônes.
-- **Budget & Échéancier** : Suivi des dépenses récurrentes et prévisionnelles.
+### Linux
 
-### 2. Import / Export
+Télécharge l'AppImage, rends-la exécutable, puis lance-la :
 
-- **Formats supportés** : OFX, QIF, CSV.
-- **Logique intelligente** : Détection automatique des doublons, mappage des catégories, création de comptes à la volée.
-- **Backup** : Export complet de la base de données au format `.dmx` (JSON encodé localement).
+```bash
+chmod +x DmxMoney_*.AppImage
+./DmxMoney_*.AppImage
+```
 
-### 3. Interface Utilisateur (UI/UX)
+## Architecture
 
-- **Thèmes** : Support Clair/Sombre automatique ou manuel.
-- **Couleur d'accentuation** : Personnalisable par l'utilisateur, appliquée partout.
-- **Sidebar Rétractable** : Optimisation de l'espace de travail.
-- **Performance** : Animations fluides (View Transitions API), chargement asynchrone, virtualisation.
+```text
+.
+├── src/                  # Frontend React/TypeScript
+├── src-tauri/            # Backend Tauri/Rust, SQLite, configuration desktop
+├── config-presets/       # Presets modern et legacy pour Vite/Tailwind
+├── .github/workflows/    # Pipeline de release
+├── CHANGELOG.md          # Notes de version publiques
+└── switch-tailwind.sh    # Bascule modern/legacy utilisée par la release
+```
 
-### 4. Mise à jour Automatique
+### Frontend
 
-- Système d'auto-update intégré (vérification au démarrage + manuelle).
-- Signature cryptographique des mises à jour (Ed25519) pour la sécurité.
-- Hébergement via GitHub Releases.
+- `src/App.tsx` assemble les providers et les pages principales.
+- `src/layouts/Layout.tsx` gère la navigation, le filtre global par compte et les soldes.
+- `src/context/BankContext.tsx` contient la logique métier côté UI : comptes, transactions, virements, budgets, échéances et génération des opérations dues.
+- `src/context/SettingsContext.tsx` applique les thèmes, couleurs, tailles/positions de fenêtre et notes de version.
+- `src/services/db.ts` centralise les appels Tauri vers Rust.
+- `src/utils/importParsers.ts` parse CSV/QIF/OFX et filtre les doublons.
+- `src/hooks/useUpdater.ts` lance la vérification silencieuse des mises à jour et l'installation manuelle.
 
----
+### Backend
 
-## 🚀 Installation
+- `src-tauri/src/db.rs` initialise SQLite dans le dossier de données Tauri, active `foreign_keys`, définit un `busy_timeout`, crée les tables et applique les migrations légères.
+- `src-tauri/src/commands.rs` expose les commandes Tauri pour les comptes, transactions, catégories, budgets, échéances, settings et imports.
+- `src-tauri/src/models.rs` définit les structures sérialisées entre Rust et React.
+- `src-tauri/tauri.conf.json` configure l'identité de l'app, le bundle, le CSP, les plugins et l'updater signé.
 
-###  macOS (Intel & Apple Silicon)
+Les données utilisateur restent locales dans la base SQLite `dmxmoney2025.db`. Le fichier `.dmx` est un export JSON de sauvegarde/fusion, pas un chiffrement.
 
-Comme l'application est Open Source et n'est pas signée avec un certificat Apple Developer payant, macOS affichera un message indiquant qu'elle est "endommagée" ou que le développeur est inconnu.
+## Stack
 
-Pour l'installer correctement :
+- Tauri `2.11`
+- Rust `1.77.2+`
+- SQLite via `sqlx`
+- React `19`
+- TypeScript `5`
+- Vite `8`
+- Tailwind CSS v4 en modern, Tailwind CSS v3 en legacy
+- Recharts pour les graphiques
+- Lucide React pour l'iconographie
+- Bun pour les scripts et dépendances frontend
 
-1. Téléchargez le fichier `.dmg` depuis les [Releases](https://github.com/thefrcrazy/Dmx-Money/releases).
+## Développement
 
-2. Ouvrez le `.dmg` et faites glisser **DmxMoney** dans votre dossier **Applications**.
+### Prérequis
 
-3. Ouvrez votre **Terminal** (via Spotlight ou Dossier Utilitaires).
+- Bun
+- Rust stable
+- Dépendances système Tauri pour la plateforme ciblée
 
-4. Copiez et collez la commande suivante, puis appuyez sur Entrée :
+Installation :
 
-   ```bash
+```bash
+bun install
+```
 
-   xattr -cr "/Applications/DmxMoney.app"
+Lancement web uniquement :
 
-   ```
+```bash
+bun run dev
+```
 
-5. Vous pouvez maintenant lancer l'application normalement.
+Lancement desktop Tauri :
 
-### ⊞ Windows
+```bash
+bun tauri dev
+```
 
-Téléchargez le fichier `.msi` ou le setup `.exe` et lancez l'installation. Si Windows SmartScreen affiche une alerte, cliquez sur "Informations complémentaires" puis "Exécuter quand même".
+Vérifications utiles :
 
-### 🐧 Linux
+```bash
+bun run lint
+bun test
+bun tsc --noEmit
+cargo check --manifest-path src-tauri/Cargo.toml
+```
 
-Téléchargez le fichier `.AppImage`, rendez-le exécutable (`chmod +x`) et lancez-le.
+Build local modern :
 
----
+```bash
+./switch-tailwind.sh modern
+bun tauri build
+```
 
-## 🛠️ Stack Technologique
+Build local legacy Intel/Catalina :
+
+```bash
+./switch-tailwind.sh legacy
+MACOSX_DEPLOYMENT_TARGET=10.15 bun tauri build --target x86_64-apple-darwin
+```
+
+`switch-tailwind.sh` modifie les fichiers de configuration Vite/Tailwind et peut toucher les dépendances. Vérifie toujours le diff après l'avoir utilisé.
+
+## Release Et Updater
+
+Le workflow `.github/workflows/release.yml` se déclenche sur les tags `v*`.
+
+Il exécute les étapes suivantes :
+
+1. Création d'une release GitHub en brouillon.
+2. Build matriciel Apple Silicon, Intel macOS, Windows et Linux.
+3. Bascule automatique du preset :
+   - `legacy` pour macOS Intel/x64.
+   - `modern` pour Apple Silicon, Windows et Linux.
+4. Signature des artefacts updater avec la clé Tauri.
+5. Upload des installateurs et signatures.
+6. Génération de `latest.json`.
+7. Publication de la release.
+
+L'updater lit :
+
+```text
+https://github.com/thefrcrazy/Dmx-Money/releases/latest/download/latest.json
+```
+
+Les clés de plateforme utilisées par `latest.json` sont :
+
+- `darwin-aarch64`
+- `darwin-x86_64`
+- `windows-x86_64`
+- `linux-x86_64`
+
+Sur Windows, l'artefact de mise à jour est le setup NSIS signé (`*_setup.exe`) afin d'éviter le chemin fragile de téléchargement/décompression d'un `.msi.zip`.
+
+## Versioning
+
+- La version principale est dans `package.json`.
+- `src-tauri/tauri.conf.json` référence `../package.json`, donc Tauri reprend cette version.
+- `src-tauri/Cargo.toml` garde aussi la version crate alignée.
+- Les notes visibles dans l'app sont dans `src/constants/changelog.ts`.
+- Les notes publiques sont dans `CHANGELOG.md`.
+- L'interface lit la version via Tauri au runtime, pour éviter les versions affichées en dur.
+
+## Compatibilité Legacy macOS
+
+Le support Catalina/Intel repose sur plusieurs garde-fous :
+
+- Build `x86_64-apple-darwin` séparé.
+- `MACOSX_DEPLOYMENT_TARGET=10.15`.
+- Preset legacy avec `@vitejs/plugin-legacy`, `renderModernChunks: false`, target Safari 13 et polyfills.
+- Correction de l'URL SystemJS pour charger les assets via `tauri://localhost/assets/...`.
+- CSP Tauri adaptée aux scripts/styles legacy nécessaires au bootstrap.
+- Polyfill `MediaQueryList.addEventListener` pour Safari 13.
+
+Les builds modern restent conservés pour les Mac Apple Silicon.
+
+## Fichiers Importés Et Sauvegardes
+
+Formats supportés :
+
+- `.dmx` : export complet DmxMoney.
+- `.csv` : import bancaire avec mapping manuel des colonnes.
+- `.qif` : import bancaire QIF.
+- `.ofx` : import bancaire OFX.
+
+Pendant l'import bancaire, l'application peut ignorer les doublons évidents en comparant date, compte, type, montant et description normalisée.
+
+## Licence
+
+MIT.
