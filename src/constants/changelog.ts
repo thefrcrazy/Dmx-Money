@@ -12,6 +12,30 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.2",
+        date: "2026-05-18",
+        title: "Correctif updater Windows & Catalina",
+        changes: [
+            "Remplacement du flux de mise à jour Windows par un installateur NSIS signé directement, sans archive MSI zip à extraire.",
+            "Séparation plus stricte des builds macOS : build modern conservé pour Apple Silicon et build legacy-only pour Intel/Catalina.",
+            "Correction du risque d'écran de chargement infini lors du démarrage si les paramètres locaux ne répondent pas.",
+            "Centralisation de l'état de mise à jour pour éviter les vérifications concurrentes dans l'interface.",
+            "Nettoyage des versions affichées en dur : l'interface lit maintenant la version exposée par Tauri."
+        ],
+        features: [
+            {
+                title: "Mises à jour Windows fiabilisées",
+                description: "Le nouvel artefact de mise à jour évite le chemin fragile de décompression du fichier MSI zip.",
+                icon: "RefreshCw"
+            },
+            {
+                title: "Compatibilité Mac préservée",
+                description: "Les Mac Apple Silicon gardent le build modern, tandis que les anciens Mac Intel utilisent le build legacy.",
+                icon: "Monitor"
+            }
+        ]
+    },
+    {
         version: "1.0.1",
         date: "2026-05-15",
         title: "UX/UI et Refonte des Paramètres",
@@ -455,4 +479,4 @@ export const CHANGELOG: VersionUpdate[] = [
     }
 ];
 
-export const LATEST_VERSION = "1.0.1";
+export const LATEST_VERSION = CHANGELOG[0].version;

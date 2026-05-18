@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DmxMoney",
-  "version": "1.0.1",
+  "version": "../package.json",
   "identifier": "com.dmxmoney.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -19,12 +19,16 @@
       "endpoints": [
         "https://github.com/thefrcrazy/Dmx-Money/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNENTFFRTVDNjFCRjIyQ0QKUldUTklyOWhYTzVSUFF2aE81TlA5bisveFM5THlHSlBOaFlpbWpTMmdqc3U3bDlpZG05UnFVbVgK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNENTFFRTVDNjFCRjIyQ0QKUldUTklyOWhYTzVSUFF2aE81TlA5bisveFM5THlHSlBOaFlpbWpTMmdqc3U3bDlpZG05UnFVbVgK",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

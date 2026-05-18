@@ -16,7 +16,8 @@ export default defineConfig({
         'es.object.from-entries',
         'es.symbol.description'
       ],
-      modernPolyfills: true
+      modernPolyfills: true,
+      renderModernChunks: false
     })
   ],
   build: {

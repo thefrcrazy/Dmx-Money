@@ -147,23 +147,48 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     useEffect(() => {
+        let completed = false;
+        let transitionTimer: ReturnType<typeof setTimeout> | undefined;
+        let doneTimer: ReturnType<typeof setTimeout> | undefined;
+
+        const finishInitialLoad = (initial: Settings, delay = 1500) => {
+            if (completed) return;
+            completed = true;
+
+            applyVisualSettings(initial);
+            setSettings(initial);
+            isLoadedRef.current = true;
+
+            transitionTimer = setTimeout(() => {
+                setIsTransitioning(true);
+                doneTimer = setTimeout(() => {
+                    setIsInitialLoadDone(true);
+                }, 500);
+            }, delay);
+        };
+
+        const fallbackTimer = setTimeout(() => {
+            console.warn('Settings load timed out; continuing with default settings.');
+            finishInitialLoad(DEFAULT_SETTINGS, 0);
+        }, 6000);
+
         dbService.getSettings()
             .then(savedSettings => {
+                clearTimeout(fallbackTimer);
                 const initial = savedSettings || DEFAULT_SETTINGS;
-                applyVisualSettings(initial);
-                setSettings(initial);
-                isLoadedRef.current = true;
-
-                setTimeout(() => {
-                    setIsTransitioning(true);
-                    setTimeout(() => {
-                        setIsInitialLoadDone(true);
-                    }, 500);
-                }, 1500);
+                finishInitialLoad(initial);
             })
             .catch(() => {
-                setIsInitialLoadDone(true);
+                clearTimeout(fallbackTimer);
+                finishInitialLoad(DEFAULT_SETTINGS, 0);
             });
+
+        return () => {
+            completed = true;
+            clearTimeout(fallbackTimer);
+            if (transitionTimer) clearTimeout(transitionTimer);
+            if (doneTimer) clearTimeout(doneTimer);
+        };
     }, []);
 
     useEffect(() => {

@@ -32,22 +32,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-14' # Apple Silicon (M1/M2/M3)
+          - platform: 'macos-15' # Apple Silicon (M1/M2/M3)
             args: '--target aarch64-apple-darwin'
             arch: 'aarch64'
             os_name: 'darwin'
-          - platform: 'macos-latest' # Intel Mac
+            rust_target: 'aarch64-apple-darwin'
+          - platform: 'macos-15-intel' # Intel Mac
             args: '--target x86_64-apple-darwin'
             arch: 'x64'
             os_name: 'darwin'
+            rust_target: 'x86_64-apple-darwin'
           - platform: 'windows-latest'
             args: ''
             arch: 'x64'
             os_name: 'windows'
+            rust_target: ''
           - platform: 'ubuntu-22.04'
             args: ''
             arch: 'x64'
             os_name: 'linux'
+            rust_target: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -61,7 +65,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rust_target }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -81,6 +85,10 @@ jobs:
             ./switch-tailwind.sh modern
           fi
         shell: bash
+
+      - name: Configure Intel macOS deployment target
+        if: matrix.arch == 'x64' && matrix.os_name == 'darwin'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=10.15" >> "$GITHUB_ENV"
 
       # Build sans release automatique mais avec les clés pour générer les bundles d'update
       - name: Build Tauri App
@@ -112,49 +120,53 @@ jobs:
             echo "❌ Bundle directory not found"
             exit 1
           fi
-          
-          UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f \( -name "*.app.tar.gz" -o -name "*.AppImage.tar.gz" -o -name "*.nsis.zip" -o -name "*.msi.zip" \) | head -n 1)
-          
-          if [ -z "$UPDATE_BUNDLE" ]; then
-             UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f \( -name "*.tar.gz" -o -name "*.zip" \) | head -n 1)
-          fi
+
+          case "$OS_NAME" in
+            windows)
+              # Use the signed NSIS setup directly for Tauri v2 updates.
+              # This avoids the fragile MSI zip extraction path on Windows.
+              UPDATE_BUNDLE=$(find "$BUNDLE_DIR/nsis" -type f -name "*.exe" ! -name "*.sig" | head -n 1)
+              NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}_setup.exe"
+              ;;
+            darwin)
+              UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f -name "*.app.tar.gz" ! -name "*.sig" | head -n 1)
+              NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.app.tar.gz"
+              ;;
+            linux)
+              UPDATE_BUNDLE=$(find "$BUNDLE_DIR" -type f -name "*.AppImage" ! -name "*.sig" | head -n 1)
+              NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.AppImage"
+              ;;
+            *)
+              echo "❌ Unsupported OS_NAME: $OS_NAME"
+              exit 1
+              ;;
+          esac
 
           if [ -z "$UPDATE_BUNDLE" ]; then
-            INSTALLER=$(find "$BUNDLE_DIR" -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.dmg" \) | head -n 1)
-            INST_FILENAME=$(basename "$INSTALLER")
-            if [[ "$OS_NAME" == "windows" ]]; then
-                NEW_ZIP="${INSTALLER}.zip"
-                7z a -tzip "$NEW_ZIP" "$INSTALLER"
-                UPDATE_BUNDLE="$NEW_ZIP"
-            else
-                NEW_TAR="${INSTALLER}.tar.gz"
-                tar -czf "$NEW_TAR" -C "$(dirname "$INSTALLER")" "$INST_FILENAME"
-                UPDATE_BUNDLE="$NEW_TAR"
-            fi
+            echo "❌ Updater bundle not found for $OS_NAME/$ARCH"
+            find "$BUNDLE_DIR" -type f
+            exit 1
           fi
 
-          FILENAME=$(basename "$UPDATE_BUNDLE")
-          if [[ "$FILENAME" == *.app.tar.gz ]]; then EXT="app.tar.gz"
-          elif [[ "$FILENAME" == *.AppImage.tar.gz ]]; then EXT="AppImage.tar.gz"
-          elif [[ "$FILENAME" == *.nsis.zip ]]; then EXT="nsis.zip"
-          elif [[ "$FILENAME" == *.msi.zip ]]; then EXT="msi.zip"
-          elif [[ "$FILENAME" == *.tar.gz ]]; then EXT="tar.gz"
-          elif [[ "$FILENAME" == *.zip ]]; then EXT="zip"
-          else EXT="${FILENAME##*.}"
-          fi
-          
-          NEW_BUNDLE_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.${EXT}"
           cp "$UPDATE_BUNDLE" "./$NEW_BUNDLE_NAME"
-          
+
           export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
           export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
           bun tauri signer sign "./$NEW_BUNDLE_NAME"
-          
+
           gh release upload "$VERSION" "./$NEW_BUNDLE_NAME" "./$NEW_BUNDLE_NAME.sig" --clobber
-          
+
           find "$BUNDLE_DIR" -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -path "*/deps/*" | while read -r INSTALLER_PATH; do
+            if [ "$INSTALLER_PATH" = "$UPDATE_BUNDLE" ]; then
+              continue
+            fi
             INST_NAME=$(basename "$INSTALLER_PATH")
-            NEW_INST_NAME="${INST_NAME%.*}_${ARCH}_${OS_NAME}.${INST_NAME##*.}"
+            EXT="${INST_NAME##*.}"
+            if [[ "$INST_NAME" == *setup*.exe ]]; then
+              NEW_INST_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}_setup.exe"
+            else
+              NEW_INST_NAME="DmxMoney_${CLEAN_VERSION}_${ARCH}_${OS_NAME}.${EXT}"
+            fi
             cp "$INSTALLER_PATH" "./$NEW_INST_NAME"
             gh release upload "$VERSION" "./$NEW_INST_NAME" --clobber
           done
@@ -191,8 +203,8 @@ jobs:
 
           add_platform "darwin-aarch64" "aarch64.*darwin.*app\.tar\.gz"
           add_platform "darwin-x86_64"  "x64.*darwin.*app\.tar\.gz"
-          add_platform "windows-x86_64" "x64.*windows.*(msi|nsis)\.zip"
-          add_platform "linux-x86_64"   "x64.*linux.*AppImage.*tar\.gz"
+          add_platform "windows-x86_64" "x64.*windows.*setup\.exe"
+          add_platform "linux-x86_64"   "x64.*linux.*AppImage"
 
           jq -n --arg version "$CLEAN_VERSION" --arg notes "Mise à jour $CLEAN_VERSION" --arg pub_date "$PUB_DATE" --argjson platforms "$PLATFORMS" '{version: $version, notes: $notes, pub_date: $pub_date, platforms: $platforms}' > latest.json
           gh release upload "$VERSION" latest.json --repo "$REPO" --clobber

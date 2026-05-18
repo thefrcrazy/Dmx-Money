@@ -3,43 +3,65 @@ import { ask, message } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { useState, useCallback, useEffect } from 'react';
 
+type UpdaterState = {
+    isChecking: boolean;
+    updateAvailable: boolean;
+};
+
+const sharedState: UpdaterState = {
+    isChecking: false,
+    updateAvailable: false,
+};
+
+const listeners = new Set<(state: UpdaterState) => void>();
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
+const hasTauriRuntime = () => (
+    typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+);
+
+const setSharedState = (patch: Partial<UpdaterState>) => {
+    Object.assign(sharedState, patch);
+    const nextState = { ...sharedState };
+    listeners.forEach(listener => listener(nextState));
+};
+
 export const useUpdater = () => {
-    const [isChecking, setIsChecking] = useState(false);
-    const [updateAvailable, setUpdateAvailable] = useState(false);
+    const [state, setState] = useState<UpdaterState>(sharedState);
 
     const checkUpdate = useCallback(async (silent = false) => {
         // Prevent running in browser mode without Tauri
-        if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
-        
-        setIsChecking(true);
+        if (!hasTauriRuntime() || sharedState.isChecking) return;
+
+        setSharedState({ isChecking: true });
         try {
             const updateResult = await check();
             
             if (updateResult) {
                 console.log(`Update available: ${updateResult.version}`);
-                setUpdateAvailable(true);
+                setSharedState({ updateAvailable: true });
                 
                 // If not silent (manual check), ask to update immediately
                 if (!silent) {
                     const yes = await ask(
-                        `Update to ${updateResult.version} is available!\n\nRelease notes: ${updateResult.body}`,
+                        `La version ${updateResult.version} est disponible.\n\nNotes : ${updateResult.body || 'Aucune note fournie.'}`,
                         {
-                            title: 'Update Available',
+                            title: 'Mise à jour disponible',
                             kind: 'info',
-                            okLabel: 'Update',
-                            cancelLabel: 'Cancel',
+                            okLabel: 'Installer',
+                            cancelLabel: 'Annuler',
                         }
                     );
 
                     if (yes) {
-                        await updateResult.downloadAndInstall();
+                        await updateResult.downloadAndInstall(undefined, { timeout: 600000 });
                         await relaunch();
                     }
                 }
             } else {
-                setUpdateAvailable(false);
+                setSharedState({ updateAvailable: false });
                 if (!silent) {
-                    await message('You are on the latest version.', { title: 'No Update Available', kind: 'info' });
+                    await message('Vous utilisez déjà la dernière version.', { title: 'Aucune mise à jour', kind: 'info' });
                 }
             }
         } catch (error) {
@@ -54,25 +76,36 @@ export const useUpdater = () => {
                         { title: 'Mise à jour en cours', kind: 'info' }
                     );
                 } else {
-                    await message(`Impossible de vérifier les mises à jour.\n\n${errorMsg}`, { title: 'Erreur', kind: 'error' });
+                    await message(`Impossible de vérifier ou installer la mise à jour.\n\n${errorMsg}`, { title: 'Erreur de mise à jour', kind: 'error' });
                 }
             }
         } finally {
-            setIsChecking(false);
+            setSharedState({ isChecking: false });
         }
     }, []);
 
     // Poll for updates every 15 minutes
     useEffect(() => {
-        // Check at startup (silent)
-        checkUpdate(true);
+        listeners.add(setState);
+        setState({ ...sharedState });
 
-        const interval = setInterval(() => {
+        if (!pollingInterval && hasTauriRuntime()) {
+            // Check at startup (silent)
             checkUpdate(true);
-        }, 15 * 60 * 1000); // 15 minutes
 
-        return () => clearInterval(interval);
+            pollingInterval = setInterval(() => {
+                checkUpdate(true);
+            }, 15 * 60 * 1000); // 15 minutes
+        }
+
+        return () => {
+            listeners.delete(setState);
+            if (listeners.size === 0 && pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        };
     }, [checkUpdate]);
 
-    return { checkUpdate, isChecking, updateAvailable };
+    return { checkUpdate, isChecking: state.isChecking, updateAvailable: state.updateAvailable };
 };

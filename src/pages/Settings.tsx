@@ -18,10 +18,10 @@ const SettingsPage: React.FC = () => {
     const { settings, updateTheme, updatePrimaryColor } = useSettings();
     const { addTransaction } = useBank();
     const { checkUpdate, isChecking, updateAvailable } = useUpdater();
-    const [appVersion, setAppVersion] = useState('0.0.0');
+    const [appVersion, setAppVersion] = useState<string | null>(null);
 
     useEffect(() => {
-        getVersion().then(setAppVersion).catch(() => setAppVersion('1.0.1'));
+        getVersion().then(setAppVersion).catch(() => setAppVersion(null));
     }, []);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -300,7 +300,7 @@ const SettingsPage: React.FC = () => {
                                 <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl" />
                                 <div>
                                     <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">DmxMoney</h3>
-                                    <p className="text-[13px] text-gray-500 mt-0.5">Version {appVersion}</p>
+                                    <p className="text-[13px] text-gray-500 mt-0.5">{appVersion ? `Version ${appVersion}` : 'Version indisponible'}</p>
                                 </div>
                             </div>
                             <button
