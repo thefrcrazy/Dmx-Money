@@ -5,6 +5,7 @@ import SearchableSelect from '../../components/ui/SearchableSelect';
 import { useBank } from '../../context/BankContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '../../context/ToastContext';
+import { parseOfxTransactions } from '../../utils/importParsers';
 
 interface OfxImportModalProps {
     isOpen: boolean;
@@ -42,63 +43,10 @@ const OfxImportModal: React.FC<OfxImportModalProps> = ({ isOpen, onClose, file, 
         }
     }, [isOpen, file]);
 
-    const parseOfxDate = (dateStr: string) => {
-        // OFX Date format: YYYYMMDDHHMMSS or YYYYMMDD
-        if (!dateStr || dateStr.length < 8) return new Date().toISOString().split('T')[0];
-
-        const year = dateStr.substring(0, 4);
-        const month = dateStr.substring(4, 6);
-        const day = dateStr.substring(6, 8);
-
-        return `${year}-${month}-${day}`;
-    };
-
     const parsedData = useMemo(() => {
         if (!file) return [];
         try {
-            const transactions: any[] = [];
-            const content = file.content;
-
-            // Helper to extract tag content
-            const getTagValue = (block: string, tag: string) => {
-                const regex = new RegExp(`<${tag}>(.*?)(?:<|$)`, 'i');
-                const match = block.match(regex);
-                return match ? match[1].trim() : '';
-            };
-
-            const blocks = content.split('<STMTTRN>');
-            if (blocks.length <= 1) {
-                throw new Error("Aucune transaction trouvée dans le fichier OFX. Le format est peut-être incorrect.");
-            }
-
-            for (let i = 1; i < blocks.length; i++) {
-                const block = blocks[i];
-                const dateStr = getTagValue(block, 'DTPOSTED');
-                const amountStr = getTagValue(block, 'TRNAMT');
-                const name = getTagValue(block, 'NAME');
-                const memo = getTagValue(block, 'MEMO');
-
-                if (!dateStr || !amountStr) continue;
-
-                const date = parseOfxDate(dateStr);
-                const amount = parseFloat(amountStr.replace(',', '.'));
-
-                if (isNaN(amount)) continue;
-
-                let description = name;
-                if (memo && memo !== name) {
-                    description = description ? `${description} - ${memo}` : memo;
-                }
-                if (!description) description = 'Transaction OFX';
-
-                transactions.push({
-                    date,
-                    amount,
-                    description,
-                    category: ''
-                });
-            }
-            return transactions;
+            return parseOfxTransactions(file.content).map(transaction => ({ ...transaction, category: '' }));
         } catch (e: any) {
             console.error("Parsing error:", e);
             setError(e.message || "Erreur lors de la lecture du fichier OFX");

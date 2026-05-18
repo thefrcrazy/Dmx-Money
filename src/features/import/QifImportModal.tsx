@@ -5,6 +5,7 @@ import SearchableSelect from '../../components/ui/SearchableSelect';
 import { useBank } from '../../context/BankContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '../../context/ToastContext';
+import { parseQifTransactions } from '../../utils/importParsers';
 
 interface QifImportModalProps {
     isOpen: boolean;
@@ -42,70 +43,10 @@ const QifImportModal: React.FC<QifImportModalProps> = ({ isOpen, onClose, file, 
         }
     }, [isOpen, file]);
 
-    const parseQifDate = (dateStr: string) => {
-        if (!dateStr) return new Date().toISOString().split('T')[0];
-        try {
-            // Remove ' if present (often used in QIF for year like D/M'YY)
-            let cleanStr = dateStr.replace("'", "/");
-
-            const parts = cleanStr.split('/');
-            if (parts.length === 3) {
-                let day = parseInt(parts[0], 10);
-                let month = parseInt(parts[1], 10);
-                let year = parseInt(parts[2], 10);
-
-                if (year < 100) year += 2000;
-
-                const d = day.toString().padStart(2, '0');
-                const m = month.toString().padStart(2, '0');
-                return `${year}-${m}-${d}`;
-            }
-            return new Date().toISOString().split('T')[0];
-        } catch (e) {
-            return new Date().toISOString().split('T')[0];
-        }
-    };
-
     const parsedData = useMemo(() => {
         if (!file) return [];
         try {
-            const transactions: any[] = [];
-            let currentTx: any = {};
-            const lines = file.content.split('\n');
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-
-                const char = trimmed[0];
-                const content = trimmed.substring(1);
-
-                if (char === '^') {
-                    if (Object.keys(currentTx).length > 0) {
-                        if (!currentTx.amount) currentTx.amount = 0;
-                        if (!currentTx.description) currentTx.description = 'Transaction QIF';
-                        if (!currentTx.date) currentTx.date = new Date().toISOString().split('T')[0];
-
-                        transactions.push(currentTx);
-                        currentTx = {};
-                    }
-                } else if (char === 'D') {
-                    currentTx.date = parseQifDate(content);
-                } else if (char === 'T') {
-                    const amount = parseFloat(content.replace(/,/g, ''));
-                    if (!isNaN(amount)) currentTx.amount = amount;
-                } else if (char === 'P') {
-                    currentTx.description = content;
-                } else if (char === 'L') {
-                    currentTx.category = content;
-                }
-            }
-
-            if (transactions.length === 0) {
-                throw new Error("Aucune transaction valide trouvée dans le fichier QIF.");
-            }
-
-            return transactions;
+            return parseQifTransactions(file.content);
         } catch (e: any) {
             console.error("QIF Parsing error:", e);
             setError(e.message || "Erreur lors de la lecture du fichier QIF");

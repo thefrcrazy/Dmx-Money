@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.3 - 2026-05-18
+
+- Correction du démarrage Mac Intel/Catalina avec assets Tauri/Vite en chemins relatifs.
+- Séparation plus nette du build modern et du build legacy Intel.
+- Suppression du bootstrap legacy inutile dans le build modern.
+- Parsers CSV, QIF et OFX centralisés et plus tolérants.
+- Ignorance des doublons évidents lors des imports bancaires.
+- Suppression cohérente des deux lignes d'un virement lié.
+- Activation de garde-fous SQLite et CSP Tauri plus stricte.
+- Correction du libellé backup : le `.dmx` est un export local encodé, pas un chiffrement.
+
 ## 1.0.2 - 2026-05-18
 
 - Remplacement du flux de mise à jour Windows par un setup NSIS signé directement.

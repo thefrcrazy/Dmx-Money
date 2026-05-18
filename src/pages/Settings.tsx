@@ -13,10 +13,12 @@ import QifImportModal from '../features/import/QifImportModal';
 import OfxImportModal from '../features/import/OfxImportModal';
 import AlertModal from '../components/ui/AlertModal';
 import ReleaseNotesModal from '../components/ui/ReleaseNotesModal';
+import { LOGO_PATH } from '../utils/assets';
+import { filterDuplicateTransactions, type ImportTransactionInput } from '../utils/importParsers';
 
 const SettingsPage: React.FC = () => {
     const { settings, updateTheme, updatePrimaryColor } = useSettings();
-    const { addTransaction } = useBank();
+    const { addTransaction, transactions: existingTransactions } = useBank();
     const { checkUpdate, isChecking, updateAvailable } = useUpdater();
     const [appVersion, setAppVersion] = useState<string | null>(null);
 
@@ -136,15 +138,20 @@ const SettingsPage: React.FC = () => {
         }
     };
 
-    const handleTransactionImport = async (transactions: any[], accountId: string) => {
+    const handleTransactionImport = async (transactions: ImportTransactionInput[], accountId: string) => {
         try {
-            for (const tx of transactions) {
-                await addTransaction({ ...tx, accountId });
+            const preparedTransactions = transactions.map(transaction => ({ ...transaction, accountId }));
+            const { unique, duplicateCount } = filterDuplicateTransactions(preparedTransactions, existingTransactions, accountId);
+
+            for (const tx of unique) {
+                await addTransaction({ ...tx, checked: tx.checked ?? true });
             }
             setAlertState({
                 isOpen: true,
                 title: 'Import terminé',
-                message: `${transactions.length} transactions importées.`,
+                message: duplicateCount > 0
+                    ? `${unique.length} transactions importées, ${duplicateCount} doublon${duplicateCount > 1 ? 's' : ''} ignoré${duplicateCount > 1 ? 's' : ''}.`
+                    : `${unique.length} transactions importées.`,
                 type: 'success'
             });
         } catch (error) {
@@ -263,7 +270,7 @@ const SettingsPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">Exporter les données</h3>
-                                    <p className="text-[13px] text-gray-500 mt-0.5">Créer une sauvegarde sécurisée (.dmx)</p>
+                                    <p className="text-[13px] text-gray-500 mt-0.5">Créer une sauvegarde locale (.dmx)</p>
                                 </div>
                             </div>
                             <ChevronRight className="w-5 h-5 text-gray-300 dark:text-gray-600" />
@@ -297,7 +304,7 @@ const SettingsPage: React.FC = () => {
                         
                         <div className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl" />
+                                <img src={LOGO_PATH} alt="Logo" className="w-10 h-10 rounded-xl" />
                                 <div>
                                     <h3 className="text-[15px] font-medium text-gray-900 dark:text-white">DmxMoney</h3>
                                     <p className="text-[13px] text-gray-500 mt-0.5">{appVersion ? `Version ${appVersion}` : 'Version indisponible'}</p>

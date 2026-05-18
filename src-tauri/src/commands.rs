@@ -163,9 +163,37 @@ pub async fn update_transaction(
 #[command]
 pub async fn delete_transaction(pool: State<'_, DbPool>, id: String) -> Result<(), String> {
     log::debug!("Invoked delete_transaction: {id}");
-    sqlx::query("DELETE FROM transactions WHERE id = $1")
-        .bind(id)
-        .execute(&*pool)
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| map_db_error(e, "début de suppression de transaction"))?;
+
+    let linked_transaction_id: Option<String> = sqlx::query_scalar(
+        "SELECT \"linkedTransactionId\" FROM transactions WHERE id = $1",
+    )
+    .bind(&id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| map_db_error(e, "récupération du virement lié"))?
+    .flatten();
+
+    if let Some(linked_id) = linked_transaction_id {
+        sqlx::query("DELETE FROM transactions WHERE id = $1 OR id = $2")
+            .bind(&id)
+            .bind(linked_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| map_db_error(e, "suppression du virement lié"))?;
+    } else {
+        sqlx::query("DELETE FROM transactions WHERE id = $1")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| map_db_error(e, "suppression de transaction"))?;
+    }
+
+    tx.commit()
         .await
         .map_err(|e| map_db_error(e, "suppression de transaction"))?;
     Ok(())

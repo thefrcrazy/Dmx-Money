@@ -65,7 +65,7 @@ L'interface est construite autour de Contextes pour la gestion d'état globale.
 
 - **Formats supportés** : OFX, QIF, CSV.
 - **Logique intelligente** : Détection automatique des doublons, mappage des catégories, création de comptes à la volée.
-- **Backup** : Export complet de la base de données au format `.dmx` (JSON chiffré).
+- **Backup** : Export complet de la base de données au format `.dmx` (JSON encodé localement).
 
 ### 3. Interface Utilisateur (UI/UX)
 

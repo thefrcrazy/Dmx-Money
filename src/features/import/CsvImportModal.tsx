@@ -5,6 +5,7 @@ import SearchableSelect from '../../components/ui/SearchableSelect';
 import { useBank } from '../../context/BankContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '../../context/ToastContext';
+import { parseBankAmount, parseBankDate, parseDelimitedRows } from '../../utils/importParsers';
 
 interface CsvImportModalProps {
     isOpen: boolean;
@@ -61,15 +62,10 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ isOpen, onClose, file, 
     const parsedData = useMemo(() => {
         if (!file) return [];
         try {
-            const lines = file.content.split('\n').filter(line => line.trim() !== '');
-            if (lines.length === 0) throw new Error("Le fichier est vide.");
-            
-            const startIndex = hasHeader ? 1 : 0;
-            if (hasHeader && lines.length <= 1) throw new Error("Le fichier ne contient que l'en-tête.");
+            const rows = parseDelimitedRows(file.content, separator, hasHeader);
+            if (rows.length === 0) throw new Error(hasHeader ? "Le fichier ne contient que l'en-tête." : "Le fichier est vide.");
 
-            return lines.slice(startIndex).map(line => {
-                return line.split(separator).map(cell => cell.trim().replace(/^"|"$/g, ''));
-            });
+            return rows;
         } catch (e: any) {
             console.error("CSV Parsing error:", e);
             setError(e.message || "Erreur lors de la lecture du fichier CSV");
@@ -132,35 +128,14 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ isOpen, onClose, file, 
         }
     };
 
-    const parseAmount = (amountStr: string) => {
-        if (!amountStr) return 0;
-        const cleanStr = amountStr.replace(/\s/g, '').replace(',', '.');
-        return parseFloat(cleanStr);
-    };
-
-    const parseDate = (dateStr: string) => {
-        if (!dateStr) return new Date().toISOString().split('T')[0];
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-            let day = parts[0];
-            let month = parts[1];
-            let year = parts[2];
-            if (day.length === 1) day = '0' + day;
-            if (month.length === 1) month = '0' + month;
-            if (year.length === 2) year = '20' + year;
-            return `${year}-${month}-${day}`;
-        }
-        return dateStr;
-    };
-
     const handleFinalImport = async () => {
         setIsImporting(true);
         setError(null);
         try {
             // 1. Parse transactions
             let processedTransactions = parsedData.map(row => {
-                const amount = parseAmount(row[mapping.amount]);
-                const date = parseDate(row[mapping.date]);
+                const amount = parseBankAmount(row[mapping.amount]);
+                const date = parseBankDate(row[mapping.date]);
                 const description = row[mapping.description] || 'Import CSV';
                 const rawCategory = mapping.category !== -1 ? row[mapping.category] : undefined;
 

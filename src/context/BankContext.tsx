@@ -372,19 +372,24 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const deleteTransaction = useCallback(async (id: string) => {
+        const transaction = transactions.find(t => t.id === id);
+        const idsToRemove = new Set([id]);
+        if (transaction?.linkedTransactionId) {
+            idsToRemove.add(transaction.linkedTransactionId);
+        }
+
         await dbService.deleteTransaction(id);
-        setTransactions(prev => prev.filter(t => t.id !== id));
-    }, []);
+        setTransactions(prev => prev.filter(t => !idsToRemove.has(t.id)));
+    }, [transactions]);
 
     const toggleTransactionCheck = useCallback(async (id: string) => {
-        setTransactions(prev => {
-            const transaction = prev.find(t => t.id === id);
-            if (!transaction) return prev;
-            const updated = { ...transaction, checked: !transaction.checked };
-            dbService.updateTransaction(updated);
-            return prev.map(t => t.id === id ? updated : t);
-        });
-    }, []);
+        const transaction = transactions.find(t => t.id === id);
+        if (!transaction) return;
+
+        const updated = { ...transaction, checked: !transaction.checked };
+        await dbService.updateTransaction(updated);
+        setTransactions(prev => prev.map(t => t.id === id ? updated : t));
+    }, [transactions]);
 
     const processDueScheduledTransactions = useCallback(async () => {
         if (isLoading || isProcessingScheduledRef.current) return 0;

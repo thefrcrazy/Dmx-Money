@@ -12,6 +12,32 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.3",
+        date: "2026-05-18",
+        title: "Correctifs Mac Intel & imports",
+        changes: [
+            "Correction du démarrage Mac Intel/Catalina avec des chemins d'assets relatifs dans les builds Tauri.",
+            "Séparation plus nette du build modern et du build legacy : Apple Silicon conserve le build modern, Intel utilise un bundle legacy-only.",
+            "Suppression du bootstrap legacy inutile dans le build modern pour éviter les erreurs de détection de modules sur WebKit ancien.",
+            "Centralisation et fiabilisation des parsers CSV, QIF et OFX.",
+            "Détection des doublons évidents lors des imports bancaires.",
+            "Suppression cohérente des deux lignes d'un virement lié.",
+            "Durcissement SQLite et CSP Tauri, avec correction du libellé backup."
+        ],
+        features: [
+            {
+                title: "Démarrage Intel fiabilisé",
+                description: "Les anciens Mac Intel chargent le bundle legacy avec des chemins relatifs adaptés au packaging Tauri.",
+                icon: "Monitor"
+            },
+            {
+                title: "Imports plus robustes",
+                description: "Les fichiers CSV, QIF et OFX sont mieux parsés et les doublons simples sont ignorés.",
+                icon: "Upload"
+            }
+        ]
+    },
+    {
         version: "1.0.2",
         date: "2026-05-18",
         title: "Correctif updater Windows & Catalina",

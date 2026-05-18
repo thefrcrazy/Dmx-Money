@@ -1,12 +1,13 @@
 {
   "name": "dmxmoney",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "bun test",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -23,6 +23,13 @@ pub async fn init_db(app_handle: &tauri::AppHandle) -> Result<DbPool, String> {
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                sqlx::query("PRAGMA foreign_keys = ON").execute(&mut *conn).await?;
+                sqlx::query("PRAGMA busy_timeout = 5000").execute(&mut *conn).await?;
+                Ok(())
+            })
+        })
         .connect(&db_url)
         .await
         .map_err(|e| e.to_string())?;

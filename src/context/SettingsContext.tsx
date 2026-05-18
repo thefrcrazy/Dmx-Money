@@ -4,6 +4,7 @@ import { Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
 import { generatePalette, formatRgb } from '../utils/colors';
 import { LATEST_VERSION } from '../constants/changelog';
+import { LOGO_PATH, publicAsset } from '../utils/assets';
 
 const iconCache: Record<string, Uint8Array> = {};
 
@@ -11,7 +12,7 @@ const loadIcon = async (isDark: boolean): Promise<Uint8Array | null> => {
     const iconName = isDark ? 'icon-dark.png' : 'icon-light.png';
     if (iconCache[iconName]) return iconCache[iconName];
     try {
-        const response = await fetch(`/icons/${iconName}`);
+        const response = await fetch(publicAsset(`icons/${iconName}`));
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
@@ -367,7 +368,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             {!isInitialLoadDone && (
                 <div className={`fixed inset-0 w-full h-full flex flex-col items-center justify-center z-[9999] transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-110 blur-sm' : 'opacity-100'} ${isSystemDark ? 'bg-black' : 'bg-white'} dark:bg-black`}>
                     <div className="flex flex-col items-center justify-center space-y-12">
-                        <img src="/logo.png" alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
+                        <img src={LOGO_PATH} alt="Logo" className={`w-32 h-32 transition-transform duration-700 ${isTransitioning ? 'rotate-12 scale-110' : ''}`} />
                         <div className="w-10 h-10 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                     </div>
                 </div>
