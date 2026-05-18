@@ -12,6 +12,24 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.5",
+        date: "2026-05-18",
+        title: "Correctif Catalina SystemJS",
+        changes: [
+            "Correction de la résolution du bundle legacy SystemJS sur le protocole `tauri://` de macOS Catalina.",
+            "Forçage de l'import legacy vers `tauri://localhost/assets/...` pour éviter le fallback HTML et l'erreur `Unexpected token '<'`.",
+            "Conservation de Vite 8/Rolldown pour les builds modern et Apple Silicon.",
+            "Maintien du build legacy-only pour les Mac Intel/Catalina."
+        ],
+        features: [
+            {
+                title: "Catalina plus compatible",
+                description: "Le vieux WebKit charge l'entry legacy depuis l'origine Tauri correcte.",
+                icon: "Monitor"
+            }
+        ]
+    },
+    {
         version: "1.0.4",
         date: "2026-05-18",
         title: "Correctif CSP Mac Intel",

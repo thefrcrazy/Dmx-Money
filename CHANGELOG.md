@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.5 - 2026-05-18
+
+- Correction du chargement SystemJS legacy sur macOS Catalina.
+- Forçage de l'URL du bundle legacy vers `tauri://localhost/assets/...` dans le vieux WebKit.
+- Conservation de Vite 8/Rolldown pour les builds modern et Apple Silicon.
+- Build Mac Intel toujours réservé au preset legacy.
+
 ## 1.0.4 - 2026-05-18
 
 - Correction du blocage CSP sur Mac Intel/Catalina.
