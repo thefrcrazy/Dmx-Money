@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.6 - 2026-05-21
+
+- Ajout de transactions fictives dans Prédictions pour simuler des dépenses, revenus ou virements sans modifier le journal.
+- Édition et suppression des simulations directement depuis la page Prédictions.
+- Activation/désactivation individuelle des simulations via checkbox pour tester rapidement plusieurs scénarios.
+- Conservation locale des simulations et compatibilité avec les anciennes simulations déjà enregistrées.
+
 ## 1.0.5 - 2026-05-18
 
 - Correction du chargement SystemJS legacy sur macOS Catalina.

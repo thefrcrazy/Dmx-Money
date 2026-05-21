@@ -1,11 +1,41 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useBank } from '../context/BankContext';
+import { useToast } from '../context/ToastContext';
 import { format, addMonths, endOfMonth, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { ArrowRightLeft, Edit2, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import Button from '../components/ui/Button';
+import FormPopup from '../components/ui/FormPopup';
+import Input from '../components/ui/Input';
+import SearchableSelect from '../components/ui/SearchableSelect';
+import { TransactionType } from '../types';
+import { formatCurrency } from '../utils/format';
 
 type PredictionTimeRange = 'week' | 'month' | '2months' | '3months' | '6months' | '9months' | 'year' | 'custom';
+
+interface PredictionFakeTransaction {
+    id: string;
+    date: string;
+    accountId: string;
+    type: TransactionType;
+    amount: number;
+    category: string;
+    description: string;
+    enabled: boolean;
+    toAccountId?: string;
+}
+
+interface FakeTransactionFormData {
+    date: string;
+    description: string;
+    amount: string;
+    type: TransactionType;
+    accountId: string;
+    toAccountId: string;
+    categoryId: string;
+}
 
 interface AlertCrossingMarker {
     date: string;
@@ -24,6 +54,7 @@ const PREDICTION_TIME_RANGE_STORAGE_KEY = 'dmxmoney.predictions.timeRange';
 const PREDICTION_CUSTOM_END_DATE_STORAGE_KEY = 'dmxmoney.predictions.customEndDate';
 const PREDICTION_ALERT_THRESHOLD_STORAGE_KEY = 'dmxmoney.predictions.alertThreshold';
 const PREDICTION_MONTH_START_STORAGE_KEY = 'dmxmoney.predictions.monthStartsOnFirst';
+const PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY = 'dmxmoney.predictions.fakeTransactions';
 
 const PREDICTION_TIME_RANGES: PredictionTimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
 
@@ -83,6 +114,43 @@ const getStoredMonthStartsOnFirst = () => {
         return stored === null ? true : stored === 'true';
     } catch {
         return true;
+    }
+};
+
+const isPredictionFakeTransaction = (value: unknown): value is PredictionFakeTransaction => {
+    if (!value || typeof value !== 'object') return false;
+
+    const item = value as Partial<PredictionFakeTransaction>;
+    return (
+        typeof item.id === 'string'
+        && typeof item.date === 'string'
+        && typeof item.accountId === 'string'
+        && (item.type === 'income' || item.type === 'expense' || item.type === 'transfer')
+        && typeof item.amount === 'number'
+        && Number.isFinite(item.amount)
+        && item.amount > 0
+        && typeof item.description === 'string'
+        && typeof item.category === 'string'
+        && (item.enabled === undefined || typeof item.enabled === 'boolean')
+    );
+};
+
+const getStoredFakeTransactions = (): PredictionFakeTransaction[] => {
+    try {
+        const stored = localStorage.getItem(PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY);
+        if (!stored) return [];
+
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+            .filter(isPredictionFakeTransaction)
+            .map(transaction => ({
+                ...transaction,
+                enabled: transaction.enabled !== false
+            }));
+    } catch {
+        return [];
     }
 };
 
@@ -170,17 +238,52 @@ const CustomTooltip = ({ active, payload, negativeMarkerByDate, alertThreshold }
 };
 
 const Predictions: React.FC = () => {
-    const { accounts: allAccounts, scheduled: allScheduled, transactions: allTransactions, filterAccount } = useBank();
+    const { accounts: allAccounts, scheduled: allScheduled, transactions: allTransactions, categories, filterAccount } = useBank();
+    const { showToast } = useToast();
     const [timeRange, setTimeRange] = useState<PredictionTimeRange>(getStoredPredictionTimeRange);
     const [customEndDate, setCustomEndDate] = useState(getStoredCustomEndDate);
     const [alertThreshold, setAlertThreshold] = useState(getStoredAlertThreshold);
     const [monthStartsOnFirst, setMonthStartsOnFirst] = useState(getStoredMonthStartsOnFirst);
+    const [fakeTransactions, setFakeTransactions] = useState<PredictionFakeTransaction[]>(getStoredFakeTransactions);
+    const [isFakeTransactionModalOpen, setIsFakeTransactionModalOpen] = useState(false);
+    const [editingFakeTransaction, setEditingFakeTransaction] = useState<PredictionFakeTransaction | null>(null);
+    const [fakeTransactionForm, setFakeTransactionForm] = useState<FakeTransactionFormData>({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        description: '',
+        amount: '',
+        type: 'expense',
+        accountId: '',
+        toAccountId: '',
+        categoryId: ''
+    });
 
     const accounts = useMemo(() => filterAccount.length === 0 ? allAccounts : allAccounts.filter(a => filterAccount.includes(a.id)), [allAccounts, filterAccount]);
     const transactions = useMemo(() => filterAccount.length === 0 ? allTransactions : allTransactions.filter(t => filterAccount.includes(t.accountId)), [allTransactions, filterAccount]);
     const scheduled = useMemo(() => filterAccount.length === 0 ? allScheduled : allScheduled.filter(s =>
         filterAccount.includes(s.accountId) || (s.type === 'transfer' && s.toAccountId && filterAccount.includes(s.toAccountId))
     ), [allScheduled, filterAccount]);
+    const appliedFakeTransactions = useMemo(() => filterAccount.length === 0 ? fakeTransactions : fakeTransactions.filter(transaction =>
+        filterAccount.includes(transaction.accountId) || (transaction.type === 'transfer' && !!transaction.toAccountId && filterAccount.includes(transaction.toAccountId))
+    ), [fakeTransactions, filterAccount]);
+    const enabledFakeTransactions = useMemo(() => appliedFakeTransactions.filter(transaction => transaction.enabled), [appliedFakeTransactions]);
+    const accountMap = useMemo(() => new Map(allAccounts.map(account => [account.id, account])), [allAccounts]);
+    const categoryMap = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);
+    const categoryOptions = useMemo(() => categories
+        .filter(category => category.id !== 'transfer')
+        .map(category => ({ id: category.id, label: category.name, icon: category.icon, color: category.color }))
+    , [categories]);
+    const visibleAccountOptions = useMemo(() => accounts.map(account => ({
+        id: account.id,
+        label: account.name,
+        icon: account.icon || 'Wallet',
+        color: account.color
+    })), [accounts]);
+    const allAccountOptions = useMemo(() => allAccounts.map(account => ({
+        id: account.id,
+        label: account.name,
+        icon: account.icon || 'Wallet',
+        color: account.color
+    })), [allAccounts]);
 
     // Calculate current total balance
     const currentTotalBalance = useMemo(() => {
@@ -204,6 +307,10 @@ const Predictions: React.FC = () => {
     useEffect(() => {
         localStorage.setItem(PREDICTION_MONTH_START_STORAGE_KEY, String(monthStartsOnFirst));
     }, [monthStartsOnFirst]);
+
+    useEffect(() => {
+        localStorage.setItem(PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY, JSON.stringify(fakeTransactions));
+    }, [fakeTransactions]);
 
     const todayInputValue = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
@@ -248,6 +355,29 @@ const Predictions: React.FC = () => {
 
             const dateStr = format(transactionDate, 'yyyy-MM-dd');
             const amount = Math.round((transaction.type === 'income' ? transaction.amount : -transaction.amount) * 100);
+            dailyImpacts[transaction.accountId][dateStr] = (dailyImpacts[transaction.accountId][dateStr] || 0) + amount;
+        });
+
+        enabledFakeTransactions.forEach(transaction => {
+            const transactionDate = parseLocalDate(transaction.date);
+            if (transactionDate < startDate || transactionDate > endDate) return;
+
+            const dateStr = format(transactionDate, 'yyyy-MM-dd');
+            const amountCents = Math.round(transaction.amount * 100);
+
+            if (transaction.type === 'transfer') {
+                if (dailyImpacts[transaction.accountId]) {
+                    dailyImpacts[transaction.accountId][dateStr] = (dailyImpacts[transaction.accountId][dateStr] || 0) - amountCents;
+                }
+                if (transaction.toAccountId && dailyImpacts[transaction.toAccountId]) {
+                    dailyImpacts[transaction.toAccountId][dateStr] = (dailyImpacts[transaction.toAccountId][dateStr] || 0) + amountCents;
+                }
+                return;
+            }
+
+            if (!dailyImpacts[transaction.accountId]) return;
+
+            const amount = transaction.type === 'income' ? amountCents : -amountCents;
             dailyImpacts[transaction.accountId][dateStr] = (dailyImpacts[transaction.accountId][dateStr] || 0) + amount;
         });
 
@@ -373,10 +503,34 @@ const Predictions: React.FC = () => {
             data.push(dayData);
         }
         return data;
-    }, [accounts, transactions, scheduled, projectionRange]);
+    }, [accounts, transactions, enabledFakeTransactions, scheduled, projectionRange]);
 
     const midpointPrediction = predictionData[Math.floor((predictionData.length - 1) / 2)]?.total ?? currentTotalBalance;
     const finalPrediction = predictionData[predictionData.length - 1]?.total ?? currentTotalBalance;
+    const fakeTransactionsImpact = useMemo(() => {
+        const visibleAccountIds = new Set(accounts.map(account => account.id));
+
+        return enabledFakeTransactions.reduce((sum, transaction) => {
+            const transactionDate = parseLocalDate(transaction.date);
+            if (transactionDate < projectionRange.startDate || transactionDate > projectionRange.endDate) return sum;
+
+            if (transaction.type === 'transfer') {
+                const sourceImpact = visibleAccountIds.has(transaction.accountId) ? -transaction.amount : 0;
+                const destinationImpact = transaction.toAccountId && visibleAccountIds.has(transaction.toAccountId) ? transaction.amount : 0;
+                return sum + sourceImpact + destinationImpact;
+            }
+
+            if (!visibleAccountIds.has(transaction.accountId)) return sum;
+            return sum + (transaction.type === 'income' ? transaction.amount : -transaction.amount);
+        }, 0);
+    }, [accounts, enabledFakeTransactions, projectionRange.endDate, projectionRange.startDate]);
+
+    const sortedAppliedFakeTransactions = useMemo(() => [...appliedFakeTransactions].sort((a, b) => {
+        const dateDiff = parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return a.description.localeCompare(b.description);
+    }), [appliedFakeTransactions]);
+
     const negativeCrossingMarkers = useMemo(() => {
         const watchedKeys = ['total', ...accounts.map(account => account.id)];
         const markers = new Map<string, AlertCrossingMarker>();
@@ -432,6 +586,178 @@ const Predictions: React.FC = () => {
         return format(new Date(tickItem), 'dd MMM', { locale: fr });
     };
 
+    const resetFakeTransactionForm = () => {
+        const defaultAccountId = accounts[0]?.id || allAccounts[0]?.id || '';
+        const defaultToAccountId = allAccounts.find(account => account.id !== defaultAccountId)?.id || '';
+
+        setFakeTransactionForm({
+            date: todayInputValue,
+            description: '',
+            amount: '',
+            type: 'expense',
+            accountId: defaultAccountId,
+            toAccountId: defaultToAccountId,
+            categoryId: categoryOptions[0]?.id || ''
+        });
+    };
+
+    const openFakeTransactionModal = () => {
+        setEditingFakeTransaction(null);
+        resetFakeTransactionForm();
+        setIsFakeTransactionModalOpen(true);
+    };
+
+    const openEditFakeTransactionModal = (transaction: PredictionFakeTransaction) => {
+        setEditingFakeTransaction(transaction);
+        setFakeTransactionForm({
+            date: transaction.date,
+            description: transaction.description,
+            amount: String(transaction.amount),
+            type: transaction.type,
+            accountId: transaction.accountId,
+            toAccountId: transaction.toAccountId || '',
+            categoryId: transaction.type === 'transfer' ? 'transfer' : transaction.category
+        });
+        setIsFakeTransactionModalOpen(true);
+    };
+
+    const closeFakeTransactionModal = () => {
+        setIsFakeTransactionModalOpen(false);
+        setEditingFakeTransaction(null);
+    };
+
+    const handleFakeTransactionTypeChange = (type: string) => {
+        const nextType = type as TransactionType;
+        setFakeTransactionForm(prev => {
+            const nextAccountId = prev.accountId || accounts[0]?.id || allAccounts[0]?.id || '';
+            const nextToAccountId = prev.toAccountId && prev.toAccountId !== nextAccountId
+                ? prev.toAccountId
+                : allAccounts.find(account => account.id !== nextAccountId)?.id || '';
+
+            return {
+                ...prev,
+                type: nextType,
+                accountId: nextAccountId,
+                toAccountId: nextType === 'transfer' ? nextToAccountId : prev.toAccountId,
+                categoryId: nextType === 'transfer' ? 'transfer' : (prev.categoryId === 'transfer' ? categoryOptions[0]?.id || '' : prev.categoryId)
+            };
+        });
+    };
+
+    const handleFakeTransactionAccountChange = (accountId: string) => {
+        setFakeTransactionForm(prev => ({
+            ...prev,
+            accountId,
+            toAccountId: prev.type === 'transfer' && prev.toAccountId === accountId
+                ? allAccounts.find(account => account.id !== accountId)?.id || ''
+                : prev.toAccountId
+        }));
+    };
+
+    const handleSubmitFakeTransaction = (event: React.FormEvent) => {
+        event.preventDefault();
+
+        const amount = Number(fakeTransactionForm.amount);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fakeTransactionForm.date)) {
+            showToast("Sélectionnez une date valide", "error");
+            return;
+        }
+
+        const selectedDate = parseLocalDate(fakeTransactionForm.date);
+        const today = parseLocalDate(todayInputValue);
+        if (selectedDate < today) {
+            showToast("La date doit être aujourd'hui ou dans le futur", "error");
+            return;
+        }
+
+        if (!fakeTransactionForm.accountId) {
+            showToast("Sélectionnez un compte", "error");
+            return;
+        }
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            showToast("Saisissez un montant valide", "error");
+            return;
+        }
+
+        if (fakeTransactionForm.type !== 'transfer' && !fakeTransactionForm.categoryId) {
+            showToast("Sélectionnez une catégorie", "error");
+            return;
+        }
+
+        if (fakeTransactionForm.type === 'transfer' && (!fakeTransactionForm.toAccountId || fakeTransactionForm.toAccountId === fakeTransactionForm.accountId)) {
+            showToast("Sélectionnez un compte destination différent", "error");
+            return;
+        }
+
+        const nextTransaction: PredictionFakeTransaction = {
+            id: editingFakeTransaction?.id || uuidv4(),
+            date: fakeTransactionForm.date,
+            accountId: fakeTransactionForm.accountId,
+            type: fakeTransactionForm.type,
+            amount,
+            category: fakeTransactionForm.type === 'transfer' ? 'transfer' : fakeTransactionForm.categoryId,
+            description: fakeTransactionForm.description.trim() || 'Transaction fictive',
+            enabled: editingFakeTransaction?.enabled ?? true,
+            toAccountId: fakeTransactionForm.type === 'transfer' ? fakeTransactionForm.toAccountId : undefined
+        };
+
+        setFakeTransactions(prev => editingFakeTransaction
+            ? prev.map(transaction => transaction.id === editingFakeTransaction.id ? nextTransaction : transaction)
+            : [...prev, nextTransaction]
+        );
+        closeFakeTransactionModal();
+        showToast(editingFakeTransaction ? "Transaction fictive mise à jour" : "Transaction fictive ajoutée", "success");
+    };
+
+    const toggleFakeTransactionEnabled = (id: string) => {
+        setFakeTransactions(prev => prev.map(transaction => transaction.id === id
+            ? { ...transaction, enabled: !transaction.enabled }
+            : transaction
+        ));
+    };
+
+    const removeFakeTransaction = (id: string) => {
+        setFakeTransactions(prev => prev.filter(transaction => transaction.id !== id));
+        showToast("Transaction fictive retirée", "success");
+    };
+
+    const clearAppliedFakeTransactions = () => {
+        const appliedIds = new Set(appliedFakeTransactions.map(transaction => transaction.id));
+        setFakeTransactions(prev => prev.filter(transaction => !appliedIds.has(transaction.id)));
+        showToast("Transactions fictives retirées", "success");
+    };
+
+    const getFakeTransactionTypeMeta = (transaction: PredictionFakeTransaction) => {
+        if (transaction.type === 'income') {
+            return {
+                label: 'Revenu',
+                icon: TrendingUp,
+                amountPrefix: '+',
+                amountClassName: 'text-emerald-600 dark:text-emerald-400',
+                iconClassName: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+            };
+        }
+
+        if (transaction.type === 'transfer') {
+            return {
+                label: 'Virement',
+                icon: ArrowRightLeft,
+                amountPrefix: '',
+                amountClassName: 'text-blue-600 dark:text-blue-400',
+                iconClassName: 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+            };
+        }
+
+        return {
+            label: 'Dépense',
+            icon: TrendingDown,
+            amountPrefix: '-',
+            amountClassName: 'text-red-600 dark:text-red-400',
+            iconClassName: 'bg-red-500/10 text-red-600 dark:text-red-400'
+        };
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -468,6 +794,130 @@ const Predictions: React.FC = () => {
                         />
                     </div>
                 </div>
+            </div>
+
+            <div className="app-card p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200">Transactions fictives</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Elles modifient uniquement cette projection et ne sont pas ajoutées au journal.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {appliedFakeTransactions.length > 0 && (
+                            <Button variant="secondary" size="sm" icon={Trash2} onClick={clearAppliedFakeTransactions}>
+                                Tout retirer
+                            </Button>
+                        )}
+                        <Button size="sm" icon={Plus} onClick={openFakeTransactionModal} disabled={accounts.length === 0}>
+                            Ajouter
+                        </Button>
+                    </div>
+                </div>
+
+                {appliedFakeTransactions.length > 0 ? (
+                    <div className="mt-4">
+                        <div className="mb-3 flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+                            <span>
+                                {enabledFakeTransactions.length}/{appliedFakeTransactions.length} simulation{appliedFakeTransactions.length > 1 ? 's' : ''} active{enabledFakeTransactions.length === 1 ? '' : 's'}
+                            </span>
+                            <span className={`font-semibold tabular-nums ${fakeTransactionsImpact >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                Impact période : {fakeTransactionsImpact >= 0 ? '+' : ''}{formatCurrency(fakeTransactionsImpact)}
+                            </span>
+                        </div>
+
+                        <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-neutral-800">
+                            <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+                                {sortedAppliedFakeTransactions.map(transaction => {
+                                    const sourceAccount = accountMap.get(transaction.accountId);
+                                    const destinationAccount = transaction.toAccountId ? accountMap.get(transaction.toAccountId) : undefined;
+                                    const category = categoryMap.get(transaction.category);
+                                    const meta = getFakeTransactionTypeMeta(transaction);
+                                    const Icon = meta.icon;
+
+                                    return (
+                                        <div key={transaction.id} className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${transaction.enabled ? '' : 'bg-gray-50/70 opacity-70 dark:bg-neutral-900/50'}`}>
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={transaction.enabled}
+                                                    onChange={() => toggleFakeTransactionEnabled(transaction.id)}
+                                                    className="h-4 w-4 flex-none rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-neutral-600"
+                                                    aria-label={transaction.enabled ? "Désactiver cette transaction fictive" : "Activer cette transaction fictive"}
+                                                    title={transaction.enabled ? "Désactiver cette transaction fictive" : "Activer cette transaction fictive"}
+                                                />
+                                                <div className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg ${meta.iconClassName}`}>
+                                                    <Icon className="h-4 w-4" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                        <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-200">
+                                                            {transaction.description}
+                                                        </span>
+                                                        <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-neutral-800 dark:text-gray-300">
+                                                            {meta.label}
+                                                        </span>
+                                                        {!transaction.enabled && (
+                                                            <span className="rounded-md bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-neutral-700 dark:text-gray-400">
+                                                                Désactivée
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                                        <span>{format(parseLocalDate(transaction.date), 'dd MMM yyyy', { locale: fr })}</span>
+                                                        <span>•</span>
+                                                        <span>{sourceAccount?.name || 'Compte supprimé'}</span>
+                                                        {transaction.type === 'transfer' && (
+                                                            <>
+                                                                <span>→</span>
+                                                                <span>{destinationAccount?.name || 'Compte supprimé'}</span>
+                                                            </>
+                                                        )}
+                                                        {transaction.type !== 'transfer' && category && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span>{category.name}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-3 sm:justify-end">
+                                                <span className={`text-sm font-semibold tabular-nums ${transaction.enabled ? meta.amountClassName : 'text-gray-400 dark:text-gray-500'}`}>
+                                                    {meta.amountPrefix}{formatCurrency(transaction.amount)}
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        icon={Edit2}
+                                                        onClick={() => openEditFakeTransactionModal(transaction)}
+                                                        className="h-8 w-8"
+                                                        title="Modifier cette transaction fictive"
+                                                    />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        icon={Trash2}
+                                                        onClick={() => removeFakeTransaction(transaction.id)}
+                                                        className="h-8 w-8 text-red-500 hover:text-red-600"
+                                                        title="Retirer cette transaction fictive"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mt-4 rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-neutral-800 dark:text-gray-400">
+                        Aucune transaction fictive appliquée à cette projection.
+                    </div>
+                )}
             </div>
 
             <div className="app-card p-6">
@@ -586,6 +1036,84 @@ const Predictions: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <FormPopup
+                isOpen={isFakeTransactionModalOpen}
+                onClose={closeFakeTransactionModal}
+                title={editingFakeTransaction ? "Modifier la transaction fictive" : "Nouvelle transaction fictive"}
+                onSubmit={handleSubmitFakeTransaction}
+                submitLabel={editingFakeTransaction ? "Enregistrer" : "Ajouter"}
+                maxWidth="xl"
+            >
+                <div className="space-y-4">
+                    <Input
+                        label="Description"
+                        value={fakeTransactionForm.description}
+                        onChange={(event) => setFakeTransactionForm(prev => ({ ...prev, description: event.target.value }))}
+                        placeholder="Ex: Réparation voiture"
+                    />
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Input
+                            label="Montant"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            required
+                            value={fakeTransactionForm.amount}
+                            onChange={(event) => setFakeTransactionForm(prev => ({ ...prev, amount: event.target.value }))}
+                            rightElement="€"
+                            placeholder="0.00"
+                        />
+                        <SearchableSelect
+                            label="Type"
+                            value={fakeTransactionForm.type}
+                            onChange={handleFakeTransactionTypeChange}
+                            options={[
+                                { id: 'expense', label: 'Dépense', icon: 'TrendingDown', color: '#ef4444' },
+                                { id: 'income', label: 'Revenu', icon: 'TrendingUp', color: '#10b981' },
+                                { id: 'transfer', label: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <SearchableSelect
+                            label={fakeTransactionForm.type === 'transfer' ? 'Compte source' : 'Compte'}
+                            value={fakeTransactionForm.accountId}
+                            onChange={handleFakeTransactionAccountChange}
+                            options={fakeTransactionForm.type === 'transfer' ? allAccountOptions : visibleAccountOptions}
+                            placeholder="Sélectionner un compte"
+                        />
+                        <Input
+                            label="Date"
+                            type="date"
+                            min={todayInputValue}
+                            required
+                            value={fakeTransactionForm.date}
+                            onChange={(event) => setFakeTransactionForm(prev => ({ ...prev, date: event.target.value }))}
+                        />
+                    </div>
+
+                    {fakeTransactionForm.type === 'transfer' ? (
+                        <SearchableSelect
+                            label="Compte destination"
+                            value={fakeTransactionForm.toAccountId}
+                            onChange={(value) => setFakeTransactionForm(prev => ({ ...prev, toAccountId: value }))}
+                            options={allAccountOptions.filter(account => account.id !== fakeTransactionForm.accountId)}
+                            placeholder="Sélectionner un compte"
+                        />
+                    ) : (
+                        <SearchableSelect
+                            label="Catégorie"
+                            value={fakeTransactionForm.categoryId}
+                            onChange={(value) => setFakeTransactionForm(prev => ({ ...prev, categoryId: value }))}
+                            options={categoryOptions}
+                            placeholder="Sélectionner une catégorie"
+                        />
+                    )}
+                </div>
+            </FormPopup>
         </div>
     );
 };

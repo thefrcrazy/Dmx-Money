@@ -12,6 +12,24 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.6",
+        date: "2026-05-21",
+        title: "Prévisions avec simulations",
+        changes: [
+            "Ajout de transactions fictives dans Prédictions pour simuler des dépenses, revenus ou virements sans modifier le journal.",
+            "Édition et suppression des simulations directement depuis la page Prédictions.",
+            "Activation/désactivation individuelle des simulations via checkbox pour tester rapidement plusieurs scénarios.",
+            "Conservation locale des simulations et compatibilité avec les anciennes simulations déjà enregistrées."
+        ],
+        features: [
+            {
+                title: "Scénarios de trésorerie",
+                description: "Les prévisions peuvent intégrer des transactions fictives activables à la demande pour comparer plusieurs hypothèses.",
+                icon: "TrendingUp"
+            }
+        ]
+    },
+    {
         version: "1.0.5",
         date: "2026-05-18",
         title: "Correctif Catalina SystemJS",
