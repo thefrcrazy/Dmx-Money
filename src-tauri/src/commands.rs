@@ -1,7 +1,7 @@
 use crate::db::DbPool;
 use crate::models::{
-    Account, AppData, Budget, Category, ScheduledTransaction, Settings, Transaction, WindowPosition,
-    WindowSize,
+    Account, AppData, Budget, Category, ScheduledTransaction, Settings, Transaction,
+    WindowPosition, WindowSize,
 };
 use tauri::{command, State};
 
@@ -9,14 +9,14 @@ use tauri::{command, State};
 fn map_db_error(e: sqlx::Error, context: &str) -> String {
     let err_msg = e.to_string();
     log::error!("Database Error during {context}: {err_msg}");
-    
+
     if err_msg.contains("FOREIGN KEY constraint failed") {
         return "Impossible de supprimer cet élément car il est utilisé ailleurs.".to_string();
     }
     if err_msg.contains("UNIQUE constraint failed") {
         return "Un élément avec cet identifiant existe déjà.".to_string();
     }
-    
+
     format!("Erreur BDD ({context}): {err_msg}")
 }
 
@@ -169,14 +169,13 @@ pub async fn delete_transaction(pool: State<'_, DbPool>, id: String) -> Result<(
         .await
         .map_err(|e| map_db_error(e, "début de suppression de transaction"))?;
 
-    let linked_transaction_id: Option<String> = sqlx::query_scalar(
-        "SELECT \"linkedTransactionId\" FROM transactions WHERE id = $1",
-    )
-    .bind(&id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|e| map_db_error(e, "récupération du virement lié"))?
-    .flatten();
+    let linked_transaction_id: Option<String> =
+        sqlx::query_scalar("SELECT \"linkedTransactionId\" FROM transactions WHERE id = $1")
+            .bind(&id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| map_db_error(e, "récupération du virement lié"))?
+            .flatten();
 
     if let Some(linked_id) = linked_transaction_id {
         sqlx::query("DELETE FROM transactions WHERE id = $1 OR id = $2")
@@ -392,16 +391,19 @@ pub async fn delete_scheduled(pool: State<'_, DbPool>, id: String) -> Result<(),
 #[command]
 pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), String> {
     log::info!("Invoked import_data with {} accounts", data.accounts.len());
-    let mut tx = pool.begin().await.map_err(|e| map_db_error(e, "début de transaction d'import"))?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| map_db_error(e, "début de transaction d'import"))?;
 
     // STEP 1: DELETE ALL EXISTING DATA
     log::info!("Clearing existing database data...");
-    
+
     sqlx::query("DELETE FROM transactions")
         .execute(&mut *tx)
         .await
         .map_err(|e| map_db_error(e, "nettoyage des transactions"))?;
-    
+
     sqlx::query("DELETE FROM scheduled_transactions")
         .execute(&mut *tx)
         .await
@@ -411,12 +413,12 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
         .execute(&mut *tx)
         .await
         .map_err(|e| map_db_error(e, "nettoyage des budgets"))?;
-    
+
     sqlx::query("DELETE FROM accounts")
         .execute(&mut *tx)
         .await
         .map_err(|e| map_db_error(e, "nettoyage des comptes"))?;
-    
+
     sqlx::query("DELETE FROM categories")
         .execute(&mut *tx)
         .await
@@ -503,7 +505,9 @@ pub async fn import_data(pool: State<'_, DbPool>, data: AppData) -> Result<(), S
         .map_err(|e| map_db_error(e, "import d'échéance"))?;
     }
 
-    tx.commit().await.map_err(|e| map_db_error(e, "validation finale de l'import"))?;
+    tx.commit()
+        .await
+        .map_err(|e| map_db_error(e, "validation finale de l'import"))?;
     log::info!("Import data completed successfully");
     Ok(())
 }
@@ -600,7 +604,9 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
         (None, None)
     };
 
-    let display_style = settings.display_style.unwrap_or_else(|| "modern".to_string());
+    let display_style = settings
+        .display_style
+        .unwrap_or_else(|| "modern".to_string());
 
     sqlx::query(
         "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\")

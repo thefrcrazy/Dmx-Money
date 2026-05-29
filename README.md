@@ -2,7 +2,7 @@
 
 DmxMoney est une application desktop de gestion financière personnelle, construite avec Tauri, Rust, React et SQLite. Elle stocke les données en local, propose un journal de transactions complet, des budgets, un échéancier, des analyses et un système de mise à jour signé via GitHub Releases.
 
-Version actuelle du projet : `1.0.6`.
+Version actuelle du projet : `1.0.7`.
 
 ## Points Forts
 

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Account {
     pub id: String,
     pub name: String,
@@ -30,7 +30,7 @@ fn default_icon() -> String {
     "Wallet".to_string()
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Transaction {
     pub id: String,
     pub date: String,
@@ -54,7 +54,7 @@ pub struct Transaction {
     pub linked_transaction_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Category {
     pub id: String,
     pub name: String,
@@ -62,7 +62,7 @@ pub struct Category {
     pub color: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ScheduledTransaction {
     pub id: String,
     pub description: String,
@@ -92,7 +92,7 @@ pub struct ScheduledTransaction {
     pub end_date: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Budget {
     pub id: String,
     pub name: String,
@@ -103,7 +103,7 @@ pub struct Budget {
     pub account_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppData {
     pub accounts: Vec<Account>,
     pub transactions: Vec<Transaction>,
@@ -113,19 +113,19 @@ pub struct AppData {
     pub budgets: Vec<Budget>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowPosition {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowSize {
     pub width: i32,
     pub height: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub theme: String,
     #[serde(rename = "primaryColor")]

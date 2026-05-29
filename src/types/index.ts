@@ -101,6 +101,10 @@ export interface BankContextType {
     filterAccount: string[];
     setFilterAccount: (ids: string[]) => void;
     isLoading: boolean;
+    mobileConnectionState: 'idle' | 'disconnected' | 'connecting' | 'connected' | 'offline' | 'error';
+    mobileConnectionError: string | null;
+    connectMobileCompanion: () => Promise<void>;
+    unlinkMobileCompanion: () => Promise<void>;
 }
 
 export type Theme = 'light' | 'dark' | 'system';

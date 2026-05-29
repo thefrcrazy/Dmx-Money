@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { getCurrentWindow, PhysicalPosition, PhysicalSize, LogicalSize } from '@tauri-apps/api/window';
 import { Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
 import { generatePalette, formatRgb } from '../utils/colors';
 import { LATEST_VERSION } from '../constants/changelog';
 import { LOGO_PATH, publicAsset } from '../utils/assets';
+import { hasTauriRuntime } from '../utils/runtime';
 
 const iconCache: Record<string, Uint8Array> = {};
 
@@ -63,8 +63,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, [settings]);
 
     const updateWindowIcon = (isDark: boolean) => {
+        if (!hasTauriRuntime()) return;
         loadIcon(isDark).then(icon => {
-            if (icon) getCurrentWindow().setIcon(icon).catch(() => { });
+            if (!icon) return;
+            import('@tauri-apps/api/window')
+                .then(({ getCurrentWindow }) => getCurrentWindow().setIcon(icon))
+                .catch(() => { });
         });
     };
 
@@ -119,9 +123,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const restoreWindow = async (currentSettings: Settings) => {
+        if (!hasTauriRuntime()) return;
         if (isRestoringRef.current) return;
         isRestoringRef.current = true;
         try {
+            const { getCurrentWindow, PhysicalPosition, PhysicalSize, LogicalSize } = await import('@tauri-apps/api/window');
             const appWindow = getCurrentWindow();
             await appWindow.setResizable(true);
             await appWindow.setDecorations(true);
@@ -193,6 +199,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, []);
 
     useEffect(() => {
+        if (!hasTauriRuntime()) return;
         if (isInitialLoadDone && isLoadedRef.current) {
             setTimeout(() => {
                 restoreWindow(settingsRef.current);
@@ -201,9 +208,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, [isInitialLoadDone]);
 
     useEffect(() => {
+        if (!hasTauriRuntime()) return;
         let unlistenMove: (() => void) | undefined;
         let unlistenResize: (() => void) | undefined;
         const setupListeners = async () => {
+            const { getCurrentWindow } = await import('@tauri-apps/api/window');
             const appWindow = getCurrentWindow();
             unlistenMove = await appWindow.listen('tauri://move', async () => {
                 if (isRestoringRef.current) return;

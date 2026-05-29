@@ -232,6 +232,25 @@ const Transactions: React.FC = () => {
         getTransactionBudgetRemaining
     ]);
 
+    const mobileGroupedTransactions = useMemo(() => {
+        const groups = new Map<string, TransactionWithBalance[]>();
+        displayTransactions.forEach(transaction => {
+            const key = transaction.date;
+            groups.set(key, [...(groups.get(key) || []), transaction]);
+        });
+
+        return Array.from(groups.entries()).map(([date, items]) => ({
+            date,
+            label: formatDate(date, 'EEEE d MMM'),
+            items
+        }));
+    }, [displayTransactions]);
+
+    const activeFilterCount = filterCategories.length + filterTypes.length + filterStatuses.length + filterBudgets.length;
+    const mobileVisibleNet = useMemo(() => displayTransactions.reduce((sum, transaction) => (
+        sum + (transaction.type === 'income' ? transaction.amount : -transaction.amount)
+    ), 0), [displayTransactions]);
+
     const handleOpenModal = (transaction?: Transaction) => {
         if (transaction) {
             setEditingTransaction(transaction);
@@ -369,13 +388,74 @@ const Transactions: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col min-h-0 space-y-6">
-            <div className="flex items-center justify-between gap-4 px-1 flex-none">
+        <div className="flex-1 flex flex-col min-h-0 space-y-4 md:space-y-6">
+            <div className="hidden md:flex items-center justify-between gap-4 px-1 flex-none">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Journal</h2>
                 <Button onClick={() => handleOpenModal()} size="sm" icon={Plus}>Nouvelle</Button>
             </div>
 
-            <div className="flex flex-col xl:flex-row gap-3 px-1 flex-none">
+            <div className="md:hidden space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Lignes</div>
+                        <div className="mt-1 text-lg font-bold text-gray-950 dark:text-white">{displayTransactions.length}</div>
+                    </div>
+                    <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Filtres</div>
+                        <div className="mt-1 text-lg font-bold text-gray-950 dark:text-white">{activeFilterCount}</div>
+                    </div>
+                    <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Net</div>
+                        <div className={`mt-1 text-lg font-bold truncate ${mobileVisibleNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {mobileVisibleNet >= 0 ? '+' : ''}{formatCurrency(mobileVisibleNet)}
+                        </div>
+                    </div>
+                </div>
+
+                <Input
+                    placeholder="Rechercher..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    icon={Search}
+                />
+
+                <div className="grid grid-cols-2 gap-2">
+                    <MultiSelect
+                        value={filterCategories}
+                        onChange={setFilterCategories}
+                        options={categoryFilterOptions}
+                        placeholder="Catégories"
+                        className="w-full min-w-0"
+                        size="sm"
+                    />
+                    <MultiSelect
+                        value={filterTypes}
+                        onChange={setFilterTypes}
+                        options={TRANSACTION_TYPE_FILTER_OPTIONS}
+                        placeholder="Types"
+                        className="w-full min-w-0"
+                        size="sm"
+                    />
+                    <MultiSelect
+                        value={filterStatuses}
+                        onChange={setFilterStatuses}
+                        options={TRANSACTION_STATUS_FILTER_OPTIONS}
+                        placeholder="États"
+                        className="w-full min-w-0"
+                        size="sm"
+                    />
+                    <MultiSelect
+                        value={filterBudgets}
+                        onChange={setFilterBudgets}
+                        options={TRANSACTION_BUDGET_FILTER_OPTIONS}
+                        placeholder="Budgets"
+                        className="w-full min-w-0"
+                        size="sm"
+                    />
+                </div>
+            </div>
+
+            <div className="hidden md:flex flex-col xl:flex-row gap-3 px-1 flex-none">
                 <div className="w-full xl:max-w-sm xl:flex-none">
                     <Input
                         placeholder="Rechercher dans toutes les colonnes..."
@@ -418,8 +498,8 @@ const Transactions: React.FC = () => {
 
             {/* Selection Toolbar */}
             {selectedIds.size > 0 && (
-                <div className="bg-primary-500/10 border border-primary-500/20 p-2 px-4 rounded-xl flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="flex items-center gap-4 text-sm font-semibold text-primary-700 dark:text-primary-400">
+                <div className="bg-primary-500/10 border border-primary-500/20 p-2 px-3 md:px-4 rounded-2xl md:rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="flex items-center gap-3 md:gap-4 text-sm font-semibold text-primary-700 dark:text-primary-400">
                         <span>{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
                         <div className="h-4 w-px bg-primary-500/30"></div>
                         <div className="flex gap-2">
@@ -431,7 +511,7 @@ const Transactions: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex justify-end gap-2">
                         <Button 
                             variant="ghost" 
                             size="sm" 
@@ -452,7 +532,7 @@ const Transactions: React.FC = () => {
                 </div>
             )}
 
-            <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
+            <div className="hidden md:flex flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
                 <Table
                     data={displayTransactions}
                     keyExtractor={(t) => t.id}
@@ -582,6 +662,129 @@ const Transactions: React.FC = () => {
                     ]}
                 />
             </div>
+
+            <div className="md:hidden space-y-3 pb-4">
+                {displayTransactions.length > 0 ? (
+                    mobileGroupedTransactions.map(group => (
+                        <section key={group.date} className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] shadow-sm overflow-hidden">
+                            <div className="px-4 py-2.5 bg-gray-50 dark:bg-white/[0.03] border-b border-black/[0.04] dark:border-white/10">
+                                <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 dark:text-neutral-500 capitalize">{group.label}</h3>
+                            </div>
+                            <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+                                {group.items.map(transaction => {
+                                    const account = accountMap.get(transaction.accountId);
+                                    const category = getCategoryDetails(transaction.category);
+                                    const budgetRemaining = getTransactionBudgetRemaining(transaction);
+                                    const isIncome = transaction.type === 'income';
+                                    const isSelected = selectedIds.has(transaction.id);
+
+                                    return (
+                                        <article key={transaction.id} className={`p-3 transition-colors ${isSelected ? 'bg-primary-50/60 dark:bg-primary-500/10' : ''}`}>
+                                            <div className="flex items-start gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Sélectionner ${transaction.description}`}
+                                                    className="mt-4 w-4 h-4 rounded border-gray-300 dark:border-neutral-700 text-primary-600 focus:ring-primary-500 bg-white dark:bg-neutral-900"
+                                                    checked={isSelected}
+                                                    onChange={() => handleToggleSelect(transaction.id)}
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenModal(transaction)}
+                                                    className="min-w-0 flex-1 text-left"
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <div
+                                                            className="mt-0.5 h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center"
+                                                            style={{ backgroundColor: `${category.color}16`, color: category.color }}
+                                                        >
+                                                            {renderCategoryIcon(category.icon, 'w-5 h-5')}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <p className="text-[15px] font-semibold leading-tight text-gray-950 dark:text-white truncate">
+                                                                    {transaction.description || category.name}
+                                                                </p>
+                                                                <p className={`shrink-0 text-[15px] font-bold tabular-nums ${isIncome ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                                    {isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
+                                                                </p>
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-gray-500 dark:text-neutral-400">
+                                                                <span className="truncate max-w-[120px]">{account?.name || 'Compte'}</span>
+                                                                <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-neutral-700" />
+                                                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-tight" style={{ backgroundColor: `${category.color}14`, color: category.color }}>
+                                                                    {category.name}
+                                                                </span>
+                                                                {budgetRemaining && (
+                                                                    <span className="text-[11px] font-semibold text-indigo-500">
+                                                                        {formatCurrency(budgetRemaining.remaining)} restant
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+
+                                                <div className="flex shrink-0 flex-col items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleTransactionCheck(transaction.id)}
+                                                        className={`rounded-full p-1.5 transition-colors ${transaction.checked ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-gray-300 dark:text-neutral-600 bg-gray-50 dark:bg-white/[0.04]'}`}
+                                                        aria-label={transaction.checked ? 'Dépointer' : 'Pointer'}
+                                                    >
+                                                        {transaction.checked ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenModal(transaction)}
+                                                        className="rounded-full p-1.5 text-gray-400 bg-gray-50 dark:bg-white/[0.04] dark:text-neutral-500"
+                                                        aria-label="Modifier"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTransactionToDelete(transaction.id);
+                                                            setIsDeleteModalOpen(true);
+                                                        }}
+                                                        className="rounded-full p-1.5 text-red-500 bg-red-50 dark:bg-red-500/10"
+                                                        aria-label="Supprimer"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    ))
+                ) : (
+                    <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] p-8 text-center shadow-sm">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-50 dark:bg-neutral-900">
+                            <Search className="h-8 w-8 text-gray-300 dark:text-neutral-700" />
+                        </div>
+                        <p className="text-base font-bold text-gray-950 dark:text-white">Aucune transaction</p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+                            {searchTerm || activeFilterCount > 0
+                                ? 'Aucun résultat pour les filtres actuels.'
+                                : 'Ajoute une transaction pour commencer.'}
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            <button
+                type="button"
+                onClick={() => handleOpenModal()}
+                className="md:hidden fixed right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-50 h-14 w-14 rounded-2xl bg-primary-600 text-white shadow-xl shadow-primary-600/25 flex items-center justify-center active:scale-95 transition-transform"
+                aria-label="Nouvelle transaction"
+            >
+                <Plus className="w-6 h-6" />
+            </button>
 
             <FormPopup isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={async (e) => {

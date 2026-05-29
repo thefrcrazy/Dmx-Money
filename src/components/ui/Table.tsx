@@ -105,7 +105,7 @@ function Table<T>({
 }: TableProps<T>) {
     const [editingCell, setEditingCell] = React.useState<{ rowId: string | number, accessor: keyof T } | null>(null);
     const [editValue, setEditValue] = React.useState<any>("");
-    const bodyRef = React.useRef<HTMLDivElement>(null);
+    const scrollRef = React.useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = React.useState(0);
     const [viewportHeight, setViewportHeight] = React.useState(0);
     
@@ -137,7 +137,7 @@ function Table<T>({
     };
 
     React.useEffect(() => {
-        const element = bodyRef.current;
+        const element = scrollRef.current;
         if (!element) return;
 
         const updateViewportHeight = () => setViewportHeight(element.clientHeight);
@@ -150,7 +150,7 @@ function Table<T>({
     }, []);
 
     React.useEffect(() => {
-        setScrollTop(bodyRef.current?.scrollTop || 0);
+        setScrollTop(scrollRef.current?.scrollTop || 0);
     }, [data.length]);
 
     const totalHeight = data.length * rowHeight;
@@ -258,7 +258,13 @@ function Table<T>({
     };
 
     return (
-        <div className="flex flex-col h-full w-full overflow-hidden bg-transparent">
+        <div
+            ref={scrollRef}
+            data-no-pull-refresh="true"
+            className="h-full min-h-0 w-full overflow-auto overscroll-contain bg-transparent scrollbar-thin"
+            onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        >
+            <div className="min-h-full min-w-[760px] md:min-w-full">
             {/* Header */}
             <div 
                 className="grid items-center bg-gray-50 dark:bg-[#121212] border-b border-black/[0.05] dark:border-white/10 sticky top-0 z-20"
@@ -292,11 +298,7 @@ function Table<T>({
             </div>
 
             {/* Body */}
-            <div
-                ref={bodyRef}
-                className="flex-1 overflow-y-auto min-h-0 scrollbar-thin"
-                onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-            >
+            <div className="min-h-0">
                 {data.length > 0 ? (
                     <div
                         className={cn(shouldVirtualize && "relative")}
@@ -308,10 +310,11 @@ function Table<T>({
                         }
                     </div>
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-400 p-12">
+                    <div className="min-h-[260px] flex flex-col items-center justify-center text-gray-400 p-12">
                         {React.isValidElement(emptyMessage) ? emptyMessage : <span className="text-sm">{emptyMessage}</span>}
                     </div>
                 )}
+            </div>
             </div>
         </div>
     );

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { v4 as uuidv4 } from 'uuid';
 import { Account, Transaction, Category, ScheduledTransaction, BankContextType, AppData, Budget } from '../types';
 import { dbService } from '../services/db';
+import { hasTauriRuntime, isMobileCompanion } from '../utils/runtime';
 
 const BankContext = createContext<BankContextType | undefined>(undefined);
 
@@ -213,91 +214,218 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [budgets, setBudgets] = useState<Budget[]>([]);
     const [filterAccount, setFilterAccount] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [mobileConnectionState, setMobileConnectionState] = useState<BankContextType['mobileConnectionState']>('idle');
+    const [mobileConnectionError, setMobileConnectionError] = useState<string | null>(null);
     const isProcessingScheduledRef = useRef(false);
+    const lastDataVersionRef = useRef<number | null>(null);
+
+    const loadBankData = useCallback(async (options: { processScheduled?: boolean } = {}) => {
+        const shouldProcessScheduled = options.processScheduled ?? false;
+        const [loadedAccounts, loadedTransactions, loadedCategories, loadedScheduled, loadedBudgets] = await Promise.all([
+            dbService.getAccounts(),
+            dbService.getTransactions(),
+            dbService.getCategories(),
+            dbService.getScheduled(),
+            dbService.getBudgets()
+        ]);
+
+        let currentAccounts = loadedAccounts;
+        let currentTransactions = loadedTransactions;
+        let currentCategories = loadedCategories;
+        let currentScheduled = loadedScheduled;
+        let currentBudgets = loadedBudgets;
+
+        if (loadedAccounts.length === 0 && loadedTransactions.length === 0 && loadedCategories.length === 0 && loadedScheduled.length === 0 && loadedBudgets.length === 0) {
+            currentAccounts = DEFAULT_DATA.accounts;
+            currentTransactions = DEFAULT_DATA.transactions;
+            currentCategories = DEFAULT_DATA.categories;
+            currentScheduled = DEFAULT_DATA.scheduled;
+            currentBudgets = DEFAULT_DATA.budgets;
+
+            await Promise.all([
+                ...DEFAULT_DATA.accounts.map(acc => dbService.addAccount(acc)),
+                ...DEFAULT_DATA.categories.map(cat => dbService.addCategory(cat)),
+                ...DEFAULT_DATA.budgets.map(budget => dbService.addBudget(budget))
+            ]);
+        } else {
+            const transferExists = currentCategories.some(c => c.id === 'transfer');
+            if (!transferExists) {
+                const transferCategory = { id: 'transfer', name: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' };
+                await dbService.addCategory(transferCategory);
+                currentCategories = [...currentCategories, transferCategory];
+            }
+        }
+
+        const migratedScheduled = [...currentScheduled];
+        const migratedBudgets = [...currentBudgets];
+        const legacyScheduledToMigrate = migratedScheduled.filter(item => item.includeInForecast && !item.budgetId && item.type === 'expense' && item.category !== 'transfer');
+
+        if (legacyScheduledToMigrate.length > 0) {
+            for (const scheduledTx of legacyScheduledToMigrate) {
+                const newBudget: Budget = {
+                    id: uuidv4(),
+                    name: scheduledTx.description,
+                    amount: scheduledTx.amount,
+                    category: scheduledTx.category,
+                    accountId: scheduledTx.accountId
+                };
+
+                scheduledTx.budgetId = newBudget.id;
+                scheduledTx.includeInForecast = true;
+                migratedBudgets.push(newBudget);
+
+                await dbService.addBudget(newBudget);
+                await dbService.updateScheduled(scheduledTx);
+            }
+            currentScheduled = migratedScheduled;
+            currentBudgets = migratedBudgets;
+        }
+
+        const scheduledResult = shouldProcessScheduled
+            ? await processDueScheduledItems(currentScheduled)
+            : { processedScheduled: currentScheduled, newTransactions: [] as Transaction[] };
+
+        setAccounts(currentAccounts);
+        setTransactions([...scheduledResult.newTransactions, ...currentTransactions]);
+        setCategories(currentCategories);
+        setScheduled(scheduledResult.processedScheduled);
+        setBudgets(currentBudgets);
+    }, []);
 
     // Initialize DB and load data
     useEffect(() => {
         const init = async () => {
+            const mobileMode = isMobileCompanion();
+
             try {
                 await dbService.init();
-                const [loadedAccounts, loadedTransactions, loadedCategories, loadedScheduled, loadedBudgets] = await Promise.all([
-                    dbService.getAccounts(),
-                    dbService.getTransactions(),
-                    dbService.getCategories(),
-                    dbService.getScheduled(),
-                    dbService.getBudgets()
-                ]);
-
-                let currentAccounts = loadedAccounts;
-                let currentTransactions = loadedTransactions;
-                let currentCategories = loadedCategories;
-                let currentScheduled = loadedScheduled;
-                let currentBudgets = loadedBudgets;
-
-                if (loadedAccounts.length === 0 && loadedTransactions.length === 0 && loadedCategories.length === 0 && loadedScheduled.length === 0 && loadedBudgets.length === 0) {
-                    // If no data loaded, use default data and save it
-                    currentAccounts = DEFAULT_DATA.accounts;
-                    currentTransactions = DEFAULT_DATA.transactions;
-                    currentCategories = DEFAULT_DATA.categories;
-                    currentScheduled = DEFAULT_DATA.scheduled;
-                    currentBudgets = DEFAULT_DATA.budgets;
-
-                    await Promise.all([
-                        ...DEFAULT_DATA.accounts.map(acc => dbService.addAccount(acc)),
-                        ...DEFAULT_DATA.categories.map(cat => dbService.addCategory(cat)),
-                        ...DEFAULT_DATA.budgets.map(budget => dbService.addBudget(budget))
-                    ]);
+                await loadBankData({ processScheduled: true });
+                if (mobileMode) {
+                    try {
+                        const status = await dbService.getSyncStatus();
+                        lastDataVersionRef.current = status.dataVersion;
+                        setMobileConnectionState('connected');
+                    } catch (error) {
+                        if (!dbService.isOfflineError(error)) throw error;
+                        setMobileConnectionState('offline');
+                    }
                 } else {
-                    // Check if 'transfer' category exists, if not add it (migration)
-                    const transferExists = currentCategories.some(c => c.id === 'transfer');
-                    if (!transferExists) {
-                        const transferCategory = { id: 'transfer', name: 'Virement', icon: 'ArrowRightLeft', color: '#6366f1' };
-                        await dbService.addCategory(transferCategory);
-                        currentCategories = [...currentCategories, transferCategory];
-                    }
+                    setMobileConnectionState('connected');
                 }
-
-                const migratedScheduled = [...currentScheduled];
-                const migratedBudgets = [...currentBudgets];
-                const legacyScheduledToMigrate = migratedScheduled.filter(item => item.includeInForecast && !item.budgetId && item.type === 'expense' && item.category !== 'transfer');
-
-                if (legacyScheduledToMigrate.length > 0) {
-                    for (const scheduledTx of legacyScheduledToMigrate) {
-                        const newBudget: Budget = {
-                            id: uuidv4(),
-                            name: scheduledTx.description,
-                            amount: scheduledTx.amount,
-                            category: scheduledTx.category,
-                            accountId: scheduledTx.accountId
-                        };
-
-                        scheduledTx.budgetId = newBudget.id;
-                        scheduledTx.includeInForecast = true;
-                        migratedBudgets.push(newBudget);
-
-                        await dbService.addBudget(newBudget);
-                        await dbService.updateScheduled(scheduledTx);
-                    }
-                    currentScheduled = migratedScheduled;
-                    currentBudgets = migratedBudgets;
-                }
-
-                const { processedScheduled, newTransactions } = await processDueScheduledItems(currentScheduled);
-
-                setAccounts(currentAccounts);
-                setTransactions([...newTransactions, ...currentTransactions]);
-                setCategories(currentCategories);
-                setScheduled(processedScheduled);
-                setBudgets(currentBudgets);
-
             } catch (error) {
                 console.error("Failed to initialize database:", error);
+                if (mobileMode) {
+                    setMobileConnectionError(error instanceof Error ? error.message : String(error));
+                    setMobileConnectionState('error');
+                }
             } finally {
                 setIsLoading(false);
             }
         };
         init();
+    }, [loadBankData]);
+
+    const connectMobileCompanion = useCallback(async () => {
+        if (!isMobileCompanion()) return;
+
+        setIsLoading(true);
+        setMobileConnectionState('connecting');
+        setMobileConnectionError(null);
+        try {
+            await dbService.connectMobileCompanion();
+            await loadBankData({ processScheduled: true });
+            const status = await dbService.getSyncStatus();
+            lastDataVersionRef.current = status.dataVersion;
+            setMobileConnectionState('connected');
+        } catch (error) {
+            console.error("Failed to connect mobile companion:", error);
+            setMobileConnectionError(error instanceof Error ? error.message : String(error));
+            setMobileConnectionState('error');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loadBankData]);
+
+    const unlinkMobileCompanion = useCallback(async () => {
+        if (!isMobileCompanion()) return;
+
+        setIsLoading(true);
+        try {
+            await dbService.unlinkMobileCompanion();
+            setAccounts([]);
+            setTransactions([]);
+            setCategories([]);
+            setScheduled([]);
+            setBudgets([]);
+            setFilterAccount([]);
+            lastDataVersionRef.current = null;
+            setMobileConnectionError(null);
+            setMobileConnectionState('disconnected');
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        if (isLoading) return;
+
+        let disposed = false;
+        let unlisten: (() => void) | undefined;
+        let syncTimeout: ReturnType<typeof setTimeout> | undefined;
+        let consecutiveSyncFailures = 0;
+
+        if (hasTauriRuntime()) {
+            import('@tauri-apps/api/event')
+                .then(({ listen }) => listen('bank-data-changed', async () => {
+                    if (!disposed) await loadBankData({ processScheduled: false });
+                }))
+                .then(removeListener => {
+                    unlisten = removeListener;
+                })
+                .catch(() => { });
+        }
+
+        if (isMobileCompanion() && (mobileConnectionState === 'connected' || mobileConnectionState === 'offline')) {
+            const checkForRemoteChanges = async () => {
+                if (disposed) return;
+
+                try {
+                    const status = await dbService.getSyncStatus();
+                    consecutiveSyncFailures = 0;
+                    if (!disposed) setMobileConnectionState('connected');
+                    if (lastDataVersionRef.current === null) {
+                        lastDataVersionRef.current = status.dataVersion;
+                        return;
+                    }
+                    if (status.dataVersion !== lastDataVersionRef.current) {
+                        lastDataVersionRef.current = status.dataVersion;
+                        await loadBankData({ processScheduled: false });
+                    }
+                } catch (error) {
+                    consecutiveSyncFailures += 1;
+                    if (dbService.isOfflineError(error) && !disposed) {
+                        setMobileConnectionState('offline');
+                    }
+                    console.warn('Mobile sync status unavailable:', error);
+                } finally {
+                    if (!disposed) {
+                        const delay = consecutiveSyncFailures === 0
+                            ? 2500
+                            : Math.min(30000, 5000 * consecutiveSyncFailures);
+                        syncTimeout = setTimeout(checkForRemoteChanges, delay);
+                    }
+                }
+            };
+
+            syncTimeout = setTimeout(checkForRemoteChanges, 2500);
+        }
+
+        return () => {
+            disposed = true;
+            if (unlisten) unlisten();
+            if (syncTimeout) clearTimeout(syncTimeout);
+        };
+    }, [isLoading, loadBankData, mobileConnectionState]);
 
     const getAccountDefaults = (type: string) => {
         switch (type) {
@@ -358,10 +486,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
             category: 'transfer', description, checked: false, isTransfer: true, linkedTransactionId: fromTxId
         };
 
-        await Promise.all([
-            dbService.addTransaction(fromTx),
-            dbService.addTransaction(toTx)
-        ]);
+        await dbService.addTransfer(fromTx, toTx);
 
         setTransactions(prev => [fromTx, toTx, ...prev]);
     }, []);
@@ -494,9 +619,14 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteBudget,
         filterAccount,
         setFilterAccount,
-        isLoading
+        isLoading,
+        mobileConnectionState,
+        mobileConnectionError,
+        connectMobileCompanion,
+        unlinkMobileCompanion
     }), [
         accounts, transactions, categories, scheduled, budgets, filterAccount, isLoading,
+        mobileConnectionState, mobileConnectionError, connectMobileCompanion, unlinkMobileCompanion,
         addAccount, updateAccount, deleteAccount,
         addTransaction, addTransfer, updateTransaction, deleteTransaction, toggleTransactionCheck,
         addCategory, updateCategory, deleteCategory,

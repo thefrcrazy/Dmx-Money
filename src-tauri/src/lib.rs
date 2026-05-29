@@ -1,11 +1,15 @@
 mod commands;
 mod db;
+mod mobile_companion;
 mod models;
+mod secure_bridge;
 
 use tauri::{LogicalPosition, Manager, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -20,11 +24,12 @@ pub fn run() {
             )?;
 
             // Manual Window Creation for full control
-            let mut window_builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
-                .title("DmxMoney")
-                .inner_size(400.0, 400.0) // 400x400 square splash
-                .resizable(true)
-                .center();
+            let mut window_builder =
+                WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                    .title("DmxMoney")
+                    .inner_size(400.0, 400.0) // 400x400 square splash
+                    .resizable(true)
+                    .center();
 
             #[cfg(target_os = "macos")]
             {
@@ -43,6 +48,12 @@ pub fn run() {
             let pool = tauri::async_runtime::block_on(db::init_db(handle))
                 .expect("failed to initialize database");
             app.manage(pool.clone());
+
+            let mobile_state =
+                mobile_companion::MobileCompanionState::new(pool.clone(), app.handle().clone());
+            tauri::async_runtime::block_on(mobile_state.bootstrap())
+                .expect("failed to initialize mobile companion");
+            app.manage(mobile_state);
 
             Ok(())
         })
@@ -69,7 +80,12 @@ pub fn run() {
             commands::delete_scheduled,
             commands::import_data,
             commands::get_settings,
-            commands::save_settings
+            commands::save_settings,
+            mobile_companion::get_mobile_companion_status,
+            mobile_companion::get_secure_bridge_status,
+            mobile_companion::set_secure_bridge_enabled,
+            mobile_companion::regenerate_secure_pairing_token,
+            mobile_companion::revoke_mobile_passkey
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

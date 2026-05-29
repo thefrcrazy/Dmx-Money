@@ -113,17 +113,17 @@ const Dashboard: React.FC = () => {
     };
 
     return (
-        <div className="space-y-8 animate-fade-in-up">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tableau de Bord</h2>
+        <div className="space-y-4 md:space-y-8 animate-fade-in-up">
+            <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-100">Tableau de Bord</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 {/* 1. Échéances */}
                 <Card 
                     title="Échéances" 
                     icon={CalendarClock} 
                     action={<button onClick={() => setActivePage('scheduled')} className="text-xs text-primary-600 hover:underline">Tout voir</button>}
                 >
-                    <div className="space-y-4 min-h-[140px] flex flex-col justify-center">
+                    <div className="space-y-3 md:space-y-4 min-h-[128px] md:min-h-[140px] flex flex-col justify-center">
                         {upcomingScheduled.length > 0 ? (
                             upcomingScheduled.map(s => (
                                 <div key={s.id} className="flex items-center justify-between">
@@ -158,9 +158,9 @@ const Dashboard: React.FC = () => {
                     icon={ArrowRightLeft}
                     action={<span className="text-[10px] bg-gray-100 dark:bg-neutral-700 px-2 py-0.5 rounded-full text-gray-500">Ce mois-ci</span>}
                 >
-                    <div className="flex flex-col items-center justify-center min-h-[140px]">
+                    <div className="flex flex-col items-center justify-center min-h-[128px] md:min-h-[140px]">
                         <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Revenus - Dépenses</div>
-                        <div className={`text-4xl font-bold mb-6 ${monthlySaved >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <div className={`text-4xl font-bold mb-5 md:mb-6 ${monthlySaved >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {monthlySaved > 0 ? '+' : ''}{Math.round(monthlySaved)} €
                         </div>
                         <div className="grid grid-cols-3 w-full gap-2 text-center border-t border-black/[0.05] dark:border-white/10 pt-4">
@@ -192,7 +192,7 @@ const Dashboard: React.FC = () => {
                     icon={Tag}
                     action={<span className="text-[10px] bg-gray-100 dark:bg-neutral-700 px-2 py-0.5 rounded-full text-gray-500">Ce mois-ci</span>}
                 >
-                    <div className="min-h-[140px] flex items-center justify-center text-gray-400 text-xs text-center">
+                    <div className="min-h-[128px] md:min-h-[140px] flex items-center justify-center text-gray-400 text-xs text-center">
                         {topCategories.length > 0 ? (
                             <div className="w-full space-y-3">
                                 {topCategories.slice(0, 3).map(cat => (
@@ -210,7 +210,7 @@ const Dashboard: React.FC = () => {
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 {/* 4. Mes Comptes */}
                 <Card 
                     title="Mes Comptes" 
@@ -221,7 +221,7 @@ const Dashboard: React.FC = () => {
                     <div className="min-h-[200px] flex flex-col">
                         <div className="flex-1 divide-y divide-neutral-100 dark:divide-neutral-800">
                             {accountsWithBalance.map(acc => (
-                                <div key={acc.id} className="px-6 py-3 flex items-center justify-between hover:bg-neutral-50/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer">
+                                <div key={acc.id} className="px-4 md:px-6 py-3 flex items-center justify-between hover:bg-neutral-50/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${acc.color}15`, color: acc.color }}>
                                             {renderCategoryIcon(acc.icon || 'Wallet')}
@@ -232,7 +232,7 @@ const Dashboard: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        <div className="px-6 py-4 border-t border-black/[0.05] dark:border-white/10 flex justify-between items-center bg-neutral-50/30 dark:bg-neutral-900/50">
+                        <div className="px-4 md:px-6 py-4 border-t border-black/[0.05] dark:border-white/10 flex justify-between items-center bg-neutral-50/30 dark:bg-neutral-900/50">
                             <span className="text-xs font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Total</span>
                             <span className="text-lg font-bold text-primary-600">{formatCurrency(currentBalance)}</span>
                         </div>
@@ -250,7 +250,7 @@ const Dashboard: React.FC = () => {
                         {relevantTransactions.slice(0, 5).map(t => {
                             const cat = categories.find(c => c.id === t.category);
                             return (
-                                <div key={t.id} className="px-6 py-3 flex items-center justify-between hover:bg-neutral-50/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer">
+                                <div key={t.id} className="px-4 md:px-6 py-3 flex items-center justify-between hover:bg-neutral-50/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cat?.color || '#9ca3af'}15`, color: cat?.color || '#9ca3af' }}>
                                             {renderCategoryIcon(cat?.icon || 'Tag')}

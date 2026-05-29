@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.7 - 2026-05-29
+
+- Ajout du mode compagnon mobile avec PWA installable, accès local HTTPS et QR d’appairage.
+- Ajout d’un mode offline mobile avec stockage IndexedDB, queue de mutations et resynchronisation au retour du Wi-Fi local.
+- Ajout de l’authentification mobile par clé d’accès/passkey, sessions courtes en cookie sécurisé et protection CSRF.
+- Ajout du pont HTTPS managé via Cloudflare Worker, DNS local `*.sync.develop-max.com` et certificats ACME.
+- Durcissement sécurité du bridge : provisioning protégé par secret serveur, suppression du token mobile legacy et nettoyage des anciens secrets SQLite.
+- Amélioration de la PWA mobile : tutoriel d’installation, liaison par scan QR, déconnexion complète, reconnexion automatique par clé d’accès et priorité donnée à la passkey quand elle existe.
+- Amélioration responsive mobile : navigation mobile, pull-to-refresh, tableaux plus robustes et masquage des fonctions desktop-only.
+
 ## 1.0.6 - 2026-05-21
 
 - Ajout de transactions fictives dans Prédictions pour simuler des dépenses, revenus ou virements sans modifier le journal.

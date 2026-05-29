@@ -1,6 +1,3 @@
-import { check } from '@tauri-apps/plugin-updater';
-import { ask, message } from '@tauri-apps/plugin-dialog';
-import { relaunch } from '@tauri-apps/plugin-process';
 import { useState, useCallback, useEffect } from 'react';
 
 type UpdaterState = {
@@ -35,6 +32,11 @@ export const useUpdater = () => {
 
         setSharedState({ isChecking: true });
         try {
+            const [{ check }, { ask, message }, { relaunch }] = await Promise.all([
+                import('@tauri-apps/plugin-updater'),
+                import('@tauri-apps/plugin-dialog'),
+                import('@tauri-apps/plugin-process')
+            ]);
             const updateResult = await check();
             
             if (updateResult) {
@@ -70,6 +72,7 @@ export const useUpdater = () => {
             
             // Only show error if not silent
             if (!silent) {
+                const { message } = await import('@tauri-apps/plugin-dialog');
                 if (errorMsg.includes('fetch a valid release JSON')) {
                     await message(
                         'Une mise à jour est probablement en cours de préparation sur le serveur.\n\nVeuillez réessayer dans quelques minutes.',

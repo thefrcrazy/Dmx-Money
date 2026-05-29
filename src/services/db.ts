@@ -1,141 +1,798 @@
-import { invoke } from '@tauri-apps/api/core';
 import { Account, Transaction, Category, ScheduledTransaction, Settings, Budget } from '../types';
+import { offlineStore, OfflineDataKey } from './offlineStore';
+import {
+    clearMobileCompanionLocalState,
+    clearMobilePairingToken,
+    getMobileApiBaseUrl,
+    getMobileCsrfToken,
+    getMobilePairingToken,
+    hasTauriRuntime,
+    isMobileCompanion,
+    isStandalonePwa,
+    markMobilePasskeyReady,
+    setMobileCsrfToken
+} from '../utils/runtime';
+
+type InvokeFn = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+
+interface RawSettings extends Omit<Settings, 'accountGroups' | 'customGroups' | 'customGroupsOrder' | 'accountsOrder'> {
+    accountGroups?: string | Settings['accountGroups'] | null;
+    customGroups?: string | Settings['customGroups'] | null;
+    customGroupsOrder?: string | Settings['customGroupsOrder'] | null;
+    accountsOrder?: string | Settings['accountsOrder'] | null;
+}
+
+interface SyncStatus {
+    ok: boolean;
+    dataVersion: number;
+}
+
+class MobileNetworkError extends Error {
+    constructor(message = 'Serveur mobile local indisponible.') {
+        super(message);
+        this.name = 'MobileNetworkError';
+    }
+}
+
+class MobilePasskeyInvalidStateError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'MobilePasskeyInvalidStateError';
+    }
+}
+
+interface SecureSessionResponse {
+    ok: boolean;
+    csrfToken: string;
+    passkeyRequired?: boolean;
+}
+
+interface WebauthnOptionsResponse<T> {
+    challengeId: string;
+    publicKey: T;
+}
+
+type RegistrationChallenge = Omit<PublicKeyCredentialCreationOptions, 'challenge' | 'user' | 'excludeCredentials'> & {
+    challenge: string;
+    user: PublicKeyCredentialUserEntity & { id: string };
+    excludeCredentials?: Array<PublicKeyCredentialDescriptor & { id: string }>;
+};
+
+type AuthenticationChallenge = Omit<PublicKeyCredentialRequestOptions, 'challenge' | 'allowCredentials'> & {
+    challenge: string;
+    allowCredentials?: Array<PublicKeyCredentialDescriptor & { id: string }>;
+};
+
+const parseMaybeJson = <T>(value: string | T | null | undefined): T | undefined => {
+    if (!value) return undefined;
+    if (typeof value === 'string') return JSON.parse(value) as T;
+    return value;
+};
+
+const parseSettings = (res: RawSettings | null): Settings | null => {
+    if (!res) return null;
+
+    return {
+        ...res,
+        accountGroups: parseMaybeJson<Settings['accountGroups']>(res.accountGroups),
+        customGroups: parseMaybeJson<Settings['customGroups']>(res.customGroups),
+        customGroupsOrder: parseMaybeJson<Settings['customGroupsOrder']>(res.customGroupsOrder),
+        accountsOrder: parseMaybeJson<Settings['accountsOrder']>(res.accountsOrder)
+    };
+};
+
+const serializeSettings = (settings: Settings): RawSettings => ({
+    ...settings,
+    accountGroups: settings.accountGroups ? JSON.stringify(settings.accountGroups) : null,
+    customGroups: settings.customGroups ? JSON.stringify(settings.customGroups) : null,
+    customGroupsOrder: settings.customGroupsOrder ? JSON.stringify(settings.customGroupsOrder) : null,
+    accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null
+});
 
 export class DatabaseService {
+    private invokeFn: Promise<InvokeFn> | null = null;
+    private flushPromise: Promise<void> | null = null;
+    private sessionPromise: Promise<void> | null = null;
+    private readonly requestTimeoutMs = 2500;
+    private readonly statusTimeoutMs = 2500;
+
     async init(): Promise<void> {
         await this.getAccounts();
     }
 
-    // --- CRUD Operations ---
+    private usesHttp() {
+        return isMobileCompanion();
+    }
+
+    private async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+        if (!hasTauriRuntime()) {
+            throw new Error('API Tauri indisponible dans ce contexte.');
+        }
+
+        if (!this.invokeFn) {
+            this.invokeFn = import('@tauri-apps/api/core').then(mod => mod.invoke as InvokeFn);
+        }
+
+        const invoke = await this.invokeFn;
+        return invoke<T>(command, args);
+    }
+
+    private async request<T>(
+        path: string,
+        init: RequestInit = {},
+        timeoutMs = this.requestTimeoutMs,
+        retrySession = true,
+    ): Promise<T> {
+        const apiBaseUrl = getMobileApiBaseUrl();
+        const method = init.method || 'GET';
+        if (!apiBaseUrl) {
+            throw new Error('Configuration mobile manquante. Ouvrez le lien depuis le QR code.');
+        }
+
+        const headers = new Headers(init.headers);
+        const csrfToken = getMobileCsrfToken();
+        if (path.startsWith('/api/') && method !== 'GET' && !csrfToken) {
+            if (retrySession) {
+                await this.ensureSecureMobileSession();
+                return this.request<T>(path, init, timeoutMs, false);
+            }
+            throw new MobileNetworkError('Session mobile à reconnecter.');
+        }
+        if (csrfToken && method !== 'GET') {
+            headers.set('X-Dmx-Csrf', csrfToken);
+        }
+        if (init.body && !headers.has('Content-Type')) {
+            headers.set('Content-Type', 'application/json');
+        }
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+        const url = new URL(path, apiBaseUrl || window.location.origin).toString();
+
+        let response: Response;
+        let text: string;
+        try {
+            response = await fetch(url, {
+                ...init,
+                cache: 'no-store',
+                credentials: 'include',
+                headers,
+                signal: controller.signal
+            });
+            text = await response.text();
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                throw new MobileNetworkError('Serveur mobile local indisponible ou trop lent.');
+            }
+            if (error instanceof TypeError) {
+                throw new MobileNetworkError(error.message);
+            }
+            throw error;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+
+        if (!response.ok) {
+            let message = text || `Erreur HTTP ${response.status}`;
+            try {
+                message = JSON.parse(text).error || message;
+            } catch {
+                // Keep the raw HTTP body when it is not JSON.
+            }
+            if (apiBaseUrl && response.status === 401) {
+                setMobileCsrfToken(null);
+                if (retrySession && path.startsWith('/api/')) {
+                    await this.ensureSecureMobileSession();
+                    return this.request<T>(path, init, timeoutMs, false);
+                }
+            }
+            throw new Error(message);
+        }
+
+        if (!text) return undefined as T;
+        return JSON.parse(text) as T;
+    }
+
+    private async ensureSecureMobileSession() {
+        if (!getMobileApiBaseUrl() || getMobileCsrfToken()) return;
+        if (this.sessionPromise) return this.sessionPromise;
+
+        this.sessionPromise = this.createSecureMobileSession().finally(() => {
+            this.sessionPromise = null;
+        });
+        return this.sessionPromise;
+    }
+
+    private async createSecureMobileSession() {
+        const pairingToken = getMobilePairingToken();
+        if (pairingToken) {
+            setMobileCsrfToken(null);
+            let pairingStarted = false;
+            try {
+                await this.requestSecureAuth<SecureSessionResponse>('/auth/pairing/start', {
+                    method: 'POST',
+                    body: JSON.stringify({ token: pairingToken, deviceLabel: this.mobileDeviceLabel() })
+                });
+                pairingStarted = true;
+                try {
+                    await this.registerMobilePasskey();
+                } catch (error) {
+                    if (error instanceof MobilePasskeyInvalidStateError) {
+                        clearMobilePairingToken();
+                        await this.loginWithMobilePasskey();
+                        return;
+                    }
+                    throw error;
+                }
+                clearMobilePairingToken();
+            } catch (error) {
+                setMobileCsrfToken(null);
+                if (pairingStarted) clearMobilePairingToken();
+                throw error;
+            }
+            return;
+        }
+
+        await this.loginWithMobilePasskey();
+    }
+
+    async connectMobileCompanion() {
+        if (!this.usesHttp()) return;
+        await this.ensureSecureMobileSession();
+        await this.getSyncStatus();
+    }
+
+    async unlinkMobileCompanion() {
+        if (this.usesHttp() && getMobileApiBaseUrl()) {
+            try {
+                await this.requestSecureAuth('/auth/unlink', { method: 'POST' });
+            } catch (error) {
+                console.warn('Mobile passkey unlink failed, clearing local state anyway:', error);
+                try {
+                    await this.requestSecureAuth('/auth/logout', { method: 'POST' });
+                } catch {
+                    // Local unlink must remain possible offline.
+                }
+            }
+        }
+
+        this.flushPromise = null;
+        this.sessionPromise = null;
+        setMobileCsrfToken(null);
+
+        try {
+            await offlineStore.clearAll();
+        } catch (error) {
+            console.warn('Mobile offline cache clear failed:', error);
+        }
+
+        clearMobileCompanionLocalState();
+    }
+
+    private async requestSecureAuth<T>(path: string, init: RequestInit): Promise<T> {
+        const apiBaseUrl = getMobileApiBaseUrl();
+        if (!apiBaseUrl) throw new Error('URL API sécurisée manquante.');
+        const headers = new Headers(init.headers);
+        if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), this.requestTimeoutMs);
+        let response: Response;
+        let text: string;
+        try {
+            response = await fetch(new URL(path, apiBaseUrl).toString(), {
+                ...init,
+                cache: 'no-store',
+                credentials: 'include',
+                headers,
+                signal: controller.signal,
+            });
+            text = await response.text();
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                throw new MobileNetworkError('Pont HTTPS local indisponible ou trop lent.');
+            }
+            if (error instanceof TypeError) {
+                throw new MobileNetworkError(error.message);
+            }
+            throw error;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+        if (!response.ok) {
+            let message = text || `Erreur HTTP ${response.status}`;
+            try {
+                message = JSON.parse(text).error || message;
+            } catch {
+                // Keep raw body.
+            }
+            throw new Error(message);
+        }
+        return text ? JSON.parse(text) as T : undefined as T;
+    }
+
+    private async registerMobilePasskey() {
+        this.assertPasskeyAvailable();
+        const options = await this.requestSecureAuth<WebauthnOptionsResponse<RegistrationChallenge>>('/auth/passkey/register/options', {
+            method: 'POST',
+            body: JSON.stringify({ deviceLabel: this.mobileDeviceLabel() })
+        });
+        let credential: PublicKeyCredential | null;
+        try {
+            credential = await navigator.credentials.create({
+                publicKey: this.toCreationOptions(options.publicKey)
+            }) as PublicKeyCredential | null;
+        } catch (error) {
+            throw this.normalizePasskeyError(error, 'register');
+        }
+        if (!credential) throw new Error('Création de la passkey annulée.');
+        const response = credential.response as AuthenticatorAttestationResponse;
+        const transports = typeof response.getTransports === 'function' ? response.getTransports() : [];
+        const session = await this.requestSecureAuth<SecureSessionResponse>('/auth/passkey/register/verify', {
+            method: 'POST',
+            body: JSON.stringify({
+                challengeId: options.challengeId,
+                deviceLabel: this.mobileDeviceLabel(),
+                response: {
+                    id: credential.id,
+                    attestationObject: this.bufferToBase64Url(response.attestationObject),
+                    clientDataJSON: this.bufferToBase64Url(response.clientDataJSON),
+                    transports,
+                }
+            })
+        });
+        setMobileCsrfToken(session.csrfToken);
+        markMobilePasskeyReady();
+    }
+
+    private async loginWithMobilePasskey() {
+        this.assertPasskeyAvailable();
+        const options = await this.requestSecureAuth<WebauthnOptionsResponse<AuthenticationChallenge>>('/auth/passkey/login/options', {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+        let credential: PublicKeyCredential | null;
+        try {
+            credential = await navigator.credentials.get({
+                publicKey: this.toRequestOptions(options.publicKey)
+            }) as PublicKeyCredential | null;
+        } catch (error) {
+            throw this.normalizePasskeyError(error, 'login');
+        }
+        if (!credential) throw new Error('Authentification passkey annulée.');
+        const response = credential.response as AuthenticatorAssertionResponse;
+        const session = await this.requestSecureAuth<SecureSessionResponse>('/auth/passkey/login/verify', {
+            method: 'POST',
+            body: JSON.stringify({
+                challengeId: options.challengeId,
+                deviceLabel: this.mobileDeviceLabel(),
+                response: {
+                    id: credential.id,
+                    authenticatorData: this.bufferToBase64Url(response.authenticatorData),
+                    signature: this.bufferToBase64Url(response.signature),
+                    clientDataJSON: this.bufferToBase64Url(response.clientDataJSON),
+                    userHandle: response.userHandle ? this.bufferToBase64Url(response.userHandle) : undefined,
+                }
+            })
+        });
+        setMobileCsrfToken(session.csrfToken);
+        markMobilePasskeyReady();
+    }
+
+    private assertPasskeyAvailable() {
+        if (!window.isSecureContext) {
+            throw new Error('La clé d’accès nécessite HTTPS. Ouvre la PWA depuis dmxmoney.develop-max.com.');
+        }
+        if (!window.PublicKeyCredential || !navigator.credentials) {
+            throw new Error('Passkey indisponible dans ce navigateur.');
+        }
+    }
+
+    private normalizePasskeyError(error: unknown, mode: 'register' | 'login') {
+        const name = error instanceof DOMException ? error.name : '';
+        const message = error instanceof Error ? error.message : String(error);
+        const lowerMessage = message.toLowerCase();
+
+        if (name === 'InvalidStateError' || lowerMessage.includes('invalid state')) {
+            const details = mode === 'register'
+                ? 'Une clé d’accès existe déjà pour cette PWA ou Safari a gardé un état précédent. Je tente une reconnexion avec cette clé.'
+                : 'La clé d’accès enregistrée n’est pas utilisable dans cette PWA. Déconnecte cette PWA, puis scanne un nouveau QR depuis l’application desktop.';
+            return mode === 'register'
+                ? new MobilePasskeyInvalidStateError(details)
+                : new Error(details);
+        }
+
+        if (name === 'NotAllowedError') {
+            return new Error('Opération Passkey annulée, refusée ou expirée.');
+        }
+
+        if (name === 'SecurityError') {
+            return new Error('Passkey refusée par le navigateur. Vérifie que la PWA est ouverte en HTTPS sur dmxmoney.develop-max.com.');
+        }
+
+        return error instanceof Error ? error : new Error(message);
+    }
+
+    private toCreationOptions(challenge: RegistrationChallenge): PublicKeyCredentialCreationOptions {
+        return {
+            ...challenge,
+            challenge: this.base64UrlToBuffer(challenge.challenge),
+            user: {
+                ...challenge.user,
+                id: this.base64UrlToBuffer(challenge.user.id),
+            },
+            excludeCredentials: challenge.excludeCredentials?.map(credential => ({
+                ...credential,
+                id: this.base64UrlToBuffer(credential.id),
+            })),
+        };
+    }
+
+    private toRequestOptions(challenge: AuthenticationChallenge): PublicKeyCredentialRequestOptions {
+        return {
+            ...challenge,
+            challenge: this.base64UrlToBuffer(challenge.challenge),
+            allowCredentials: challenge.allowCredentials?.map(credential => ({
+                ...credential,
+                id: this.base64UrlToBuffer(credential.id),
+            })),
+        };
+    }
+
+    private base64UrlToBuffer(value: string): ArrayBuffer {
+        const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+        const binary = atob(padded);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+        return bytes.buffer;
+    }
+
+    private bufferToBase64Url(value: ArrayBuffer): string {
+        const bytes = new Uint8Array(value);
+        let binary = '';
+        bytes.forEach(byte => {
+            binary += String.fromCharCode(byte);
+        });
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    private mobileDeviceLabel() {
+        const userAgent = navigator.userAgent;
+        const platform = navigator.platform || '';
+        let device = 'Mobile';
+        if (/iPhone/i.test(userAgent)) device = 'iPhone';
+        else if (/iPad/i.test(userAgent) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) device = 'iPad';
+        else if (/Android/i.test(userAgent)) device = 'Android';
+
+        let browser = 'Navigateur';
+        if (/CriOS|Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) browser = 'Chrome';
+        else if (/FxiOS|Firefox/i.test(userAgent)) browser = 'Firefox';
+        else if (/EdgiOS|Edg/i.test(userAgent)) browser = 'Edge';
+        else if (/Safari/i.test(userAgent)) browser = 'Safari';
+
+        const mode = isStandalonePwa() ? 'PWA' : 'Web';
+        return `${device} - ${browser} ${mode}`;
+    }
+
+    private isMobileNetworkError(error: unknown) {
+        return error instanceof MobileNetworkError;
+    }
+
+    isOfflineError(error: unknown) {
+        return this.isMobileNetworkError(error);
+    }
+
+    private async getMobileData<K extends OfflineDataKey>(
+        key: K,
+        path: string,
+    ): Promise<Awaited<ReturnType<typeof offlineStore.getData<K>>>> {
+        try {
+            const data = await this.request<Awaited<ReturnType<typeof offlineStore.getData<K>>>>(path);
+            if (data !== null) {
+                await offlineStore.setData(key, data as never);
+            }
+            return data;
+        } catch (error) {
+            if (!this.isMobileNetworkError(error)) throw error;
+
+            const cached = await offlineStore.getData(key);
+            if (cached !== null) return cached as Awaited<ReturnType<typeof offlineStore.getData<K>>>;
+            throw error;
+        }
+    }
+
+    private async commitMobileMutation(
+        path: string,
+        method: string,
+        body: string | undefined,
+        applyLocalChange: () => Promise<void>,
+    ) {
+        await applyLocalChange();
+        await offlineStore.enqueueMutation(path, method, body);
+        this.flushPendingMobileMutations().catch(error => {
+            if (!this.isMobileNetworkError(error)) {
+                console.warn('Mobile offline sync failed:', error);
+            }
+        });
+    }
+
+    private async flushPendingMobileMutations() {
+        if (!this.usesHttp()) return;
+        if (this.flushPromise) return this.flushPromise;
+
+        this.flushPromise = (async () => {
+            const mutations = await offlineStore.listMutations();
+            for (const mutation of mutations) {
+                await this.request(mutation.path, {
+                    method: mutation.method,
+                    body: mutation.body,
+                }, this.requestTimeoutMs);
+                await offlineStore.removeMutation(mutation.id);
+            }
+        })().finally(() => {
+            this.flushPromise = null;
+        });
+
+        return this.flushPromise;
+    }
 
     // Accounts
     async getAccounts(): Promise<Account[]> {
-        return invoke<Account[]>('get_accounts');
+        if (this.usesHttp()) return (await this.getMobileData('accounts', '/api/accounts')) || [];
+        return this.invoke<Account[]>('get_accounts');
     }
 
     async addAccount(account: Account): Promise<void> {
-        await invoke('add_account', { account });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(account);
+            await this.commitMobileMutation('/api/accounts', 'POST', body, () =>
+                offlineStore.updateCollection<Account>('accounts', items => [...items, account])
+            );
+            return;
+        }
+        await this.invoke('add_account', { account });
     }
 
     async updateAccount(account: Account): Promise<void> {
-        await invoke('update_account', { account });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(account);
+            await this.commitMobileMutation('/api/accounts', 'PUT', body, () =>
+                offlineStore.updateCollection<Account>('accounts', items => items.map(item => item.id === account.id ? account : item))
+            );
+            return;
+        }
+        await this.invoke('update_account', { account });
     }
 
     async deleteAccount(id: string): Promise<void> {
-        await invoke('delete_account', { id });
+        if (this.usesHttp()) {
+            await this.commitMobileMutation(`/api/accounts/${encodeURIComponent(id)}`, 'DELETE', undefined, async () => {
+                await offlineStore.updateCollection<Account>('accounts', items => items.filter(item => item.id !== id));
+                await offlineStore.updateCollection<Transaction>('transactions', items => items.filter(item => item.accountId !== id));
+                await offlineStore.updateCollection<ScheduledTransaction>('scheduled', items => items.filter(item => item.accountId !== id));
+                await offlineStore.updateCollection<Budget>('budgets', items => items.map(item => item.accountId === id ? { ...item, accountId: undefined } : item));
+            });
+            return;
+        }
+        await this.invoke('delete_account', { id });
     }
 
     // Transactions
     async getTransactions(): Promise<Transaction[]> {
-        return invoke<Transaction[]>('get_transactions');
+        if (this.usesHttp()) return (await this.getMobileData('transactions', '/api/transactions')) || [];
+        return this.invoke<Transaction[]>('get_transactions');
     }
 
     async addTransaction(transaction: Transaction): Promise<string> {
-        await invoke('add_transaction', { transaction });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(transaction);
+            await this.commitMobileMutation('/api/transactions', 'POST', body, () =>
+                offlineStore.updateCollection<Transaction>('transactions', items => [transaction, ...items])
+            );
+            return transaction.id;
+        }
+        await this.invoke('add_transaction', { transaction });
         return transaction.id;
     }
 
+    async addTransfer(fromTransaction: Transaction, toTransaction: Transaction): Promise<void> {
+        if (this.usesHttp()) {
+            const body = JSON.stringify({ fromTransaction, toTransaction });
+            await this.commitMobileMutation('/api/transfers', 'POST', body, () =>
+                offlineStore.updateCollection<Transaction>('transactions', items => [fromTransaction, toTransaction, ...items])
+            );
+            return;
+        }
+
+        await Promise.all([
+            this.addTransaction(fromTransaction),
+            this.addTransaction(toTransaction)
+        ]);
+    }
+
     async updateTransaction(transaction: Transaction): Promise<void> {
-        await invoke('update_transaction', { transaction });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(transaction);
+            await this.commitMobileMutation('/api/transactions', 'PUT', body, () =>
+                offlineStore.updateCollection<Transaction>('transactions', items => items.map(item => item.id === transaction.id ? transaction : item))
+            );
+            return;
+        }
+        await this.invoke('update_transaction', { transaction });
     }
 
     async deleteTransaction(id: string): Promise<void> {
-        await invoke('delete_transaction', { id });
+        if (this.usesHttp()) {
+            await this.commitMobileMutation(`/api/transactions/${encodeURIComponent(id)}`, 'DELETE', undefined, async () => {
+                const transactions = await offlineStore.getData('transactions') || [];
+                const transaction = transactions.find(item => item.id === id);
+                const idsToRemove = new Set([id]);
+                if (transaction?.linkedTransactionId) idsToRemove.add(transaction.linkedTransactionId);
+                await offlineStore.setData('transactions', transactions.filter(item => !idsToRemove.has(item.id)));
+            });
+            return;
+        }
+        await this.invoke('delete_transaction', { id });
     }
 
     // Categories
     async getCategories(): Promise<Category[]> {
-        return invoke<Category[]>('get_categories');
+        if (this.usesHttp()) return (await this.getMobileData('categories', '/api/categories')) || [];
+        return this.invoke<Category[]>('get_categories');
     }
 
     async addCategory(category: Category): Promise<void> {
-        await invoke('add_category', { category });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(category);
+            await this.commitMobileMutation('/api/categories', 'POST', body, () =>
+                offlineStore.updateCollection<Category>('categories', items => [...items, category])
+            );
+            return;
+        }
+        await this.invoke('add_category', { category });
     }
 
     async updateCategory(category: Category): Promise<void> {
-        await invoke('update_category', { category });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(category);
+            await this.commitMobileMutation('/api/categories', 'PUT', body, () =>
+                offlineStore.updateCollection<Category>('categories', items => items.map(item => item.id === category.id ? category : item))
+            );
+            return;
+        }
+        await this.invoke('update_category', { category });
     }
 
     async deleteCategory(id: string): Promise<void> {
-        await invoke('delete_category', { id });
+        if (this.usesHttp()) {
+            await this.commitMobileMutation(`/api/categories/${encodeURIComponent(id)}`, 'DELETE', undefined, () =>
+                offlineStore.updateCollection<Category>('categories', items => items.filter(item => item.id !== id))
+            );
+            return;
+        }
+        await this.invoke('delete_category', { id });
     }
 
     // Budgets
     async getBudgets(): Promise<Budget[]> {
-        return invoke<Budget[]>('get_budgets');
+        if (this.usesHttp()) return (await this.getMobileData('budgets', '/api/budgets')) || [];
+        return this.invoke<Budget[]>('get_budgets');
     }
 
     async addBudget(budget: Budget): Promise<void> {
-        await invoke('add_budget', { budget });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(budget);
+            await this.commitMobileMutation('/api/budgets', 'POST', body, () =>
+                offlineStore.updateCollection<Budget>('budgets', items => [budget, ...items])
+            );
+            return;
+        }
+        await this.invoke('add_budget', { budget });
     }
 
     async updateBudget(budget: Budget): Promise<void> {
-        await invoke('update_budget', { budget });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(budget);
+            await this.commitMobileMutation('/api/budgets', 'PUT', body, () =>
+                offlineStore.updateCollection<Budget>('budgets', items => items.map(item => item.id === budget.id ? budget : item))
+            );
+            return;
+        }
+        await this.invoke('update_budget', { budget });
     }
 
     async deleteBudget(id: string): Promise<void> {
-        await invoke('delete_budget', { id });
+        if (this.usesHttp()) {
+            await this.commitMobileMutation(`/api/budgets/${encodeURIComponent(id)}`, 'DELETE', undefined, async () => {
+                await offlineStore.updateCollection<Budget>('budgets', items => items.filter(item => item.id !== id));
+                await offlineStore.updateCollection<ScheduledTransaction>('scheduled', items => items.map(item => item.budgetId === id ? { ...item, budgetId: undefined, includeInForecast: false } : item));
+            });
+            return;
+        }
+        await this.invoke('delete_budget', { id });
     }
 
     // Scheduled
     async getScheduled(): Promise<ScheduledTransaction[]> {
-        return invoke<ScheduledTransaction[]>('get_scheduled');
+        if (this.usesHttp()) return (await this.getMobileData('scheduled', '/api/scheduled')) || [];
+        return this.invoke<ScheduledTransaction[]>('get_scheduled');
     }
 
     async addScheduled(scheduled: ScheduledTransaction): Promise<void> {
-        await invoke('add_scheduled', { scheduled });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(scheduled);
+            await this.commitMobileMutation('/api/scheduled', 'POST', body, () =>
+                offlineStore.updateCollection<ScheduledTransaction>('scheduled', items => [...items, scheduled])
+            );
+            return;
+        }
+        await this.invoke('add_scheduled', { scheduled });
     }
 
     async updateScheduled(scheduled: ScheduledTransaction): Promise<void> {
-        await invoke('update_scheduled', { scheduled });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(scheduled);
+            await this.commitMobileMutation('/api/scheduled', 'PUT', body, () =>
+                offlineStore.updateCollection<ScheduledTransaction>('scheduled', items => items.map(item => item.id === scheduled.id ? scheduled : item))
+            );
+            return;
+        }
+        await this.invoke('update_scheduled', { scheduled });
     }
 
     async deleteScheduled(id: string): Promise<void> {
-        await invoke('delete_scheduled', { id });
+        if (this.usesHttp()) {
+            await this.commitMobileMutation(`/api/scheduled/${encodeURIComponent(id)}`, 'DELETE', undefined, () =>
+                offlineStore.updateCollection<ScheduledTransaction>('scheduled', items => items.filter(item => item.id !== id))
+            );
+            return;
+        }
+        await this.invoke('delete_scheduled', { id });
+    }
+
+    async processDueScheduled(): Promise<number> {
+        if (!this.usesHttp()) return 0;
+        const result = await this.request<{ processed: number }>('/api/scheduled/process-due', { method: 'POST' });
+        return result.processed;
     }
 
     // Settings
     async getSettings(): Promise<Settings | null> {
         try {
-            // Define an interface for the raw response from Rust
-            interface RawSettings extends Omit<Settings, 'accountGroups' | 'customGroups' | 'customGroupsOrder' | 'accountsOrder'> {
-                accountGroups?: string;
-                customGroups?: string;
-                customGroupsOrder?: string;
-                accountsOrder?: string;
-            }
-
-            const res = await invoke<RawSettings | null>('get_settings');
-            if (!res) return null;
-
-            // Parse JSON strings back to objects
-            return {
-                ...res,
-                accountGroups: res.accountGroups ? JSON.parse(res.accountGroups) : undefined,
-                customGroups: res.customGroups ? JSON.parse(res.customGroups) : undefined,
-                customGroupsOrder: res.customGroupsOrder ? JSON.parse(res.customGroupsOrder) : undefined,
-                accountsOrder: res.accountsOrder ? JSON.parse(res.accountsOrder) : undefined
-            };
-        } catch (e) {
+            const res = this.usesHttp()
+                ? await this.getMobileData('settings', '/api/settings') as RawSettings | null
+                : await this.invoke<RawSettings | null>('get_settings');
+            return parseSettings(res);
+        } catch {
             return null;
         }
     }
 
     async saveSettings(settings: Settings): Promise<void> {
-        // Convert objects to JSON strings for Rust
-        const settingsToSend = {
-            ...settings,
-            accountGroups: settings.accountGroups ? JSON.stringify(settings.accountGroups) : null,
-            customGroups: settings.customGroups ? JSON.stringify(settings.customGroups) : null,
-            customGroupsOrder: settings.customGroupsOrder ? JSON.stringify(settings.customGroupsOrder) : null,
-            accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null
-        };
+        const settingsToSend = serializeSettings(settings);
 
-        await invoke('save_settings', { settings: settingsToSend });
+        if (this.usesHttp()) {
+            const body = JSON.stringify(settingsToSend);
+            await this.commitMobileMutation('/api/settings', 'PUT', body, () =>
+                offlineStore.setData('settings', settings)
+            );
+            return;
+        }
+
+        await this.invoke('save_settings', { settings: settingsToSend });
     }
 
-    // --- Data Management ---
-    async exportData(): Promise<any> {
+    async getSyncStatus(): Promise<SyncStatus> {
+        if (!this.usesHttp()) return { ok: true, dataVersion: 0 };
+        if (getMobileCsrfToken()) {
+            await this.flushPendingMobileMutations();
+        }
+        return this.request<SyncStatus>('/api/status', {}, this.statusTimeoutMs);
+    }
+
+    // Data Management
+    async exportData(): Promise<unknown> {
         const [accounts, transactions, categories, scheduled, budgets, settings] = await Promise.all([
             this.getAccounts(),
             this.getTransactions(),
@@ -152,33 +809,35 @@ export class DatabaseService {
         };
     }
 
-    async importData(backupData: any): Promise<void> {
-        if (!backupData || !backupData.data) {
+    async importData(backupData: unknown): Promise<void> {
+        if (this.usesHttp()) {
+            throw new Error('Import indisponible en mode compagnon mobile.');
+        }
+
+        const payload = backupData as { data?: Record<string, unknown> };
+        if (!payload || !payload.data) {
             throw new Error('Invalid backup data format');
         }
 
         const importPayload = {
-            accounts: backupData.data.accounts || [],
-            transactions: backupData.data.transactions || [],
-            categories: backupData.data.categories || [],
-            scheduled: backupData.data.scheduled || [],
-            budgets: backupData.data.budgets || []
+            accounts: payload.data.accounts || [],
+            transactions: payload.data.transactions || [],
+            categories: payload.data.categories || [],
+            scheduled: payload.data.scheduled || [],
+            budgets: payload.data.budgets || []
         };
 
-        await invoke('import_data', { data: importPayload });
+        await this.invoke('import_data', { data: importPayload });
 
-        // Restore settings if available (specifically groups)
-        if (backupData.data.settings) {
+        if (payload.data.settings) {
             const currentSettings = await this.getSettings() || {} as Settings;
-            const importedSettings = backupData.data.settings;
+            const importedSettings = payload.data.settings as Partial<Settings>;
 
             const newSettings: Settings = {
                 ...currentSettings,
                 accountGroups: importedSettings.accountGroups || currentSettings.accountGroups,
                 customGroups: importedSettings.customGroups || currentSettings.customGroups,
-                // @ts-ignore
                 customGroupsOrder: importedSettings.customGroupsOrder || currentSettings.customGroupsOrder,
-                // @ts-ignore
                 accountsOrder: importedSettings.accountsOrder || currentSettings.accountsOrder
             };
 
@@ -186,8 +845,13 @@ export class DatabaseService {
         }
     }
 
-    async mergeData(backupData: any): Promise<void> {
-        if (!backupData || !backupData.data) {
+    async mergeData(backupData: unknown): Promise<void> {
+        if (this.usesHttp()) {
+            throw new Error('Import indisponible en mode compagnon mobile.');
+        }
+
+        const payload = backupData as { data?: Record<string, unknown[]> };
+        if (!payload || !payload.data) {
             throw new Error('Invalid backup data format');
         }
 
@@ -199,7 +863,7 @@ export class DatabaseService {
             this.getBudgets()
         ]);
 
-        const mergeArrays = (current: any[], incoming: any[]) => {
+        const mergeArrays = <T extends { id: string }>(current: T[], incoming: T[] = []) => {
             const map = new Map(current.map(item => [item.id, item]));
             incoming.forEach(item => {
                 map.set(item.id, item);
@@ -208,14 +872,14 @@ export class DatabaseService {
         };
 
         const importPayload = {
-            accounts: mergeArrays(currentAccounts, backupData.data.accounts || []),
-            transactions: mergeArrays(currentTransactions, backupData.data.transactions || []),
-            categories: mergeArrays(currentCategories, backupData.data.categories || []),
-            scheduled: mergeArrays(currentScheduled, backupData.data.scheduled || []),
-            budgets: mergeArrays(currentBudgets, backupData.data.budgets || [])
+            accounts: mergeArrays(currentAccounts, (payload.data.accounts || []) as Account[]),
+            transactions: mergeArrays(currentTransactions, (payload.data.transactions || []) as Transaction[]),
+            categories: mergeArrays(currentCategories, (payload.data.categories || []) as Category[]),
+            scheduled: mergeArrays(currentScheduled, (payload.data.scheduled || []) as ScheduledTransaction[]),
+            budgets: mergeArrays(currentBudgets, (payload.data.budgets || []) as Budget[])
         };
 
-        await invoke('import_data', { data: importPayload });
+        await this.invoke('import_data', { data: importPayload });
     }
 }
 

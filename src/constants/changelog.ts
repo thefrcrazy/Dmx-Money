@@ -12,6 +12,32 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.7",
+        date: "2026-05-29",
+        title: "PWA mobile et pont HTTPS sécurisé",
+        changes: [
+            "Ajout du mode compagnon mobile avec PWA installable, QR d’appairage et API locale HTTPS.",
+            "Ajout du mode offline mobile avec IndexedDB, file de mutations locale et resynchronisation automatique au retour du Wi-Fi local.",
+            "Ajout de l’authentification mobile par clé d’accès/passkey, session courte en cookie sécurisé et protection CSRF.",
+            "Ajout du pont HTTPS managé via Cloudflare Worker avec DNS local `*.sync.develop-max.com` et certificats ACME.",
+            "Durcissement du bridge : enregistrement d’appareil protégé par secret serveur, suppression du token mobile legacy et nettoyage des anciens secrets SQLite.",
+            "Amélioration de l’expérience PWA : tutoriel d’installation iOS/Android, scan QR, déconnexion complète et reconnexion automatique avec la clé d’accès.",
+            "Amélioration responsive mobile avec navigation adaptée, pull-to-refresh, tableaux plus robustes et masquage des fonctions desktop-only."
+        ],
+        features: [
+            {
+                title: "Compagnon mobile sécurisé",
+                description: "La PWA peut fonctionner hors ligne puis se synchroniser automatiquement avec l’app desktop sur le réseau local sécurisé.",
+                icon: "Smartphone"
+            },
+            {
+                title: "Clé d’accès prioritaire",
+                description: "Après appairage, la PWA privilégie la passkey et tente une reconnexion automatique lorsque la session expire.",
+                icon: "KeyRound"
+            }
+        ]
+    },
+    {
         version: "1.0.6",
         date: "2026-05-21",
         title: "Prévisions avec simulations",
