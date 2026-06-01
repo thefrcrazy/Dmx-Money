@@ -12,6 +12,30 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.8",
+        date: "2026-06-01",
+        title: "Expérience mobile et maintenance du compagnon",
+        changes: [
+            "Refonte de l'expérience mobile avec une interface plus proche d'une app native.",
+            "Amélioration des modales mobiles : affichage plein écran correct, fond couvrant toute la page, scroll interne et animations d'ouverture/fermeture.",
+            "Correction de la duplication visuelle du bouton de connexion PWA pendant la reprise de synchronisation.",
+            "Correction de la génération idempotente des transactions d'échéances pour limiter les doublons après synchronisation.",
+            "Refactor du backend Rust du mode compagnon et du pont sécurisé en modules dédiés pour faciliter la maintenance."
+        ],
+        features: [
+            {
+                title: "Popup mobile plus native",
+                description: "Les formulaires mobiles s'ouvrent en bottom sheet, couvrent correctement l'écran et se ferment avec une animation fluide.",
+                icon: "Smartphone"
+            },
+            {
+                title: "Backend compagnon clarifié",
+                description: "Le serveur compagnon et le pont sécurisé sont organisés en modules spécialisés pour préparer les prochaines évolutions.",
+                icon: "Server"
+            }
+        ]
+    },
+    {
         version: "1.0.7",
         date: "2026-05-29",
         title: "PWA mobile et pont HTTPS sécurisé",

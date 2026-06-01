@@ -858,12 +858,109 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
   }
 }
 
+@keyframes form-popup-backdrop-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes form-popup-backdrop-out {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+}
+
+@keyframes form-popup-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes form-popup-panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+@keyframes form-popup-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes form-popup-sheet-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
 .animate-bottom-sheet-slide-in {
   animation: bottom-sheet-slide-in 0.32s cubic-bezier(0.32, 0.94, 0.6, 1) forwards;
 }
 
 .animate-backdrop-fade-in {
   animation: backdrop-fade-in 0.25s ease-out forwards;
+}
+
+.app-form-popup-overlay--enter {
+  animation: form-popup-backdrop-in 180ms ease-out both;
+}
+
+.app-form-popup-overlay--exit {
+  animation: form-popup-backdrop-out 180ms ease-in both;
+}
+
+.app-form-popup-content--enter {
+  animation: form-popup-panel-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center;
+}
+
+.app-form-popup-content--exit {
+  animation: form-popup-panel-out 180ms ease-in both;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-form-popup-overlay--enter,
+  .app-form-popup-overlay--exit,
+  .app-form-popup-content--enter,
+  .app-form-popup-content--exit {
+    animation: none !important;
+  }
+
+  .app-form-popup-content {
+    transform: translateY(0) scale(1) !important;
+  }
 }
 
 .tap-bounce {
@@ -918,6 +1015,11 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
   /* 3. Transformation des Modaux en Bottom Sheets style iOS */
   .app-modal-overlay {
     align-items: flex-end !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 90 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
     padding: 0 !important;
     background-color: rgba(0, 0, 0, 0.4) !important;
   }
@@ -930,14 +1032,24 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
     max-width: 100% !important;
     margin-bottom: 0 !important;
     animation: bottom-sheet-slide-in 0.32s cubic-bezier(0.32, 0.94, 0.6, 1) forwards !important;
-    max-height: 92dvh !important;
-    overflow-y: auto !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 12px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
     box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.2) !important;
     background-color: rgba(255, 255, 255, 0.9) !important;
     backdrop-filter: blur(30px) saturate(190%) !important;
     -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
     border: 1px solid rgba(0, 0, 0, 0.08) !important;
     border-bottom: none !important;
+  }
+
+  .app-form-popup-content--enter {
+    animation: form-popup-sheet-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+  }
+
+  .app-form-popup-content--exit {
+    animation: form-popup-sheet-out 0.24s cubic-bezier(0.4, 0, 1, 1) both !important;
   }
 
   .dark .app-modal-content {
@@ -954,6 +1066,11 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
   
   .app-modal-body {
     padding: 0.5rem 1.5rem 1.5rem 1.5rem !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
   }
 
   /* 4. Optimisation des Champs de Saisie (Inputs) iOS */
@@ -1047,3 +1164,10 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
   }
 }
 
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .app-form-popup-content--enter,
+  .app-form-popup-content--exit {
+    animation: none !important;
+    transform: translateY(0) !important;
+  }
+}

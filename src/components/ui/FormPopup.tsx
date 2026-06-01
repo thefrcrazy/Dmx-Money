@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Button from './Button';
 
@@ -13,6 +14,8 @@ interface FormPopupProps {
     maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
 
+const EXIT_ANIMATION_MS = 280;
+
 const FormPopup: React.FC<FormPopupProps> = ({
     isOpen,
     onClose,
@@ -23,15 +26,50 @@ const FormPopup: React.FC<FormPopupProps> = ({
     isSubmitting = false,
     maxWidth = 'lg'
 }) => {
+    const [shouldRender, setShouldRender] = useState(isOpen);
+    const [isClosing, setIsClosing] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setShouldRender(true);
+            setIsClosing(false);
+            return;
+        }
+
+        if (!shouldRender) return;
+
+        setIsClosing(true);
+        const timeout = window.setTimeout(() => {
+            setShouldRender(false);
+            setIsClosing(false);
+        }, EXIT_ANIMATION_MS);
+
+        return () => window.clearTimeout(timeout);
+    }, [isOpen, shouldRender]);
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
-        if (isOpen) window.addEventListener('keydown', handleEscape);
+        if (shouldRender && !isClosing) window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
-    }, [isOpen, onClose]);
+    }, [isClosing, onClose, shouldRender]);
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        if (!shouldRender) return;
+
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousDocumentOverflow = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previousBodyOverflow;
+            document.documentElement.style.overflow = previousDocumentOverflow;
+        };
+    }, [shouldRender]);
+
+    if (!shouldRender) return null;
 
     const maxWidthClasses = {
         sm: 'max-w-sm',
@@ -40,6 +78,13 @@ const FormPopup: React.FC<FormPopupProps> = ({
         xl: 'max-w-xl',
         '2xl': 'max-w-2xl'
     };
+
+    const overlayAnimationClass = isClosing
+        ? 'app-form-popup-overlay--exit'
+        : 'app-form-popup-overlay--enter';
+    const contentAnimationClass = isClosing
+        ? 'app-form-popup-content--exit'
+        : 'app-form-popup-content--enter';
 
     const Content = (
         <div className="space-y-4 app-form-content">
@@ -65,12 +110,12 @@ const FormPopup: React.FC<FormPopupProps> = ({
         </div>
     );
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm app-modal-overlay"
+            className={`fixed inset-0 z-[90] flex h-[100dvh] w-screen items-center justify-center p-4 bg-black/50 backdrop-blur-sm app-modal-overlay app-form-popup-overlay ${overlayAnimationClass}`}
         >
             <div
-                className={`app-card w-full ${maxWidthClasses[maxWidth]} animate-in fade-in zoom-in duration-100 app-modal-content`}
+                className={`app-card w-full ${maxWidthClasses[maxWidth]} max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden app-modal-content app-form-popup-content ${contentAnimationClass}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Drag handle visuel mobile */}
@@ -102,7 +147,8 @@ const FormPopup: React.FC<FormPopupProps> = ({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
