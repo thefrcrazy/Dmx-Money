@@ -126,12 +126,13 @@ const Categories: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Gestion des Catégories</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Gestion des Catégories</h2>
                 <Button
                     onClick={() => handleOpenModal()}
                     size="sm"
                     icon={Plus}
+                    className="w-full sm:w-auto"
                 >
                     Nouvelle catégorie
                 </Button>

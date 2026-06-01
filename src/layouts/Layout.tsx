@@ -7,6 +7,8 @@ import TitleBar from '../components/ui/TitleBar';
 import { useFinancialMetrics } from '../hooks/useFinancialMetrics';
 import { formatCurrency } from '../utils/format';
 import { hasTauriRuntime, isMobileCompanion } from '../utils/runtime';
+import { ICONS } from '../constants/icons';
+
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,6 +36,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
   const isMobileMode = isMobileCompanion();
   const showTitleBar = hasTauriRuntime();
   const pullThreshold = 78;
+
+  const hasAccountFilter = ['dashboard', 'transactions', 'budget', 'analytics', 'predictions', 'scheduled'].includes(activePage);
+  const hasBalanceWidget = ['dashboard', 'transactions'].includes(activePage);
 
   React.useEffect(() => {
     if (!hasTauriRuntime()) return;
@@ -191,6 +196,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
 
   return (
     <div className="relative flex h-[100dvh] w-screen flex-col md:flex-row text-gray-900 dark:text-gray-100 font-sans overflow-hidden bg-[var(--color-bg-primary)] dark:bg-[var(--color-bg-primary)]">
+      {/* Glow Orbs cosmiques d'arrière-plan Gemini (masqués sur desktop) */}
+      <div className="absolute top-[-15%] left-[-15%] w-[60%] aspect-square rounded-full bg-gradient-to-br from-indigo-500/10 via-purple-500/8 to-pink-500/5 dark:from-indigo-500/15 dark:via-purple-500/10 dark:to-transparent blur-[140px] pointer-events-none z-0 animate-pulse duration-[10s] md:hidden" />
+      <div className="absolute bottom-[-15%] right-[-15%] w-[60%] aspect-square rounded-full bg-gradient-to-br from-pink-500/5 via-cyan-500/8 to-indigo-500/10 dark:from-purple-500/8 dark:via-cyan-500/10 dark:to-transparent blur-[140px] pointer-events-none z-0 animate-pulse duration-[10s] md:hidden" />
+
       {showTitleBar && <TitleBar />}
 
       {/* Sidebar */}
@@ -335,48 +344,102 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
           </div>
         </header>
 
-        <header className="md:hidden flex-shrink-0 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/10 px-4 pt-[calc(env(safe-area-inset-top)+10px)] pb-3 z-40">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 dark:text-neutral-500">DmxMoney</p>
-              <h1 className="text-[24px] leading-tight font-bold tracking-tight text-gray-950 dark:text-white truncate">{pageTitle}</h1>
+        <header className={`md:hidden flex-shrink-0 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-2xl border-b border-black/[0.05] dark:border-white/10 px-4 pt-[calc(env(safe-area-inset-top)+8px)] pb-3 z-40 transition-all duration-300 ${
+          hasAccountFilter ? '' : '!pb-1.5'
+        }`}>
+          {/* Barre de navigation style iOS avec titre centré */}
+          <div className="relative flex items-center justify-between min-h-[32px] w-full">
+            {/* Espace vide à gauche pour laisser la place aux contrôles Tauri sans aucun chevauchement */}
+            <div className="w-16 h-1 flex-shrink-0 z-20" />
+            
+            {/* Titre centré absolu de la barre de titre */}
+            <div className="absolute inset-x-0 flex flex-col items-center justify-center text-center pointer-events-none z-10">
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-gray-400 dark:text-neutral-500 leading-none">DmxMoney</span>
+              <h1 className="text-[16px] font-black tracking-tight text-gray-950 dark:text-white truncate leading-tight mt-0.5 pointer-events-auto">
+                {pageTitle}
+              </h1>
             </div>
-            {isMobileMode && (
-              <div className={`mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${mobileConnectionState === 'offline'
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
-                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+
+            {/* Badge de synchro positionné à l'extrême droite */}
+            <div className="z-20 min-w-16 flex justify-end">
+              {isMobileMode && (
+                <div className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                  mobileConnectionState === 'offline'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 }`}>
-                <MobileSyncIcon className="h-3.5 w-3.5" />
-                {mobileSyncLabel}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3">
-            <MultiSelect
-              value={filterAccount}
-              onChange={setFilterAccount}
-              options={accounts.map(acc => ({ id: acc.id, label: acc.name, icon: acc.icon, color: acc.color }))}
-              placeholder="Tous les comptes"
-              className="w-full"
-              size="lg"
-            />
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-neutral-500">Pointé</div>
-              <div className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">
-                {formatCurrency(checkedBalance)}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-neutral-500">Actuel</div>
-              <div className="mt-1 text-lg font-bold text-gray-950 dark:text-white truncate">
-                {formatCurrency(currentBalance)}
-              </div>
+                  <MobileSyncIcon className="h-2.5 w-2.5" />
+                  {mobileSyncLabel}
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Widget de solde unifié style iOS Wallet (uniquement Dashboard & Journal) */}
+          {hasBalanceWidget && (
+            <div className="mt-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-white/[0.01] dark:to-white/[0.03] rounded-2xl border border-black/[0.04] dark:border-white/[0.06] px-4 py-2.5 flex items-center justify-between shadow-sm relative overflow-hidden">
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-primary-500/5 blur-2xl pointer-events-none" />
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-[0.15em] text-gray-400 dark:text-neutral-500">Solde Actuel</span>
+                <div className="text-[20px] font-extrabold tracking-tight text-gray-950 dark:text-white leading-none mt-0.5">
+                  {formatCurrency(currentBalance)}
+                </div>
+              </div>
+              <div className="text-right flex flex-col items-end justify-center">
+                <div className="inline-flex items-center gap-1 bg-emerald-500/10 dark:bg-emerald-500/20 px-2 py-0.5 rounded-lg text-emerald-700 dark:text-emerald-400 border border-emerald-500/10">
+                  <span className="text-[7.5px] font-extrabold uppercase tracking-wider">Pointé</span>
+                  <span className="text-[11px] font-bold font-mono">
+                    {formatCurrency(checkedBalance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filtre horizontal des comptes tactile (Chips) */}
+          {hasAccountFilter && (
+            <div className="mt-3 -mx-4 px-4 overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-1.5 py-0.5" data-no-pull-refresh="true">
+              <button
+                onClick={() => setFilterAccount([])}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase transition-all tap-bounce cursor-pointer ${
+                  filterAccount.length === 0
+                    ? 'bg-primary-500 text-white shadow-sm shadow-primary-500/20'
+                    : 'bg-gray-100 dark:bg-neutral-900 text-gray-600 dark:text-neutral-400 border border-black/[0.03] dark:border-white/[0.02]'
+                }`}
+              >
+                Tous
+              </button>
+              {accounts.map(acc => {
+                const isSelected = filterAccount.includes(acc.id);
+                const Icon = ICONS[acc.icon || 'Wallet'] || Wallet;
+                return (
+                  <button
+                    key={acc.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        setFilterAccount(filterAccount.filter(id => id !== acc.id));
+                      } else {
+                        setFilterAccount([...filterAccount, acc.id]);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase transition-all tap-bounce cursor-pointer border ${
+                      isSelected
+                        ? 'text-white shadow-sm'
+                        : 'bg-gray-100 dark:bg-neutral-900 text-gray-600 dark:text-neutral-400 border-black/[0.03] dark:border-white/[0.02]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? acc.color : undefined,
+                      borderColor: isSelected ? acc.color : undefined,
+                      boxShadow: isSelected ? `0 4px 10px ${acc.color}25` : undefined
+                    }}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{acc.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </header>
 
         <main
@@ -413,24 +476,35 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
 
       {isMobileMenuOpen && (
         <>
+          {/* Backdrop sombre flouté satiné interactif */}
           <button
-            className="fixed inset-0 z-[55] bg-black/20 backdrop-blur-[1px] md:hidden"
+            className="fixed inset-0 z-[55] bg-black/35 backdrop-blur-[3px] md:hidden animate-backdrop-fade-in"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Fermer le menu"
           />
-          <div className="fixed inset-x-3 bottom-[calc(76px+env(safe-area-inset-bottom)+10px)] z-[65] md:hidden">
-            <div className="rounded-3xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-neutral-950 shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.05] dark:border-white/10">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-neutral-500">Navigation</span>
+          
+          {/* Bottom Sheet coulissante */}
+          <div className="fixed inset-x-0 bottom-0 z-[65] md:hidden pb-[calc(env(safe-area-inset-bottom)+12px)] animate-bottom-sheet-slide-in">
+            <div className="mx-3 rounded-[32px] border border-black/[0.08] dark:border-white/[0.08] bg-white/80 dark:bg-neutral-950/80 backdrop-blur-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_-20px_50px_rgba(0,0,0,0.4)] overflow-hidden">
+              
+              {/* Drag Handle (tirette visuelle mobile) */}
+              <div className="flex justify-center py-2.5 cursor-pointer" onClick={() => setIsMobileMenuOpen(false)}>
+                <div className="w-12 h-1.5 rounded-full bg-gray-300 dark:bg-neutral-800" />
+              </div>
+
+              <div className="flex items-center justify-between px-6 pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-gray-400 dark:text-neutral-500">Menu Plus</span>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-1.5 rounded-lg text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-900"
-                  aria-label="Fermer le menu"
+                  className="p-1.5 rounded-full bg-gray-100 dark:bg-neutral-900 text-gray-500 dark:text-neutral-400 hover:scale-95 transition-transform"
+                  aria-label="Fermer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex flex-col gap-1 p-2">
+
+              {/* Présentation en Grille Moderne */}
+              <div className="grid grid-cols-3 gap-3 p-4">
                 {mobileMoreItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activePage === item.id;
@@ -438,19 +512,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                     <button
                       key={item.id}
                       onClick={() => navigateToPage(item.id)}
-                      className={`min-h-13 w-full rounded-xl px-3.5 py-3 flex items-center gap-3 text-left transition-colors ${isActive
-                        ? 'bg-primary-500 text-white shadow-sm'
-                        : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-900'
-                        }`}
+                      className={`flex flex-col items-center justify-center aspect-square rounded-[22px] p-3 text-center transition-all tap-bounce cursor-pointer border ${
+                        isActive
+                          ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20'
+                          : 'bg-white/40 dark:bg-neutral-900/30 text-gray-700 dark:text-neutral-300 border-black/[0.03] dark:border-white/[0.02] hover:bg-white/60 dark:hover:bg-neutral-900/50'
+                      }`}
                       aria-current={isActive ? 'page' : undefined}
                     >
-                      <div className="relative">
+                      <div className="relative p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] mb-2">
                         <Icon className="w-5 h-5 shrink-0" />
                         {item.id === 'settings' && updateAvailable && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-black" />
+                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-neutral-950" />
                         )}
                       </div>
-                      <span className="min-w-0 truncate text-sm font-semibold">{item.label}</span>
+                      <span className="w-full text-[11px] font-extrabold tracking-wide truncate">{item.label}</span>
                     </button>
                   );
                 })}
@@ -460,8 +535,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
         </>
       )}
 
-      <nav className="md:hidden flex-shrink-0 h-[calc(76px+env(safe-area-inset-bottom))] border-t border-black/[0.08] dark:border-white/10 bg-white/98 dark:bg-neutral-950/98 backdrop-blur-xl px-2 pt-2 pb-[env(safe-area-inset-bottom)] z-[60] shadow-[0_-10px_30px_rgba(15,23,42,0.08)]">
-        <div className="grid h-full grid-cols-5 gap-1">
+      <nav className="md:hidden flex-shrink-0 h-[calc(68px+env(safe-area-inset-bottom))] border-t border-black/[0.06] dark:border-white/10 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-2xl px-2 pt-2.5 pb-[env(safe-area-inset-bottom)] z-[60] shadow-[0_-12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_-12px_40px_rgba(0,0,0,0.3)]">
+        <div className="grid h-full grid-cols-5 gap-1.5">
           {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
@@ -469,10 +544,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
               <button
                 key={item.id}
                 onClick={() => navigateToPage(item.id)}
-                className={`relative min-w-0 rounded-xl flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors ${isActive
-                  ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10'
-                  : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-900'
-                  }`}
+                className={`relative min-w-0 rounded-2xl flex flex-col items-center justify-center gap-1 text-[10px] font-extrabold tracking-wide transition-all tap-bounce cursor-pointer ${
+                  isActive
+                    ? 'text-primary-600 dark:text-primary-400 bg-primary-500/10 dark:bg-primary-500/15'
+                    : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-900/50'
+                }`}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <Icon className="w-5 h-5 shrink-0" />
@@ -482,10 +558,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
           })}
           <button
             onClick={() => setIsMobileMenuOpen(prev => !prev)}
-            className={`relative min-w-0 rounded-xl flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors ${isMoreActive || isMobileMenuOpen
-              ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10'
-              : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-900'
-              }`}
+            className={`relative min-w-0 rounded-2xl flex flex-col items-center justify-center gap-1 text-[10px] font-extrabold tracking-wide transition-all tap-bounce cursor-pointer ${
+              isMoreActive || isMobileMenuOpen
+                ? 'text-primary-600 dark:text-primary-400 bg-primary-500/10 dark:bg-primary-500/15'
+                : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-900/50'
+            }`}
             aria-expanded={isMobileMenuOpen}
             aria-current={isMoreActive ? 'page' : undefined}
           >

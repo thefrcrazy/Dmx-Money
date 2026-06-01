@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Calendar, Trash2, Edit2, Clock, X, Tag, Sparkles, Search } from 'lucide-react';
+import { Plus, Calendar, Trash2, Edit2, Clock, X, Tag, Sparkles, Search, ChevronDown, ArrowRightLeft } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useBank } from '../context/BankContext';
 import { useToast } from '../context/ToastContext';
@@ -132,6 +132,7 @@ const Scheduled: React.FC = () => {
     const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [dueRange, setDueRange] = useState<ScheduledDueRange>(getStoredScheduledDueRange);
+    const [isDueRangeDropdownOpen, setIsDueRangeDropdownOpen] = useState(false);
     const [filterCategories, setFilterCategories] = useState<string[]>([]);
     const [filterFrequencies, setFilterFrequencies] = useState<string[]>([]);
     const suggestionPopupRef = useRef<HTMLDivElement>(null);
@@ -535,16 +536,17 @@ const Scheduled: React.FC = () => {
 
     return (
         <div className="flex flex-col space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Transactions Récurrentes</h2>
-                <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Transactions Récurrentes</h2>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     {monthlySuggestions.length > 0 && (
-                        <div className="relative" ref={suggestionPopupRef}>
+                        <div className="relative flex-1 sm:flex-initial" ref={suggestionPopupRef}>
                             <Button
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => setIsSuggestionsOpen(prev => !prev)}
                                 icon={Sparkles}
+                                className="w-full"
                             >
                                 Suggestions ({monthlySuggestions.length})
                             </Button>
@@ -632,6 +634,7 @@ const Scheduled: React.FC = () => {
                         onClick={() => handleOpenModal()}
                         size="sm"
                         icon={Plus}
+                        className="flex-1 sm:flex-none"
                     >
                         Nouvelle transaction
                     </Button>
@@ -639,7 +642,7 @@ const Scheduled: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-3 px-1 flex-none">
-                <div className="flex flex-wrap gap-2 period-selector">
+                <div className="hidden md:flex flex-wrap gap-2 period-selector">
                     {SCHEDULED_DUE_RANGES.map(range => (
                         <Button
                             key={range}
@@ -654,6 +657,46 @@ const Scheduled: React.FC = () => {
                             {SCHEDULED_DUE_RANGE_LABELS[range]}
                         </Button>
                     ))}
+                </div>
+
+                <div className="relative md:hidden w-full z-30">
+                    <button
+                        onClick={() => setIsDueRangeDropdownOpen(!isDueRangeDropdownOpen)}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-white/80 dark:bg-neutral-900/60 text-sm font-semibold text-gray-800 dark:text-gray-200 shadow-sm active:scale-[0.98] transition-all"
+                    >
+                        <span>{SCHEDULED_DUE_RANGE_LABELS[dueRange]}</span>
+                        <ChevronDown className={`w-4 h-4 opacity-60 transition-transform duration-200 ${isDueRangeDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isDueRangeDropdownOpen && (
+                        <>
+                            <div 
+                                className="fixed inset-0 z-40 bg-transparent" 
+                                onClick={() => setIsDueRangeDropdownOpen(false)}
+                            />
+                            <div className="absolute left-0 right-0 w-full mt-1.5 z-50 rounded-2xl border border-black/[0.08] dark:border-white/[0.12] bg-white dark:bg-neutral-900 shadow-xl p-1.5 flex flex-col gap-0.5 animate-in fade-in-50 slide-in-from-top-2 duration-150">
+                                {SCHEDULED_DUE_RANGES.map(range => (
+                                    <button
+                                        key={range}
+                                        onClick={() => {
+                                            setDueRange(range);
+                                            setIsDueRangeDropdownOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-between ${
+                                            dueRange === range
+                                                ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                                                : 'text-gray-700 dark:text-gray-300 active:bg-black/5 dark:active:bg-white/5'
+                                        }`}
+                                    >
+                                        <span>{SCHEDULED_DUE_RANGE_LABELS[range]}</span>
+                                        {dueRange === range && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -684,7 +727,7 @@ const Scheduled: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
+            <div className="hidden md:flex flex-1 bg-white dark:bg-[#121212] rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm overflow-hidden flex-col min-h-[calc(100vh-170px)] max-h-[calc(100vh-170px)]">
                 <Table
                     data={scheduledTransactions}
                     keyExtractor={(t) => t.id}
@@ -702,7 +745,7 @@ const Scheduled: React.FC = () => {
                                 return (
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div
-                                            className={`w-1 h-6 rounded-full flex-none ${isEnded ? 'bg-red-500' : ''}`}
+                                            className={`w-1 h-6 rounded-full flex-none ${isEnded ? 'bg-red-50' : ''}`}
                                             style={{ backgroundColor: isEnded ? '#ef4444' : (account?.color || '#3b82f6') }}
                                         />
                                         <span className="font-medium truncate">{account?.name}</span>
@@ -831,6 +874,106 @@ const Scheduled: React.FC = () => {
                         return isEnded ? 'bg-red-5 dark:bg-red-900/10' : '';
                     }}
                 />
+            </div>
+
+            <div className="md:hidden space-y-3 pb-4">
+                {scheduledTransactions.length > 0 ? (
+                    scheduledTransactions.map(transaction => {
+                        const account = accounts.find(a => a.id === transaction.accountId);
+                        const category = getCategoryDetails(transaction.category);
+                        const isIncome = transaction.type === 'income';
+                        const isTransfer = transaction.type === 'transfer';
+                        const isEnded = transaction.endDate && new Date(transaction.endDate) < new Date();
+
+                        return (
+                            <article 
+                                key={transaction.id} 
+                                className={`p-4 rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] shadow-sm relative overflow-hidden transition-all ${
+                                    isEnded ? 'opacity-60 border-red-200 dark:border-red-900/30' : ''
+                                }`}
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                                        <div
+                                            className="mt-0.5 h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center"
+                                            style={{ backgroundColor: isTransfer ? '#6366f116' : `${category.color}16`, color: isTransfer ? '#6366f1' : category.color }}
+                                        >
+                                            {isTransfer ? <ArrowRightLeft className="w-5 h-5" /> : renderCategoryIcon(category.icon, 'w-5 h-5')}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p className="text-[15px] font-semibold leading-tight text-gray-950 dark:text-white truncate">
+                                                    {transaction.description}
+                                                </p>
+                                                <p className={`shrink-0 text-[15px] font-bold tabular-nums ${
+                                                    isIncome ? 'text-emerald-600' : isTransfer ? 'text-blue-600 dark:text-blue-400' : 'text-red-600'
+                                                }`}>
+                                                    {isIncome ? '+' : isTransfer ? '' : '-'}{new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(transaction.amount)} €
+                                                </p>
+                                            </div>
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-neutral-400">
+                                                <span className="truncate max-w-[120px]">{account?.name || 'Compte'}</span>
+                                                <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-neutral-700" />
+                                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-tight" style={{ 
+                                                    backgroundColor: isTransfer ? '#6366f114' : `${category.color}14`, 
+                                                    color: isTransfer ? '#6366f1' : category.color 
+                                                }}>
+                                                    {isTransfer ? 'Virement' : category.name}
+                                                </span>
+                                                <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-neutral-700" />
+                                                <span className="font-semibold text-primary-600 dark:text-primary-400">
+                                                    {FREQUENCY_LABELS[transaction.frequency]}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-black/[0.03] dark:border-white/[0.03] flex items-center justify-between text-[11px] text-gray-400 dark:text-neutral-500">
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    Échéance : {format(new Date(transaction.nextDate), 'dd-MM-yyyy', { locale: fr })}
+                                                </span>
+                                                {transaction.endDate && (
+                                                    <span className="text-xs">
+                                                        Fin : {format(new Date(transaction.endDate), 'dd-MM-yyyy', { locale: fr })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex shrink-0 flex-col items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenModal(transaction)}
+                                            className="rounded-full p-1.5 text-gray-400 bg-gray-50 dark:bg-white/[0.04] hover:text-primary-500 transition-colors"
+                                            aria-label="Modifier"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteClick(transaction.id)}
+                                            className="rounded-full p-1.5 text-red-500 bg-red-55 dark:bg-red-500/10 hover:bg-red-55/20 transition-colors"
+                                            aria-label="Supprimer"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        );
+                    })
+                ) : (
+                    <div className="rounded-2xl border border-black/[0.05] dark:border-white/10 bg-white dark:bg-[#121212] p-8 text-center shadow-sm">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-50 dark:bg-neutral-900">
+                            <Search className="h-8 w-8 text-gray-300 dark:text-neutral-700" />
+                        </div>
+                        <p className="text-base font-bold text-gray-950 dark:text-white">Aucun échéancier</p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+                            {searchTerm || filterCategories.length > 0 || filterFrequencies.length > 0
+                                ? 'Aucune transaction récurrente pour les filtres actuels.'
+                                : 'Ajoute une transaction récurrente pour commencer.'}
+                        </p>
+                    </div>
+                )}
             </div>
 
             <FormPopup

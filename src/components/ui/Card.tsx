@@ -27,17 +27,17 @@ const Card: React.FC<CardProps> = ({
     return (
         <div 
             className={cn(
-                "bg-white dark:bg-[#121212] rounded-2xl md:rounded-xl border border-black/[0.05] dark:border-white/10 shadow-sm transition-all overflow-hidden",
+                "app-card overflow-hidden",
                 className
             )} 
             {...props}
         >
             {(title || action) && (
-                <div className="px-4 py-3 md:px-6 md:py-4 border-b border-black/[0.05] dark:border-white/10 flex items-center justify-between">
+                <div className="px-4 py-3.5 md:px-6 md:py-4 border-b border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        {Icon && <Icon className="w-5 h-5 text-primary-600" />}
+                        {Icon && <Icon className="w-5 h-5 text-primary-500" />}
                         <div>
-                            {title && <h3 className="text-[15px] md:text-sm font-bold text-gray-900 dark:text-gray-100 leading-none">{title}</h3>}
+                            {title && <h3 className="text-[15px] md:text-sm font-extrabold tracking-tight text-gray-950 dark:text-white leading-none">{title}</h3>}
                             {subtitle && <p className="text-[10px] text-gray-400 mt-1">{subtitle}</p>}
                         </div>
                     </div>

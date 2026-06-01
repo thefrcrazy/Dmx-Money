@@ -61,6 +61,25 @@
     --color-border: rgba(255, 255, 255, 0.1);
 }
 
+/* Overrides Mobile (style Apple iOS 26 / Gemini) */
+@media (max-width: 768px) {
+  :root {
+    --card-radius: 24px;
+    --color-primary-custom: #6366f1;
+    --color-primary-rgb-custom: 99, 102, 241;
+    --color-bg-card: rgba(255, 255, 255, 0.72);
+    --color-text-secondary: #6E6E73;
+  }
+  
+  .dark {
+    --color-primary-custom: #8b5cf6;
+    --color-primary-rgb-custom: 139, 92, 246;
+    --color-bg-card: rgba(12, 12, 12, 0.68);
+    --color-text-secondary: #8E8E93;
+    --color-border: rgba(255, 255, 255, 0.08);
+  }
+}
+
 /* Base Styles */
 * {
   @apply outline-none!;
@@ -101,7 +120,7 @@ a,
   animation-duration: 0.15s;
 }
 
-/* Components */
+/* Components (Default: Desktop) */
 .app-card {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
@@ -125,9 +144,50 @@ a,
   overflow: hidden;
 }
 
+/* Overrides Mobile (style Apple iOS 26 / Gemini) */
+@media (max-width: 768px) {
+  .app-card {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  
+  .dark .app-card {
+    box-shadow: 0 15px 45px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .app-input {
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  .app-selector-bg {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.06);
+  }
+}
+
 .dark .select-header {
   background-color: var(--color-bg-card) !important;
 }
+
+/* Gemini Irisations & Glows */
+.gemini-gradient {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 45%, #ec4899 100%);
+}
+
+.gemini-glow {
+  box-shadow: 0 0 25px 0 rgba(124, 58, 237, 0.35);
+}
+
+.dark .gemini-glow {
+  box-shadow: 0 0 35px 2px rgba(139, 92, 246, 0.25);
+}
+
 
 .app-icon-button {
   display: flex;
@@ -770,3 +830,220 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
     animation: none;
   }
 }
+
+/* Styles utilitaires et animations pour l'expérience mobile premium */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes bottom-sheet-slide-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes backdrop-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-bottom-sheet-slide-in {
+  animation: bottom-sheet-slide-in 0.32s cubic-bezier(0.32, 0.94, 0.6, 1) forwards;
+}
+
+.animate-backdrop-fade-in {
+  animation: backdrop-fade-in 0.25s ease-out forwards;
+}
+
+.tap-bounce {
+  transition: transform 0.12s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.12s ease;
+}
+
+.tap-bounce:active {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+/* Overrides Globales Mobile Premium (iOS 26 / Gemini) */
+@media (max-width: 768px) {
+  /* 1. Surcharges des Angles des Cartes */
+  .rounded-2xl, .rounded-xl, .rounded-3xl {
+    border-radius: 24px !important;
+  }
+  
+  /* 2. Métamorphose Translucide Satinée de toutes les Cartes */
+  div[class*="rounded-"].bg-white, 
+  section[class*="rounded-"].bg-white, 
+  article[class*="rounded-"].bg-white,
+  div[class*="rounded-"].bg-\[\#121212\], 
+  section[class*="rounded-"].bg-\[\#121212\], 
+  article[class*="rounded-"].bg-\[\#121212\] {
+    background-color: rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  .dark div[class*="rounded-"].bg-white, 
+  .dark section[class*="rounded-"].bg-white, 
+  .dark article[class*="rounded-"].bg-white,
+  .dark div[class*="rounded-"].bg-\[\#121212\], 
+  .dark section[class*="rounded-"].bg-\[\#121212\], 
+  .dark article[class*="rounded-"].bg-\[\#121212\],
+  .dark div[class*="rounded-"].bg-neutral-900, 
+  .dark section[class*="neutral-900"].bg-neutral-900, 
+  .dark article[class*="neutral-900"].bg-neutral-900,
+  .dark div[class*="rounded-"].bg-neutral-950, 
+  .dark section[class*="rounded-"].bg-neutral-950, 
+  .dark article[class*="rounded-"].bg-neutral-950 {
+    background-color: rgba(12, 12, 12, 0.68) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 15px 45px -12px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  /* 3. Transformation des Modaux en Bottom Sheets style iOS */
+  .app-modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+    background-color: rgba(0, 0, 0, 0.4) !important;
+  }
+  
+  .app-modal-content {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 32px !important;
+    border-top-right-radius: 32px !important;
+    max-width: 100% !important;
+    margin-bottom: 0 !important;
+    animation: bottom-sheet-slide-in 0.32s cubic-bezier(0.32, 0.94, 0.6, 1) forwards !important;
+    max-height: 92dvh !important;
+    overflow-y: auto !important;
+    box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(30px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    border-bottom: none !important;
+  }
+
+  .dark .app-modal-content {
+    background-color: rgba(14, 14, 16, 0.88) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-bottom: none !important;
+  }
+
+  /* Ajustements du corps et en-tête modal mobile */
+  .app-modal-header {
+    padding: 1.25rem 1.5rem 0.75rem 1.5rem !important;
+    border-bottom: none !important;
+  }
+  
+  .app-modal-body {
+    padding: 0.5rem 1.5rem 1.5rem 1.5rem !important;
+  }
+
+  /* 4. Optimisation des Champs de Saisie (Inputs) iOS */
+  input[type="text"], 
+  input[type="number"], 
+  input[type="date"], 
+  input[type="password"], 
+  input[type="email"], 
+  select, 
+  textarea {
+    border-radius: 14px !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    background-color: rgba(0, 0, 0, 0.02) !important;
+    color: #000000 !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+  }
+
+  input[type="text"]:focus, 
+  input[type="number"]:focus, 
+  input[type="date"]:focus, 
+  select:focus, 
+  textarea:focus {
+    border-color: var(--color-primary-custom) !important;
+    background-color: #ffffff !important;
+  }
+
+  .dark input[type="text"], 
+  .dark input[type="number"], 
+  .dark input[type="date"], 
+  .dark input[type="password"], 
+  .dark input[type="email"], 
+  .dark select, 
+  .dark textarea {
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: #ffffff !important;
+  }
+
+  .dark input[type="text"]:focus, 
+  .dark input[type="number"]:focus, 
+  .dark input[type="date"]:focus, 
+  .dark select:focus, 
+  .dark textarea:focus {
+    border-color: var(--color-primary-custom) !important;
+    background-color: rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* 5. Agrandissement et Rapprochement des Checkboxes */
+  input[type="checkbox"] {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    margin-top: 0.25rem !important;
+  }
+
+  .dark input[type="checkbox"] {
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(0, 0, 0, 0.2) !important;
+  }
+
+  /* 6. Spacings plus denses et plus élégants sur mobile */
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem !important;
+  }
+
+  .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem !important;
+  }
+
+  /* 7. Boutons tactiles et aérés */
+  .flex.shrink-0.flex-col.items-center.gap-1 button {
+    width: 34px !important;
+    height: 34px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    background-color: rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid rgba(0, 0, 0, 0.02) !important;
+  }
+  
+  .dark .flex.shrink-0.flex-col.items-center.gap-1 button {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.02) !important;
+  }
+}
+

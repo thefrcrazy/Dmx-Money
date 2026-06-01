@@ -412,13 +412,13 @@ const Accounts: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Mes Comptes</h2>
-                <div className="flex gap-2">
-                    <Button onClick={() => setIsGroupModalOpen(true)} variant="secondary" size="sm" icon={SettingsIcon}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Mes Comptes</h2>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Button onClick={() => setIsGroupModalOpen(true)} variant="secondary" size="sm" icon={SettingsIcon} className="flex-1 sm:flex-none">
                         Gérer les groupes
                     </Button>
-                    <Button onClick={() => handleOpenModal()} size="sm" icon={Plus}>
+                    <Button onClick={() => handleOpenModal()} size="sm" icon={Plus} className="flex-1 sm:flex-none">
                         Nouveau compte
                     </Button>
                 </div>

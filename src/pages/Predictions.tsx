@@ -3,7 +3,7 @@ import { useBank } from '../context/BankContext';
 import { useToast } from '../context/ToastContext';
 import { format, addMonths, endOfMonth, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ArrowRightLeft, Edit2, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowRightLeft, Edit2, Plus, Trash2, TrendingDown, TrendingUp, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import Button from '../components/ui/Button';
@@ -241,6 +241,7 @@ const Predictions: React.FC = () => {
     const { accounts: allAccounts, scheduled: allScheduled, transactions: allTransactions, categories, filterAccount } = useBank();
     const { showToast } = useToast();
     const [timeRange, setTimeRange] = useState<PredictionTimeRange>(getStoredPredictionTimeRange);
+    const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
     const [customEndDate, setCustomEndDate] = useState(getStoredCustomEndDate);
     const [alertThreshold, setAlertThreshold] = useState(getStoredAlertThreshold);
     const [monthStartsOnFirst, setMonthStartsOnFirst] = useState(getStoredMonthStartsOnFirst);
@@ -761,16 +762,16 @@ const Predictions: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Prédictions Financières</h2>
+                <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Prédictions Financières</h2>
 
-                <div className="flex flex-wrap gap-2 period-selector justify-end">
+                <div className="hidden md:flex flex-wrap gap-2 period-selector justify-end w-full md:w-auto">
                     {PREDICTION_TIME_RANGES.map((range) => (
                         <Button
                             key={range}
                             onClick={() => setTimeRange(range)}
                             variant="ghost"
                             size="sm"
-                            className={`transition-colors ${timeRange === range
+                            className={`transition-colors flex-1 sm:flex-initial text-center ${timeRange === range
                                 ? 'bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30'
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                                 }`}
@@ -778,6 +779,46 @@ const Predictions: React.FC = () => {
                             {PREDICTION_TIME_RANGE_LABELS[range]}
                         </Button>
                     ))}
+                </div>
+
+                <div className="relative md:hidden w-full z-30">
+                    <button
+                        onClick={() => setIsTimeRangeDropdownOpen(!isTimeRangeDropdownOpen)}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-white/80 dark:bg-neutral-900/60 text-sm font-semibold text-gray-800 dark:text-gray-200 shadow-sm active:scale-[0.98] transition-all"
+                    >
+                        <span>{PREDICTION_TIME_RANGE_LABELS[timeRange]}</span>
+                        <ChevronDown className={`w-4 h-4 opacity-60 transition-transform duration-200 ${isTimeRangeDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isTimeRangeDropdownOpen && (
+                        <>
+                            <div 
+                                className="fixed inset-0 z-40 bg-transparent" 
+                                onClick={() => setIsTimeRangeDropdownOpen(false)}
+                            />
+                            <div className="absolute left-0 right-0 w-full mt-1.5 z-50 rounded-2xl border border-black/[0.08] dark:border-white/[0.12] bg-white dark:bg-neutral-900 shadow-xl p-1.5 flex flex-col gap-0.5 animate-in fade-in-50 slide-in-from-top-2 duration-150">
+                                {PREDICTION_TIME_RANGES.map(range => (
+                                    <button
+                                        key={range}
+                                        onClick={() => {
+                                            setTimeRange(range);
+                                            setIsTimeRangeDropdownOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-between ${
+                                            timeRange === range
+                                                ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                                                : 'text-gray-700 dark:text-gray-300 active:bg-black/5 dark:active:bg-white/5'
+                                        }`}
+                                    >
+                                        <span>{PREDICTION_TIME_RANGE_LABELS[range]}</span>
+                                        {timeRange === range && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 

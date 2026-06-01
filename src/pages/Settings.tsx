@@ -443,7 +443,7 @@ const SettingsPage: React.FC = () => {
 
     return (
         <div className="max-w-3xl mx-auto pb-20 animate-in fade-in duration-300">
-            <header className="mb-10 px-2">
+            <header className="hidden md:block mb-10 px-2">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Paramètres</h1>
             </header>
 

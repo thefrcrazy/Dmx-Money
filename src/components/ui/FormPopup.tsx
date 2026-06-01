@@ -73,6 +73,11 @@ const FormPopup: React.FC<FormPopupProps> = ({
                 className={`app-card w-full ${maxWidthClasses[maxWidth]} animate-in fade-in zoom-in duration-100 app-modal-content`}
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* Drag handle visuel mobile */}
+                <div className="flex justify-center py-2.5 md:hidden cursor-pointer" onClick={onClose}>
+                    <div className="w-12 h-1.5 bg-gray-300 dark:bg-neutral-800 rounded-full" />
+                </div>
+
                 {title && (
                     <div className="flex items-center justify-between p-4 border-b border-black/[0.05] dark:border-white/10 app-modal-header">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 app-modal-title">

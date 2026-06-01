@@ -5,6 +5,7 @@ import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cart
 import { useBank } from '../context/BankContext';
 import { format, subMonths, eachMonthOfInterval, subWeeks, subYears, isWithinInterval, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { ChevronDown } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
 
@@ -114,6 +115,7 @@ const Analytics: React.FC = () => {
         [allAccounts, filterAccount]);
 
     const [timeRange, setTimeRange] = useState<TimeRange>(getStoredAnalyticsTimeRange);
+    const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
     const [customStartDate, setCustomStartDate] = useState(getStoredAnalyticsCustomStartDate);
     const [customEndDate, setCustomEndDate] = useState(getStoredAnalyticsCustomEndDate);
     const [monthStartsOnFirst, setMonthStartsOnFirst] = useState(getStoredAnalyticsMonthStartsOnFirst);
@@ -340,10 +342,10 @@ const Analytics: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Analyses Financières</h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
+                <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Analyses Financières</h2>
 
-                <div className="flex flex-wrap gap-2 period-selector justify-end">
+                <div className="hidden md:flex flex-wrap gap-2 period-selector justify-end">
                     {ANALYTICS_TIME_RANGES.map((range) => (
                         <Button
                             key={range}
@@ -358,6 +360,46 @@ const Analytics: React.FC = () => {
                             {ANALYTICS_TIME_RANGE_LABELS[range]}
                         </Button>
                     ))}
+                </div>
+
+                <div className="relative md:hidden w-full z-30">
+                    <button
+                        onClick={() => setIsTimeRangeDropdownOpen(!isTimeRangeDropdownOpen)}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-white/80 dark:bg-neutral-900/60 text-sm font-semibold text-gray-800 dark:text-gray-200 shadow-sm active:scale-[0.98] transition-all"
+                    >
+                        <span>{ANALYTICS_TIME_RANGE_LABELS[timeRange]}</span>
+                        <ChevronDown className={`w-4 h-4 opacity-60 transition-transform duration-200 ${isTimeRangeDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isTimeRangeDropdownOpen && (
+                        <>
+                            <div 
+                                className="fixed inset-0 z-40 bg-transparent" 
+                                onClick={() => setIsTimeRangeDropdownOpen(false)}
+                            />
+                            <div className="absolute left-0 right-0 w-full mt-1.5 z-50 rounded-2xl border border-black/[0.08] dark:border-white/[0.12] bg-white dark:bg-neutral-900 shadow-xl p-1.5 flex flex-col gap-0.5 animate-in fade-in-50 slide-in-from-top-2 duration-150">
+                                {ANALYTICS_TIME_RANGES.map(range => (
+                                    <button
+                                        key={range}
+                                        onClick={() => {
+                                            setTimeRange(range);
+                                            setIsTimeRangeDropdownOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-between ${
+                                            timeRange === range
+                                                ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                                                : 'text-gray-700 dark:text-gray-300 active:bg-black/5 dark:active:bg-white/5'
+                                        }`}
+                                    >
+                                        <span>{ANALYTICS_TIME_RANGE_LABELS[range]}</span>
+                                        {timeRange === range && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 

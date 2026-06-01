@@ -389,9 +389,16 @@ const Transactions: React.FC = () => {
 
     return (
         <div className="flex-1 flex flex-col min-h-0 space-y-4 md:space-y-6">
-            <div className="hidden md:flex items-center justify-between gap-4 px-1 flex-none">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Journal</h2>
-                <Button onClick={() => handleOpenModal()} size="sm" icon={Plus}>Nouvelle</Button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 flex-none w-full">
+                <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Journal</h2>
+                <Button 
+                    onClick={() => handleOpenModal()} 
+                    size="sm" 
+                    icon={Plus}
+                    className="w-full sm:w-auto"
+                >
+                    Nouvelle transaction
+                </Button>
             </div>
 
             <div className="md:hidden space-y-3">
@@ -776,15 +783,6 @@ const Transactions: React.FC = () => {
                     </div>
                 )}
             </div>
-
-            <button
-                type="button"
-                onClick={() => handleOpenModal()}
-                className="md:hidden fixed right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-50 h-14 w-14 rounded-2xl bg-primary-600 text-white shadow-xl shadow-primary-600/25 flex items-center justify-center active:scale-95 transition-transform"
-                aria-label="Nouvelle transaction"
-            >
-                <Plus className="w-6 h-6" />
-            </button>
 
             <FormPopup isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={async (e) => {

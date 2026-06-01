@@ -464,21 +464,22 @@ const Budget: React.FC = () => {
 
     return (
         <div className="space-y-6" style={{ gap: `${settings.componentSpacing * 4}px` }}>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                <div className="hidden md:block">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-200">Budget</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         {format(now, 'MMMM yyyy', { locale: fr })} · budgets configurés et dépenses du Journal
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     {budgetSuggestions.length > 0 && (
-                        <div className="relative" ref={suggestionPopupRef}>
+                        <div className="relative flex-1 sm:flex-none" ref={suggestionPopupRef}>
                             <Button
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => setIsSuggestionsOpen(prev => !prev)}
                                 icon={Sparkles}
+                                className="w-full"
                             >
                                 Suggestions ({budgetSuggestions.length})
                             </Button>
@@ -562,7 +563,7 @@ const Budget: React.FC = () => {
                             )}
                         </div>
                     )}
-                    <Button variant="primary" size="sm" onClick={() => handleOpenBudgetModal()} icon={Plus}>
+                    <Button variant="primary" size="sm" onClick={() => handleOpenBudgetModal()} icon={Plus} className="flex-1 sm:flex-none">
                         Nouveau budget
                     </Button>
                 </div>
