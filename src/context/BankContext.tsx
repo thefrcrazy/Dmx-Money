@@ -66,6 +66,12 @@ interface ScheduledProcessingResult {
     hasScheduledChanges: boolean;
 }
 
+const getScheduledTransactionId = (
+    scheduledId: string,
+    occurrenceDate: string,
+    side: 'single' | 'from' | 'to',
+) => `scheduled:${scheduledId}:${occurrenceDate}:${side}`;
+
 const addMonths = (date: Date, months: number) => {
     const nextDate = new Date(date);
     nextDate.setMonth(nextDate.getMonth() + months);
@@ -107,12 +113,16 @@ const getNextScheduledDate = (date: Date, frequency: ScheduledTransaction['frequ
     }
 };
 
-const processDueScheduledItems = async (sourceScheduled: ScheduledTransaction[]): Promise<ScheduledProcessingResult> => {
+const processDueScheduledItems = async (
+    sourceScheduled: ScheduledTransaction[],
+    existingTransactions: Transaction[] = [],
+): Promise<ScheduledProcessingResult> => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const processedScheduled = sourceScheduled.map(scheduledTx => ({ ...scheduledTx }));
     const newTransactions: Transaction[] = [];
+    const existingTransactionIds = new Set(existingTransactions.map(transaction => transaction.id));
     let hasScheduledChanges = false;
 
     for (let i = 0; i < processedScheduled.length; i++) {
@@ -133,14 +143,15 @@ const processDueScheduledItems = async (sourceScheduled: ScheduledTransaction[])
                 }
             }
 
-            const txId = uuidv4();
+            const occurrenceDate = scheduledTx.nextDate;
 
             if (scheduledTx.type === 'transfer' && scheduledTx.toAccountId) {
-                const linkedId = uuidv4();
+                const txId = getScheduledTransactionId(scheduledTx.id, occurrenceDate, 'from');
+                const linkedId = getScheduledTransactionId(scheduledTx.id, occurrenceDate, 'to');
 
                 const sourceTx: Transaction = {
                     id: txId,
-                    date: scheduledTx.nextDate,
+                    date: occurrenceDate,
                     accountId: scheduledTx.accountId,
                     type: 'expense',
                     amount: scheduledTx.amount,
@@ -153,7 +164,7 @@ const processDueScheduledItems = async (sourceScheduled: ScheduledTransaction[])
 
                 const destTx: Transaction = {
                     id: linkedId,
-                    date: scheduledTx.nextDate,
+                    date: occurrenceDate,
                     accountId: scheduledTx.toAccountId,
                     type: 'income',
                     amount: scheduledTx.amount,
@@ -164,15 +175,23 @@ const processDueScheduledItems = async (sourceScheduled: ScheduledTransaction[])
                     linkedTransactionId: txId
                 };
 
-                newTransactions.push(sourceTx, destTx);
-                await Promise.all([
-                    dbService.addTransaction(sourceTx),
-                    dbService.addTransaction(destTx)
-                ]);
+                const inserts = [];
+                if (!existingTransactionIds.has(sourceTx.id)) {
+                    newTransactions.push(sourceTx);
+                    existingTransactionIds.add(sourceTx.id);
+                    inserts.push(dbService.addTransaction(sourceTx));
+                }
+                if (!existingTransactionIds.has(destTx.id)) {
+                    newTransactions.push(destTx);
+                    existingTransactionIds.add(destTx.id);
+                    inserts.push(dbService.addTransaction(destTx));
+                }
+                await Promise.all(inserts);
             } else {
+                const txId = getScheduledTransactionId(scheduledTx.id, occurrenceDate, 'single');
                 const newTx: Transaction = {
                     id: txId,
-                    date: scheduledTx.nextDate,
+                    date: occurrenceDate,
                     accountId: scheduledTx.accountId,
                     type: scheduledTx.type,
                     amount: scheduledTx.amount,
@@ -181,8 +200,11 @@ const processDueScheduledItems = async (sourceScheduled: ScheduledTransaction[])
                     checked: false
                 };
 
-                newTransactions.push(newTx);
-                await dbService.addTransaction(newTx);
+                if (!existingTransactionIds.has(newTx.id)) {
+                    newTransactions.push(newTx);
+                    existingTransactionIds.add(newTx.id);
+                    await dbService.addTransaction(newTx);
+                }
             }
 
             const newDate = getNextScheduledDate(new Date(scheduledTx.nextDate), scheduledTx.frequency);
@@ -221,6 +243,16 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const loadBankData = useCallback(async (options: { processScheduled?: boolean } = {}) => {
         const shouldProcessScheduled = options.processScheduled ?? false;
+        const mobileMode = isMobileCompanion();
+
+        if (shouldProcessScheduled && mobileMode) {
+            try {
+                await dbService.processDueScheduled();
+            } catch (error) {
+                if (!dbService.isOfflineError(error)) throw error;
+            }
+        }
+
         const [loadedAccounts, loadedTransactions, loadedCategories, loadedScheduled, loadedBudgets] = await Promise.all([
             dbService.getAccounts(),
             dbService.getTransactions(),
@@ -281,8 +313,8 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
             currentBudgets = migratedBudgets;
         }
 
-        const scheduledResult = shouldProcessScheduled
-            ? await processDueScheduledItems(currentScheduled)
+        const scheduledResult = shouldProcessScheduled && !mobileMode
+            ? await processDueScheduledItems(currentScheduled, currentTransactions)
             : { processedScheduled: currentScheduled, newTransactions: [] as Transaction[] };
 
         setAccounts(currentAccounts);
@@ -521,7 +553,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         isProcessingScheduledRef.current = true;
         try {
-            const { processedScheduled, newTransactions, hasScheduledChanges } = await processDueScheduledItems(scheduled);
+            const { processedScheduled, newTransactions, hasScheduledChanges } = await processDueScheduledItems(scheduled, transactions);
 
             if (newTransactions.length > 0) {
                 setTransactions(prev => [...newTransactions, ...prev]);
@@ -537,7 +569,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } finally {
             isProcessingScheduledRef.current = false;
         }
-    }, [isLoading, scheduled]);
+    }, [isLoading, scheduled, transactions]);
 
     // --- Categories ---
     const addCategory = useCallback(async (category: Omit<Category, 'id'>) => {

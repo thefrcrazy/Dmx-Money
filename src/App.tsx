@@ -245,6 +245,7 @@ const MobileConnectionScreen: React.FC = () => {
   const autoReconnectAttemptedRef = React.useRef(false);
   const visibleConnectionError = isSetupRequiredMobileError(mobileConnectionError) ? null : mobileConnectionError;
   const hasPasskeySetup = hasMobilePasskeySetup();
+  const showQrButton = !hasPasskeySetup || !isConnecting;
 
   const stopQrScanner = React.useCallback(() => {
     scannerControlsRef.current?.stop();
@@ -460,22 +461,24 @@ const MobileConnectionScreen: React.FC = () => {
           </button>
         )}
 
-        <button
-          onClick={handleStartQrScanner}
-          disabled={isConnecting || isScannerStarting}
-          className={`${hasPasskeySetup ? 'mt-3 border border-gray-200 bg-white text-gray-800 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-100' : 'mt-5 bg-primary-500 text-white shadow-sm hover:bg-primary-600'} flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold uppercase tracking-wide transition-colors disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-white/10`}
-        >
-          {isConnecting || isScannerStarting
-            ? <RefreshCw className="w-4 h-4 animate-spin" />
-            : <Camera className="w-4 h-4" />}
-          {isConnecting
-            ? 'Connexion...'
-            : isScannerStarting
-              ? 'Ouverture caméra...'
-              : hasPasskeySetup
-                ? 'Scanner un nouveau QR'
-                : 'Scanner le QR code'}
-        </button>
+        {showQrButton && (
+          <button
+            onClick={handleStartQrScanner}
+            disabled={isConnecting || isScannerStarting}
+            className={`${hasPasskeySetup ? 'mt-3 border border-gray-200 bg-white text-gray-800 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-100' : 'mt-5 bg-primary-500 text-white shadow-sm hover:bg-primary-600'} flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold uppercase tracking-wide transition-colors disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-white/10`}
+          >
+            {isConnecting || isScannerStarting
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <Camera className="w-4 h-4" />}
+            {isConnecting
+              ? 'Connexion...'
+              : isScannerStarting
+                ? 'Ouverture caméra...'
+                : hasPasskeySetup
+                  ? 'Scanner un nouveau QR'
+                  : 'Scanner le QR code'}
+          </button>
+        )}
 
         <button
           type="button"
