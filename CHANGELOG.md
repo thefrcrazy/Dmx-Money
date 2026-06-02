@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.10 - 2026-06-02
+
+- Refonte visuelle du changelog desktop et mobile avec une présentation plus compacte et plus minimaliste.
+- Amélioration du contraste mobile pour éviter l'effet gris sur gris dans la fenêtre des nouveautés.
+- Affichage du changelog via portal afin de rester au-dessus de la navigation mobile et des conteneurs de page.
+- Conservation du contenu des notes de version avec une hiérarchie visuelle plus explicite.
+
 ## 1.0.9 - 2026-06-02
 
 - Réglage du pull-to-refresh mobile pour éviter les rechargements pendant le scroll des tableaux, popups, champs et zones internes.

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Sparkles, Check, ChevronRight, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { CalendarDays, Check, Sparkles, X } from 'lucide-react';
 import { CHANGELOG, VersionUpdate } from '../../constants/changelog';
 import { ICONS } from '../../constants/icons';
 import Button from './Button';
@@ -17,50 +18,59 @@ const ReleaseNotesModal: React.FC<ReleaseNotesModalProps> = ({
 }) => {
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
-            <div className="app-card w-full max-w-lg overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 flex flex-col max-h-[90vh]">
-                {/* Header avec dégradé */}
-                <div className="relative h-32 bg-gradient-to-br from-primary-600 to-indigo-700 p-6 flex items-end">
-                    <button 
-                        onClick={onClose}
-                        className="absolute top-4 right-4 p-1 rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl">
-                            <Sparkles className="w-8 h-8 text-white" />
+    return createPortal(
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-4">
+            <div
+                className="flex max-h-[calc(100dvh-env(safe-area-inset-top))] w-full flex-col overflow-hidden rounded-b-none rounded-t-2xl border border-primary-100/70 border-x-0 border-b-0 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-200 dark:border-white/10 dark:bg-neutral-950 sm:max-h-[82vh] sm:max-w-xl sm:rounded-2xl sm:border"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="release-notes-title"
+            >
+                <div className="sticky top-0 z-10 border-b border-primary-100/80 bg-white px-4 py-3 dark:border-white/10 dark:bg-neutral-950 sm:px-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300">
+                                    <Sparkles className="h-3 w-3" />
+                                    Nouveautés
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                    <CalendarDays className="h-3 w-3" />
+                                    {versionData.date}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h2 id="release-notes-title" className="min-w-0 text-lg font-bold leading-snug text-gray-950 dark:text-white sm:truncate sm:text-xl">
+                                    {versionData.title}
+                                </h2>
+                                <span className="shrink-0 rounded-md bg-primary-50 px-1.5 py-0.5 text-[11px] font-semibold text-primary-600 dark:bg-primary-500/10 dark:text-primary-300">
+                                    v{versionData.version}
+                                </span>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-white">Quoi de neuf ?</h2>
-                            <p className="text-primary-100 text-sm">Version {versionData.version} — {versionData.date}</p>
-                        </div>
+                        <button
+                            onClick={onClose}
+                            className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-neutral-900 dark:hover:text-gray-200"
+                            aria-label="Fermer le changelog"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
                     </div>
                 </div>
 
-                {/* Contenu scrollable */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                    {/* Titre de la version */}
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                            {versionData.title}
-                        </h3>
-                    </div>
-
-                    {/* Features mises en avant */}
+                <div className="flex-1 overflow-y-auto bg-gradient-to-b from-primary-50/35 via-white to-white px-4 py-4 custom-scrollbar dark:from-primary-950/15 dark:via-neutral-950 dark:to-neutral-950 sm:px-5">
                     {versionData.features && versionData.features.length > 0 && (
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {versionData.features.map((feature, idx) => {
                                 const IconComp = ICONS[feature.icon] || Sparkles;
                                 return (
-                                    <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-primary-50/50 dark:bg-primary-900/10 border border-primary-100/50 dark:border-primary-800/30">
-                                        <div className="shrink-0 w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                            <IconComp className="w-6 h-6" />
+                                    <div key={idx} className="flex min-w-0 gap-3 rounded-xl border border-primary-100/80 bg-white p-3 shadow-sm shadow-primary-950/5 dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:bg-primary-500/15 dark:text-primary-300">
+                                            <IconComp className="h-4 w-4" />
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 dark:text-gray-100">{feature.title}</h4>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                                        <div className="min-w-0">
+                                            <h3 className="text-sm font-semibold leading-snug text-gray-950 dark:text-white">{feature.title}</h3>
+                                            <p className="mt-0.5 text-xs leading-relaxed text-gray-600 dark:text-neutral-400">
                                                 {feature.description}
                                             </p>
                                         </div>
@@ -70,37 +80,42 @@ const ReleaseNotesModal: React.FC<ReleaseNotesModalProps> = ({
                         </div>
                     )}
 
-                    {/* Liste complète des changements */}
-                    <div className="space-y-4">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Toutes les améliorations</h4>
-                        <div className="space-y-3">
+                    <div className="overflow-hidden rounded-xl border border-primary-100/80 bg-white shadow-sm shadow-primary-950/5 dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+                        <div className="flex items-center justify-between border-b border-primary-100/80 bg-primary-50/80 px-3 py-2 dark:border-white/10 dark:bg-neutral-900">
+                            <h3 className="text-[11px] font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300">
+                                Changements
+                            </h3>
+                            <span className="text-[11px] font-semibold text-primary-500 dark:text-primary-300">
+                                {versionData.changes.length}
+                            </span>
+                        </div>
+                        <div className="divide-y divide-primary-100/70 dark:divide-white/10">
                             {versionData.changes.map((change, idx) => (
-                                <div key={idx} className="flex items-start gap-3 group">
-                                    <div className="mt-1 flex items-center justify-center w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 shrink-0">
-                                        <Check className="w-3 h-3" />
+                                <div key={idx} className="grid grid-cols-[1.75rem_1fr] gap-2 px-3 py-2.5 sm:grid-cols-[2rem_1fr]">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                        <Check className="h-3 w-3" />
                                     </div>
-                                    <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
+                                    <p className="text-sm leading-relaxed text-gray-700 dark:text-neutral-300">
                                         {change}
-                                    </span>
+                                    </p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-6 border-t border-black/[0.05] dark:border-white/10">
-                    <Button 
+                <div className="border-t border-primary-100/80 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-white/10 dark:bg-neutral-950 sm:px-5 sm:pb-3">
+                    <Button
                         onClick={onClose}
                         fullWidth
-                        size="lg"
-                        icon={ChevronRight}
+                        size="md"
                     >
-                        C'est parti !
+                        Fermer
                     </Button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

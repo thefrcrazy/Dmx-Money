@@ -12,6 +12,29 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.10",
+        date: "2026-06-02",
+        title: "Changelog plus lisible",
+        changes: [
+            "Refonte visuelle du changelog desktop et mobile avec une présentation plus compacte et plus minimaliste.",
+            "Amélioration du contraste mobile pour éviter l'effet gris sur gris dans la fenêtre des nouveautés.",
+            "Affichage du changelog via portal afin de rester au-dessus de la navigation mobile et des conteneurs de page.",
+            "Conservation du contenu des notes de version avec une hiérarchie visuelle plus explicite."
+        ],
+        features: [
+            {
+                title: "Nouveautés plus claires",
+                description: "Les notes de version sont plus faciles à parcourir, avec des repères visuels plus sobres.",
+                icon: "Sparkles"
+            },
+            {
+                title: "Mobile mieux contrasté",
+                description: "Le panneau mobile utilise un fond plus lumineux et des cartes mieux séparées.",
+                icon: "Smartphone"
+            }
+        ]
+    },
+    {
         version: "1.0.9",
         date: "2026-06-02",
         title: "Synchronisation mobile et gestes plus précis",
