@@ -1,9 +1,10 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Calendar, Trash2, Edit2, Clock, X, Tag, Sparkles, Search, ChevronDown, ArrowRightLeft } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useBank } from '../context/BankContext';
 import { useToast } from '../context/ToastContext';
+import { useSettings } from '../context/SettingsContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import FormPopup from '../components/ui/FormPopup';
@@ -38,7 +39,6 @@ interface MonthlySuggestion extends Omit<ScheduledTransaction, 'id'> {
 
 type ScheduledDueRange = 'all' | 'month' | '2months' | '3months' | '6months' | 'year';
 
-const DISMISSED_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedScheduledSuggestions';
 const SCHEDULED_DUE_RANGE_STORAGE_KEY = 'dmxmoney.scheduled.dueRange';
 
 const SCHEDULED_DUE_RANGES: ScheduledDueRange[] = ['all', 'month', '2months', '3months', '6months', 'year'];
@@ -109,6 +109,10 @@ const getStoredScheduledDueRange = (): ScheduledDueRange => {
     }
 };
 
+const mergeSuggestionKeys = (...sources: Array<string[] | undefined>) => (
+    Array.from(new Set(sources.flatMap(source => source || [])))
+);
+
 const getMonthIndex = (date: string) => {
     const parsedDate = parseLocalDate(date);
     return parsedDate.getFullYear() * 12 + parsedDate.getMonth();
@@ -127,6 +131,7 @@ const getRecurrenceIdentity = (item: RecurrenceIdentityInput) => [
 const Scheduled: React.FC = () => {
     const { accounts, transactions, scheduled, categories, budgets, addScheduled, updateScheduled, deleteScheduled, filterAccount } = useBank();
     const { showToast } = useToast();
+    const { settings, updateDismissedScheduledSuggestions } = useSettings();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<ScheduledTransaction | null>(null);
     const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
@@ -135,36 +140,14 @@ const Scheduled: React.FC = () => {
     const [isDueRangeDropdownOpen, setIsDueRangeDropdownOpen] = useState(false);
     const [filterCategories, setFilterCategories] = useState<string[]>([]);
     const [filterFrequencies, setFilterFrequencies] = useState<string[]>([]);
-    const suggestionPopupRef = useRef<HTMLDivElement>(null);
-    const [dismissedSuggestionKeys, setDismissedSuggestionKeys] = useState<Set<string>>(() => {
-        try {
-            const stored = localStorage.getItem(DISMISSED_SUGGESTIONS_STORAGE_KEY);
-            return new Set(stored ? JSON.parse(stored) : []);
-        } catch {
-            return new Set();
-        }
-    });
-
-    useEffect(() => {
-        localStorage.setItem(DISMISSED_SUGGESTIONS_STORAGE_KEY, JSON.stringify(Array.from(dismissedSuggestionKeys)));
-    }, [dismissedSuggestionKeys]);
+    const dismissedSuggestionKeys = useMemo(
+        () => new Set(settings.dismissedScheduledSuggestions || []),
+        [settings.dismissedScheduledSuggestions]
+    );
 
     useEffect(() => {
         localStorage.setItem(SCHEDULED_DUE_RANGE_STORAGE_KEY, dueRange);
     }, [dueRange]);
-
-    useEffect(() => {
-        if (!isSuggestionsOpen) return;
-
-        const handleOutsideClick = (event: MouseEvent) => {
-            if (!suggestionPopupRef.current?.contains(event.target as Node)) {
-                setIsSuggestionsOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleOutsideClick);
-        return () => document.removeEventListener('mousedown', handleOutsideClick);
-    }, [isSuggestionsOpen]);
 
     const accountMap = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
     const categoryMap = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);
@@ -485,10 +468,10 @@ const Scheduled: React.FC = () => {
     };
 
     const handleDismissSuggestion = (suggestion: MonthlySuggestion) => {
-        setDismissedSuggestionKeys(prev => {
-            const next = new Set(prev);
-            next.add(suggestion.suggestionKey);
-            return next;
+        updateDismissedScheduledSuggestions(
+            mergeSuggestionKeys(settings.dismissedScheduledSuggestions, [suggestion.suggestionKey])
+        ).catch(() => {
+            showToast("Erreur lors de la synchronisation de la suggestion", "error");
         });
         showToast("Suggestion supprimée", "success");
     };
@@ -540,94 +523,16 @@ const Scheduled: React.FC = () => {
                 <h2 className="hidden md:block text-2xl font-bold text-gray-900 dark:text-gray-200">Transactions Récurrentes</h2>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     {monthlySuggestions.length > 0 && (
-                        <div className="relative flex-1 sm:flex-initial" ref={suggestionPopupRef}>
+                        <div className="flex-1 sm:flex-initial">
                             <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setIsSuggestionsOpen(prev => !prev)}
+                                onClick={() => setIsSuggestionsOpen(true)}
                                 icon={Sparkles}
                                 className="w-full"
                             >
                                 Suggestions ({monthlySuggestions.length})
                             </Button>
-
-                            {isSuggestionsOpen && (
-                                <div className="absolute right-0 top-full z-40 mt-2 w-[calc(100vw-3rem)] max-w-[760px] rounded-xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#121212] shadow-2xl">
-                                    <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] dark:border-white/10 px-4 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Sparkles className="w-4 h-4 text-primary-500 flex-none" />
-                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-200 truncate">Suggestions du journal</h3>
-                                        </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            icon={X}
-                                            onClick={() => setIsSuggestionsOpen(false)}
-                                            className="h-8 w-8 p-0"
-                                        />
-                                    </div>
-                                    <div className="max-h-[420px] overflow-y-auto p-3 space-y-2">
-                                        {monthlySuggestions.map(suggestion => {
-                                            const account = accounts.find(a => a.id === suggestion.accountId);
-                                            const category = getCategoryDetails(suggestion.category);
-
-                                            return (
-                                                <div
-                                                    key={suggestion.suggestionKey}
-                                                    className="rounded-lg border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-neutral-900/60 p-3 flex flex-col sm:flex-row sm:items-center gap-3 min-w-0"
-                                                >
-                                                    <div className="flex items-center gap-3 min-w-0 flex-1 w-full">
-                                                        <div className="w-1 h-10 rounded-full flex-none" style={{ backgroundColor: account?.color || '#3b82f6' }} />
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{suggestion.description}</span>
-                                                                <span
-                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight flex-none max-w-[8rem] min-w-0"
-                                                                    style={{ backgroundColor: `${category.color}15`, color: category.color }}
-                                                                >
-                                                                    {renderCategoryIcon(category.icon, "w-3 h-3 flex-none")}
-                                                                    <span className="truncate">{category.name}</span>
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1 min-w-0">
-                                                                <span className="truncate">{account?.name || 'Compte inconnu'}</span>
-                                                                <span className="text-gray-300 dark:text-gray-700">•</span>
-                                                                <span className="whitespace-nowrap">{format(parseLocalDate(suggestion.nextDate), 'dd MMM yyyy', { locale: fr })}</span>
-                                                                <span className="text-gray-300 dark:text-gray-700">•</span>
-                                                                <span className="whitespace-nowrap">{suggestion.occurrenceCount} mois</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto flex-none">
-                                                        <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${suggestion.type === 'income' ? 'text-emerald-600' :
-                                                            suggestion.type === 'transfer' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600'
-                                                            }`}>
-                                                            {suggestion.type === 'income' ? '+' : suggestion.type === 'transfer' ? '' : '-'}{new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(suggestion.amount)} €
-                                                        </span>
-                                                        <Button
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            icon={Plus}
-                                                            onClick={() => handleAddSuggestion(suggestion)}
-                                                        >
-                                                            Ajouter
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            icon={Trash2}
-                                                            onClick={() => handleDismissSuggestion(suggestion)}
-                                                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                                        >
-                                                            Supprimer
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                     <Button
@@ -975,6 +880,74 @@ const Scheduled: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <FormPopup
+                isOpen={isSuggestionsOpen}
+                onClose={() => setIsSuggestionsOpen(false)}
+                title="Suggestions du journal"
+                maxWidth="2xl"
+            >
+                <div className="p-4 space-y-2">
+                    {monthlySuggestions.map(suggestion => {
+                        const account = accounts.find(a => a.id === suggestion.accountId);
+                        const category = getCategoryDetails(suggestion.category);
+
+                        return (
+                            <div
+                                key={suggestion.suggestionKey}
+                                className="rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-neutral-900/60 p-3 flex flex-col sm:flex-row sm:items-center gap-3 min-w-0"
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1 w-full">
+                                    <div className="w-1 h-10 rounded-full flex-none" style={{ backgroundColor: account?.color || '#3b82f6' }} />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{suggestion.description}</span>
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight flex-none max-w-[8rem] min-w-0"
+                                                style={{ backgroundColor: `${category.color}15`, color: category.color }}
+                                            >
+                                                {renderCategoryIcon(category.icon, "w-3 h-3 flex-none")}
+                                                <span className="truncate">{category.name}</span>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1 min-w-0">
+                                            <span className="truncate">{account?.name || 'Compte inconnu'}</span>
+                                            <span className="text-gray-300 dark:text-gray-700">•</span>
+                                            <span className="whitespace-nowrap">{format(parseLocalDate(suggestion.nextDate), 'dd MMM yyyy', { locale: fr })}</span>
+                                            <span className="text-gray-300 dark:text-gray-700">•</span>
+                                            <span className="whitespace-nowrap">{suggestion.occurrenceCount} mois</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto flex-none">
+                                    <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${suggestion.type === 'income' ? 'text-emerald-600' :
+                                        suggestion.type === 'transfer' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600'
+                                        }`}>
+                                        {suggestion.type === 'income' ? '+' : suggestion.type === 'transfer' ? '' : '-'}{new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(suggestion.amount)} €
+                                    </span>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        icon={Plus}
+                                        onClick={() => handleAddSuggestion(suggestion)}
+                                    >
+                                        Ajouter
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        icon={Trash2}
+                                        onClick={() => handleDismissSuggestion(suggestion)}
+                                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                    >
+                                        Supprimer
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </FormPopup>
 
             <FormPopup
                 isOpen={isModalOpen}

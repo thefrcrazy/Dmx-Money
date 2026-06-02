@@ -35,7 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
   const pullGestureModeRef = React.useRef<'pending' | 'pull' | 'ignore'>('ignore');
   const isMobileMode = isMobileCompanion();
   const showTitleBar = hasTauriRuntime();
-  const pullThreshold = 78;
+  const pullThreshold = 96;
 
   const hasAccountFilter = ['dashboard', 'transactions', 'budget', 'analytics', 'predictions', 'scheduled'].includes(activePage);
   const hasBalanceWidget = ['dashboard', 'transactions'].includes(activePage);
@@ -109,11 +109,64 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
     setPullDistance(value);
   };
 
+  const resetPullRefreshGesture = () => {
+    isPullingRef.current = false;
+    pullGestureModeRef.current = 'ignore';
+    setIsPulling(false);
+    setPullDistanceValue(0);
+  };
+
+  const hasScrollableAncestorBeforeMain = (target: HTMLElement, main: HTMLElement) => {
+    let current: HTMLElement | null = target;
+
+    while (current && current !== main) {
+      const style = window.getComputedStyle(current);
+      const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY)
+        && current.scrollHeight > current.clientHeight + 1;
+      const canScrollX = /(auto|scroll|overlay)/.test(style.overflowX)
+        && current.scrollWidth > current.clientWidth + 1;
+
+      if (canScrollY || canScrollX) return true;
+      current = current.parentElement;
+    }
+
+    return false;
+  };
+
+  const shouldIgnorePullRefreshTarget = (target: HTMLElement | null) => {
+    const main = mainRef.current;
+    if (!target || !main || !main.contains(target)) return true;
+    if (main.scrollTop > 1) return true;
+    if (target.closest([
+      '[data-no-pull-refresh="true"]',
+      '.app-modal-overlay',
+      '.app-modal-content',
+      '.app-modal-body',
+      '.app-form-popup-content',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'td',
+      'th',
+      'input',
+      'textarea',
+      'select',
+      'button',
+      '[role="button"]',
+      '[contenteditable="true"]'
+    ].join(','))) return true;
+
+    return hasScrollableAncestorBeforeMain(target, main);
+  };
+
   const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
     if (isRefreshing || isMobileMenuOpen) return;
     const target = event.target as HTMLElement | null;
-    if (target?.closest('[data-no-pull-refresh="true"]')) return;
-    if ((mainRef.current?.scrollTop || 0) > 0) return;
+    if (shouldIgnorePullRefreshTarget(target)) {
+      resetPullRefreshGesture();
+      return;
+    }
 
     pullStartXRef.current = event.touches[0]?.clientX || 0;
     pullStartYRef.current = event.touches[0]?.clientY || 0;
@@ -123,11 +176,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
 
   const handleTouchMove = (event: React.TouchEvent<HTMLElement>) => {
     if (!isPullingRef.current || isRefreshing) return;
-    if ((mainRef.current?.scrollTop || 0) > 0) {
-      isPullingRef.current = false;
-      pullGestureModeRef.current = 'ignore';
-      setIsPulling(false);
-      setPullDistanceValue(0);
+    if ((mainRef.current?.scrollTop || 0) > 1) {
+      resetPullRefreshGesture();
       return;
     }
 
@@ -143,7 +193,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
         setPullDistanceValue(0);
         return;
       }
-      if (delta > 8) {
+      if (delta > 18) {
         pullGestureModeRef.current = 'pull';
         setIsPulling(true);
       }
@@ -535,7 +585,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
         </>
       )}
 
-      <nav className="md:hidden flex-shrink-0 h-[calc(68px+env(safe-area-inset-bottom))] border-t border-black/[0.06] dark:border-white/10 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-2xl px-2 pt-2.5 pb-[env(safe-area-inset-bottom)] z-[60] shadow-[0_-12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_-12px_40px_rgba(0,0,0,0.3)]">
+      <nav className="mobile-bottom-nav md:hidden flex-shrink-0 h-[calc(68px+env(safe-area-inset-bottom))] border-t border-black/[0.06] dark:border-white/10 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-2xl px-2 pt-2.5 pb-[env(safe-area-inset-bottom)] z-[60] shadow-[0_-12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_-12px_40px_rgba(0,0,0,0.3)]">
         <div className="grid h-full grid-cols-5 gap-1.5">
           {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;

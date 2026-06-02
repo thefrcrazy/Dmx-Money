@@ -12,6 +12,30 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.9",
+        date: "2026-06-02",
+        title: "Synchronisation mobile et gestes plus précis",
+        changes: [
+            "Réglage du pull-to-refresh mobile pour éviter les rechargements pendant le scroll des tableaux, popups, champs et zones internes.",
+            "Synchronisation des suggestions de budget et d'échéancier supprimées entre l'application desktop et la PWA mobile.",
+            "Migration automatique des anciennes suggestions masquées depuis le stockage local vers les paramètres synchronisés.",
+            "Ajout des champs de préférences synchronisées côté SQLite, API Tauri et API compagnon mobile.",
+            "Rafraîchissement automatique des paramètres après une synchronisation mobile afin de garder desktop et PWA alignés."
+        ],
+        features: [
+            {
+                title: "Suggestions synchronisées",
+                description: "Une suggestion supprimée sur desktop ou mobile reste masquée sur l'autre appareil après synchronisation.",
+                icon: "Sparkles"
+            },
+            {
+                title: "Gestes mobiles fiabilisés",
+                description: "Le rafraîchissement par glissement ne se déclenche plus lors du scroll d'une popup ou d'un tableau.",
+                icon: "RefreshCw"
+            }
+        ]
+    },
+    {
         version: "1.0.8",
         date: "2026-06-01",
         title: "Expérience mobile et maintenance du compagnon",

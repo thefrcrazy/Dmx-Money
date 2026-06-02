@@ -31,8 +31,44 @@ const DEFAULT_SETTINGS: Settings = {
     windowSize: null,
     componentSpacing: 6,
     componentPadding: 6,
-    lastSeenVersion: LATEST_VERSION
+    lastSeenVersion: LATEST_VERSION,
+    dismissedBudgetSuggestions: [],
+    dismissedScheduledSuggestions: []
 };
+
+const DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedBudgetSuggestions';
+const DISMISSED_SCHEDULED_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedScheduledSuggestions';
+
+const normalizeSettings = (settings: Settings | null | undefined): Settings => ({
+    ...DEFAULT_SETTINGS,
+    ...(settings || {}),
+    dismissedBudgetSuggestions: settings?.dismissedBudgetSuggestions || [],
+    dismissedScheduledSuggestions: settings?.dismissedScheduledSuggestions || []
+});
+
+const parseStoredSuggestionKeys = (value: string | null) => {
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+const readAndClearStoredSuggestionKeys = (key: string) => {
+    try {
+        const keys = parseStoredSuggestionKeys(localStorage.getItem(key));
+        localStorage.removeItem(key);
+        return keys;
+    } catch {
+        return [];
+    }
+};
+
+const mergeSuggestionKeys = (...sources: Array<string[] | undefined>) => (
+    Array.from(new Set(sources.flatMap(source => source || [])))
+);
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
@@ -51,6 +87,32 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             return false;
         }
     });
+
+    const migrateLocalDismissedSuggestions = (initial: Settings) => {
+        const dismissedBudgetSuggestions = mergeSuggestionKeys(
+            initial.dismissedBudgetSuggestions,
+            readAndClearStoredSuggestionKeys(DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY)
+        );
+        const dismissedScheduledSuggestions = mergeSuggestionKeys(
+            initial.dismissedScheduledSuggestions,
+            readAndClearStoredSuggestionKeys(DISMISSED_SCHEDULED_SUGGESTIONS_STORAGE_KEY)
+        );
+
+        if (
+            dismissedBudgetSuggestions.length === (initial.dismissedBudgetSuggestions || []).length
+            && dismissedScheduledSuggestions.length === (initial.dismissedScheduledSuggestions || []).length
+        ) {
+            return initial;
+        }
+
+        const migrated = {
+            ...initial,
+            dismissedBudgetSuggestions,
+            dismissedScheduledSuggestions
+        };
+        dbService.saveSettings(migrated).catch(() => { });
+        return migrated;
+    };
 
     useEffect(() => {
         if (isSystemDark && !isLoadedRef.current) {
@@ -182,7 +244,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         dbService.getSettings()
             .then(savedSettings => {
                 clearTimeout(fallbackTimer);
-                const initial = savedSettings || DEFAULT_SETTINGS;
+                const initial = migrateLocalDismissedSuggestions(normalizeSettings(savedSettings));
                 finishInitialLoad(initial);
             })
             .catch(() => {
@@ -196,6 +258,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             if (transitionTimer) clearTimeout(transitionTimer);
             if (doneTimer) clearTimeout(doneTimer);
         };
+    }, []);
+
+    useEffect(() => {
+        const refreshSyncedSettings = () => {
+            dbService.getSettings()
+                .then(savedSettings => {
+                    if (!savedSettings) return;
+                    const next = normalizeSettings(savedSettings);
+                    applyVisualSettings(next);
+                    setSettings(next);
+                })
+                .catch(() => { });
+        };
+
+        window.addEventListener('dmxmoney-settings-refresh', refreshSyncedSettings);
+        return () => window.removeEventListener('dmxmoney-settings-refresh', refreshSyncedSettings);
     }, []);
 
     useEffect(() => {
@@ -366,6 +444,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             updateLastSeenVersion: async (version) => {
                 setSettings(prev => {
                     const next = { ...prev, lastSeenVersion: version };
+                    dbService.saveSettings(next).catch(() => { });
+                    return next;
+                });
+            },
+            updateDismissedBudgetSuggestions: async (keys) => {
+                setSettings(prev => {
+                    const next = { ...prev, dismissedBudgetSuggestions: keys };
+                    dbService.saveSettings(next).catch(() => { });
+                    return next;
+                });
+            },
+            updateDismissedScheduledSuggestions: async (keys) => {
+                setSettings(prev => {
+                    const next = { ...prev, dismissedScheduledSuggestions: keys };
                     dbService.saveSettings(next).catch(() => { });
                     return next;
                 });

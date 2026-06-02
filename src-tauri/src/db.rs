@@ -143,7 +143,9 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
             \"secureBridgeLastError\" TEXT,
             \"secureBridgeManagedServiceUrl\" TEXT,
             \"secureBridgeManagedRegisteredAt\" TEXT,
-            \"secureBridgeManagedDeviceSecret\" TEXT
+            \"secureBridgeManagedDeviceSecret\" TEXT,
+            \"dismissedBudgetSuggestions\" TEXT,
+            \"dismissedScheduledSuggestions\" TEXT
         )",
     )
     .execute(&mut *tx)
@@ -416,6 +418,30 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         )
         .execute(&mut *tx)
         .await?;
+    }
+
+    for (name, definition) in [
+        (
+            "dismissedBudgetSuggestions",
+            "ALTER TABLE settings ADD COLUMN \"dismissedBudgetSuggestions\" TEXT",
+        ),
+        (
+            "dismissedScheduledSuggestions",
+            "ALTER TABLE settings ADD COLUMN \"dismissedScheduledSuggestions\" TEXT",
+        ),
+    ] {
+        let exists: bool =
+            sqlx::query_scalar("SELECT count(*) FROM pragma_table_info('settings') WHERE name=$1")
+                .bind(name)
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap_or(0)
+                > 0;
+
+        if !exists {
+            log::info!("Migrating settings table: adding {name} column");
+            sqlx::query(definition).execute(&mut *tx).await?;
+        }
     }
 
     for (name, definition) in [

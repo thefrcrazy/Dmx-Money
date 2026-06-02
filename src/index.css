@@ -1044,6 +1044,28 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
     border-bottom: none !important;
   }
 
+  .app-form-popup-overlay {
+    z-index: 120 !important;
+  }
+
+  .app-form-popup-content {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    width: 100vw !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 12px) !important;
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    z-index: 121 !important;
+  }
+
+  .mobile-bottom-nav {
+    height: calc(62px + env(safe-area-inset-bottom)) !important;
+    padding-top: 0.375rem !important;
+    padding-bottom: max(calc(env(safe-area-inset-bottom) - 12px), 0px) !important;
+  }
+
   .app-form-popup-content--enter {
     animation: form-popup-sheet-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both !important;
   }
@@ -1056,6 +1078,10 @@ button, a, input, [role="button"] { -webkit-app-region: no-drag; }
     background-color: rgba(14, 14, 16, 0.88) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-bottom: none !important;
+  }
+
+  .dark .app-form-popup-content {
+    background-color: rgba(14, 14, 16, 0.98) !important;
   }
 
   /* Ajustements du corps et en-tête modal mobile */

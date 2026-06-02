@@ -30,6 +30,10 @@ pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings
         component_spacing: i32,
         #[sqlx(rename = "componentPadding")]
         component_padding: i32,
+        #[sqlx(rename = "dismissedBudgetSuggestions")]
+        dismissed_budget_suggestions: Option<String>,
+        #[sqlx(rename = "dismissedScheduledSuggestions")]
+        dismissed_scheduled_suggestions: Option<String>,
     }
 
     let row = sqlx::query_as::<_, SettingsRow>("SELECT * FROM settings WHERE id = 1")
@@ -65,6 +69,8 @@ pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings
             last_seen_version: row.last_seen_version,
             component_spacing: row.component_spacing,
             component_padding: row.component_padding,
+            dismissed_budget_suggestions: row.dismissed_budget_suggestions,
+            dismissed_scheduled_suggestions: row.dismissed_scheduled_suggestions,
         }
     }))
 }
@@ -90,9 +96,10 @@ pub(super) async fn save_settings_record(pool: &DbPool, settings: Settings) -> R
         "INSERT INTO settings (
             id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\",
             \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\",
-            \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\"
+            \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\",
+            \"dismissedBudgetSuggestions\", \"dismissedScheduledSuggestions\"
         )
-         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          ON CONFLICT(id) DO UPDATE SET
             theme = $1,
             \"primaryColor\" = $2,
@@ -107,7 +114,9 @@ pub(super) async fn save_settings_record(pool: &DbPool, settings: Settings) -> R
             \"accountsOrder\" = $11,
             \"lastSeenVersion\" = $12,
             \"componentSpacing\" = $13,
-            \"componentPadding\" = $14",
+            \"componentPadding\" = $14,
+            \"dismissedBudgetSuggestions\" = $15,
+            \"dismissedScheduledSuggestions\" = $16",
     )
     .bind(settings.theme)
     .bind(settings.primary_color)
@@ -123,6 +132,8 @@ pub(super) async fn save_settings_record(pool: &DbPool, settings: Settings) -> R
     .bind(settings.last_seen_version)
     .bind(settings.component_spacing)
     .bind(settings.component_padding)
+    .bind(settings.dismissed_budget_suggestions)
+    .bind(settings.dismissed_scheduled_suggestions)
     .execute(pool)
     .await
     .map_err(|e| map_db_error(e, "sauvegarde des paramètres"))?;

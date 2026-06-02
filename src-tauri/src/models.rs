@@ -150,4 +150,8 @@ pub struct Settings {
     pub component_spacing: i32,
     #[serde(rename = "componentPadding")]
     pub component_padding: i32,
+    #[serde(rename = "dismissedBudgetSuggestions")]
+    pub dismissed_budget_suggestions: Option<String>, // JSON string
+    #[serde(rename = "dismissedScheduledSuggestions")]
+    pub dismissed_scheduled_suggestions: Option<String>, // JSON string
 }

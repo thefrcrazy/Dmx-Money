@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.9 - 2026-06-02
+
+- Réglage du pull-to-refresh mobile pour éviter les rechargements pendant le scroll des tableaux, popups, champs et zones internes.
+- Synchronisation des suggestions de budget et d'échéancier supprimées entre l'application desktop et la PWA mobile.
+- Migration automatique des anciennes suggestions masquées depuis le stockage local vers les paramètres synchronisés.
+- Ajout des champs de préférences synchronisées côté SQLite, API Tauri et API compagnon mobile.
+- Rafraîchissement automatique des paramètres après une synchronisation mobile afin de garder desktop et PWA alignés.
+
 ## 1.0.8 - 2026-06-01
 
 - Refonte de l'expérience mobile avec une interface plus proche d'une app native.

@@ -130,6 +130,7 @@ const FormPopup: React.FC<FormPopupProps> = ({
                         </h3>
                         <button
                             onClick={onClose}
+                            aria-label="Fermer"
                             className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors app-modal-close-btn"
                         >
                             <X className="w-5 h-5" />

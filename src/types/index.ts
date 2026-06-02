@@ -121,6 +121,8 @@ export interface Settings {
     componentSpacing: number;
     componentPadding: number;
     lastSeenVersion?: string;
+    dismissedBudgetSuggestions?: string[];
+    dismissedScheduledSuggestions?: string[];
 }
 
 export interface SettingsContextType {
@@ -137,4 +139,6 @@ export interface SettingsContextType {
     updateComponentSpacing: (spacing: number) => Promise<void>;
     updateComponentPadding: (padding: number) => Promise<void>;
     updateLastSeenVersion: (version: string) => Promise<void>;
+    updateDismissedBudgetSuggestions: (keys: string[]) => Promise<void>;
+    updateDismissedScheduledSuggestions: (keys: string[]) => Promise<void>;
 }

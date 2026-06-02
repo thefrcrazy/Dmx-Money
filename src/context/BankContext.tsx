@@ -5,6 +5,11 @@ import { dbService } from '../services/db';
 import { hasTauriRuntime, isMobileCompanion } from '../utils/runtime';
 
 const BankContext = createContext<BankContextType | undefined>(undefined);
+const SETTINGS_REFRESH_EVENT = 'dmxmoney-settings-refresh';
+
+const notifySettingsRefresh = () => {
+    window.dispatchEvent(new Event(SETTINGS_REFRESH_EVENT));
+};
 
 const DEFAULT_DATA: AppData = {
     accounts: [],
@@ -409,7 +414,10 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (hasTauriRuntime()) {
             import('@tauri-apps/api/event')
                 .then(({ listen }) => listen('bank-data-changed', async () => {
-                    if (!disposed) await loadBankData({ processScheduled: false });
+                    if (!disposed) {
+                        notifySettingsRefresh();
+                        await loadBankData({ processScheduled: false });
+                    }
                 }))
                 .then(removeListener => {
                     unlisten = removeListener;
@@ -431,6 +439,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                     if (status.dataVersion !== lastDataVersionRef.current) {
                         lastDataVersionRef.current = status.dataVersion;
+                        notifySettingsRefresh();
                         await loadBankData({ processScheduled: false });
                     }
                 } catch (error) {

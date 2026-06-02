@@ -15,11 +15,13 @@ import {
 
 type InvokeFn = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-interface RawSettings extends Omit<Settings, 'accountGroups' | 'customGroups' | 'customGroupsOrder' | 'accountsOrder'> {
+interface RawSettings extends Omit<Settings, 'accountGroups' | 'customGroups' | 'customGroupsOrder' | 'accountsOrder' | 'dismissedBudgetSuggestions' | 'dismissedScheduledSuggestions'> {
     accountGroups?: string | Settings['accountGroups'] | null;
     customGroups?: string | Settings['customGroups'] | null;
     customGroupsOrder?: string | Settings['customGroupsOrder'] | null;
     accountsOrder?: string | Settings['accountsOrder'] | null;
+    dismissedBudgetSuggestions?: string | Settings['dismissedBudgetSuggestions'] | null;
+    dismissedScheduledSuggestions?: string | Settings['dismissedScheduledSuggestions'] | null;
 }
 
 interface SyncStatus {
@@ -77,7 +79,9 @@ const parseSettings = (res: RawSettings | null): Settings | null => {
         accountGroups: parseMaybeJson<Settings['accountGroups']>(res.accountGroups),
         customGroups: parseMaybeJson<Settings['customGroups']>(res.customGroups),
         customGroupsOrder: parseMaybeJson<Settings['customGroupsOrder']>(res.customGroupsOrder),
-        accountsOrder: parseMaybeJson<Settings['accountsOrder']>(res.accountsOrder)
+        accountsOrder: parseMaybeJson<Settings['accountsOrder']>(res.accountsOrder),
+        dismissedBudgetSuggestions: parseMaybeJson<Settings['dismissedBudgetSuggestions']>(res.dismissedBudgetSuggestions) || [],
+        dismissedScheduledSuggestions: parseMaybeJson<Settings['dismissedScheduledSuggestions']>(res.dismissedScheduledSuggestions) || []
     };
 };
 
@@ -86,7 +90,9 @@ const serializeSettings = (settings: Settings): RawSettings => ({
     accountGroups: settings.accountGroups ? JSON.stringify(settings.accountGroups) : null,
     customGroups: settings.customGroups ? JSON.stringify(settings.customGroups) : null,
     customGroupsOrder: settings.customGroupsOrder ? JSON.stringify(settings.customGroupsOrder) : null,
-    accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null
+    accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null,
+    dismissedBudgetSuggestions: JSON.stringify(settings.dismissedBudgetSuggestions || []),
+    dismissedScheduledSuggestions: JSON.stringify(settings.dismissedScheduledSuggestions || [])
 });
 
 export class DatabaseService {

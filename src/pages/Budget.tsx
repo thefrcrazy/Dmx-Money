@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useBank } from '../context/BankContext';
 import { useSettings } from '../context/SettingsContext';
 import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { AlertCircle, ArrowRightLeft, CalendarClock, CheckCircle2, Edit2, Plus, Search, Sparkles, Tag, Trash2, TrendingDown, Wallet, X } from 'lucide-react';
+import { AlertCircle, ArrowRightLeft, CalendarClock, CheckCircle2, Edit2, Plus, Search, Sparkles, Tag, Trash2, TrendingDown, Wallet } from 'lucide-react';
 import Button from '../components/ui/Button';
 import FormPopup from '../components/ui/FormPopup';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -53,7 +53,9 @@ interface BudgetDetail {
     linkedCount: number;
 }
 
-const DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedBudgetSuggestions';
+const mergeSuggestionKeys = (...sources: Array<string[] | undefined>) => (
+    Array.from(new Set(sources.flatMap(source => source || [])))
+);
 
 const Budget: React.FC = () => {
     const {
@@ -67,7 +69,7 @@ const Budget: React.FC = () => {
         deleteBudget,
         filterAccount
     } = useBank();
-    const { settings } = useSettings();
+    const { settings, updateDismissedBudgetSuggestions } = useSettings();
     const { showToast } = useToast();
 
     const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -76,38 +78,16 @@ const Budget: React.FC = () => {
     const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategories, setFilterCategories] = useState<string[]>([]);
-    const suggestionPopupRef = useRef<HTMLDivElement>(null);
-    const [dismissedSuggestionKeys, setDismissedSuggestionKeys] = useState<Set<string>>(() => {
-        try {
-            const stored = localStorage.getItem(DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY);
-            return new Set(stored ? JSON.parse(stored) : []);
-        } catch {
-            return new Set();
-        }
-    });
+    const dismissedSuggestionKeys = useMemo(
+        () => new Set(settings.dismissedBudgetSuggestions || []),
+        [settings.dismissedBudgetSuggestions]
+    );
     const [formData, setFormData] = useState({
         name: '',
         amount: '',
         category: '',
         accountId: 'all'
     });
-
-    useEffect(() => {
-        localStorage.setItem(DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY, JSON.stringify(Array.from(dismissedSuggestionKeys)));
-    }, [dismissedSuggestionKeys]);
-
-    useEffect(() => {
-        if (!isSuggestionsOpen) return;
-
-        const handleOutsideClick = (event: MouseEvent) => {
-            if (!suggestionPopupRef.current?.contains(event.target as Node)) {
-                setIsSuggestionsOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleOutsideClick);
-        return () => document.removeEventListener('mousedown', handleOutsideClick);
-    }, [isSuggestionsOpen]);
 
     const now = new Date();
     const monthStart = startOfMonth(now);
@@ -420,10 +400,10 @@ const Budget: React.FC = () => {
     };
 
     const handleDismissSuggestion = (suggestion: BudgetSuggestion) => {
-        setDismissedSuggestionKeys(prev => {
-            const next = new Set(prev);
-            next.add(suggestion.suggestionKey);
-            return next;
+        updateDismissedBudgetSuggestions(
+            mergeSuggestionKeys(settings.dismissedBudgetSuggestions, [suggestion.suggestionKey])
+        ).catch(() => {
+            showToast("Erreur lors de la synchronisation de la suggestion", "error");
         });
         showToast("Suggestion supprimée", "success");
     };
@@ -473,94 +453,16 @@ const Budget: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     {budgetSuggestions.length > 0 && (
-                        <div className="relative flex-1 sm:flex-none" ref={suggestionPopupRef}>
+                        <div className="flex-1 sm:flex-none">
                             <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setIsSuggestionsOpen(prev => !prev)}
+                                onClick={() => setIsSuggestionsOpen(true)}
                                 icon={Sparkles}
                                 className="w-full"
                             >
                                 Suggestions ({budgetSuggestions.length})
                             </Button>
-
-                            {isSuggestionsOpen && (
-                                <div className="absolute right-0 top-full z-40 mt-2 w-[calc(100vw-3rem)] max-w-[760px] rounded-xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#121212] shadow-2xl">
-                                    <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] dark:border-white/10 px-4 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Sparkles className="w-4 h-4 text-primary-500 flex-none" />
-                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-200 truncate">Suggestions du journal</h3>
-                                        </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            icon={X}
-                                            onClick={() => setIsSuggestionsOpen(false)}
-                                            className="h-8 w-8 p-0"
-                                        />
-                                    </div>
-                                    <div className="max-h-[420px] overflow-y-auto p-3 space-y-2">
-                                        {budgetSuggestions.map(suggestion => {
-                                            const category = categoryMap.get(suggestion.category) || getCategoryFallback(suggestion.category);
-                                            const account = suggestion.accountId ? accountMap.get(suggestion.accountId) : undefined;
-
-                                            return (
-                                                <div
-                                                    key={suggestion.suggestionKey}
-                                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-neutral-900/60 px-3 py-3"
-                                                >
-                                                    <div className="flex items-center gap-3 min-w-0 flex-1 w-full">
-                                                        <div
-                                                            className="w-9 h-9 rounded-lg flex items-center justify-center flex-none"
-                                                            style={{ backgroundColor: `${category.color}18`, color: category.color }}
-                                                        >
-                                                            {renderCategoryIcon(category.icon, "w-4 h-4")}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{suggestion.name}</span>
-                                                            </div>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                                                                <span>{account?.name || 'Tous les comptes'}</span>
-                                                                <span>•</span>
-                                                                <span>{suggestion.monthCount} mois observé{suggestion.monthCount > 1 ? 's' : ''}</span>
-                                                                {suggestion.currentMonthSpent > 0 && (
-                                                                    <>
-                                                                        <span>•</span>
-                                                                        <span>{formatCurrency(suggestion.currentMonthSpent)} ce mois-ci</span>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 flex-none w-full sm:w-auto">
-                                                        <span className="text-sm font-semibold tabular-nums whitespace-nowrap text-primary-600 dark:text-primary-400">
-                                                            {formatCurrency(suggestion.amount)}
-                                                        </span>
-                                                        <Button
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            icon={Plus}
-                                                            onClick={() => handleAddSuggestion(suggestion)}
-                                                        >
-                                                            Ajouter
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            icon={Trash2}
-                                                            onClick={() => handleDismissSuggestion(suggestion)}
-                                                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                                        >
-                                                            Supprimer
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                     <Button variant="primary" size="sm" onClick={() => handleOpenBudgetModal()} icon={Plus} className="flex-1 sm:flex-none">
@@ -810,6 +712,74 @@ const Budget: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <FormPopup
+                isOpen={isSuggestionsOpen}
+                onClose={() => setIsSuggestionsOpen(false)}
+                title="Suggestions du journal"
+                maxWidth="2xl"
+            >
+                <div className="p-4 space-y-2">
+                    {budgetSuggestions.map(suggestion => {
+                        const category = categoryMap.get(suggestion.category) || getCategoryFallback(suggestion.category);
+                        const account = suggestion.accountId ? accountMap.get(suggestion.accountId) : undefined;
+
+                        return (
+                            <div
+                                key={suggestion.suggestionKey}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-black/[0.05] dark:border-white/10 bg-gray-50 dark:bg-neutral-900/60 px-3 py-3"
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1 w-full">
+                                    <div
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-none"
+                                        style={{ backgroundColor: `${category.color}18`, color: category.color }}
+                                    >
+                                        {renderCategoryIcon(category.icon, "w-4 h-4")}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{suggestion.name}</span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                            <span>{account?.name || 'Tous les comptes'}</span>
+                                            <span>•</span>
+                                            <span>{suggestion.monthCount} mois observé{suggestion.monthCount > 1 ? 's' : ''}</span>
+                                            {suggestion.currentMonthSpent > 0 && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>{formatCurrency(suggestion.currentMonthSpent)} ce mois-ci</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 flex-none w-full sm:w-auto">
+                                    <span className="text-sm font-semibold tabular-nums whitespace-nowrap text-primary-600 dark:text-primary-400">
+                                        {formatCurrency(suggestion.amount)}
+                                    </span>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        icon={Plus}
+                                        onClick={() => handleAddSuggestion(suggestion)}
+                                    >
+                                        Ajouter
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        icon={Trash2}
+                                        onClick={() => handleDismissSuggestion(suggestion)}
+                                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                    >
+                                        Supprimer
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </FormPopup>
 
             <FormPopup isOpen={isBudgetModalOpen} onClose={() => setIsBudgetModalOpen(false)}>
                 <form onSubmit={handleSubmitBudget} className="p-6 space-y-5">
