@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import Calendar from './Calendar';
-import { format, parseISO, isValid } from 'date-fns';
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
+import { Calendar as CalendarIcon } from "lucide-react";
+import Calendar from "./Calendar";
+import { format, parseISO, isValid } from "date-fns";
 
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
     label?: string;
@@ -25,11 +26,13 @@ const Input: React.FC<InputProps> = ({
     onChange,
     ...props
 }) => {
-    const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+    const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-    const [displayText, setDisplayText] = useState('');
+    const [displayText, setDisplayText] = useState("");
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
 
     const sizes = {
         sm: "h-8 text-xs",
@@ -60,17 +63,58 @@ const Input: React.FC<InputProps> = ({
         }
     }, [value, type]);
 
+    useLayoutEffect(() => {
+        const updatePosition = () => {
+            if (isCalendarOpen && containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const spaceBelow = viewportHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                const popupHeight = 320;
+
+                const showAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+                const maxHeight = showAbove ? spaceAbove - 16 : viewportHeight - rect.bottom - 16;
+
+                setPopupStyle({
+                    position: "fixed",
+                    left: rect.left,
+                    ...(showAbove
+                        ? { bottom: viewportHeight - rect.top + 4, maxHeight: Math.min(maxHeight, 350) }
+                        : { top: rect.bottom + 4, maxHeight: Math.min(maxHeight, 350) }
+                    ),
+                    zIndex: 9999,
+                });
+            }
+        };
+
+        if (isCalendarOpen) {
+            updatePosition();
+            window.addEventListener("resize", updatePosition);
+            window.addEventListener("scroll", updatePosition, true);
+        }
+
+        return () => {
+            window.removeEventListener("resize", updatePosition);
+            window.removeEventListener("scroll", updatePosition, true);
+        };
+    }, [isCalendarOpen]);
+
     // Handle clicks outside to close calendar
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(event.target as Node) &&
+                popupRef.current &&
+                !popupRef.current.contains(event.target as Node)
+            ) {
                 setIsCalendarOpen(false);
             }
         };
         if (isCalendarOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener("mousedown", handleClickOutside);
         }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isCalendarOpen]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,14 +254,19 @@ const Input: React.FC<InputProps> = ({
                 )}
 
                 {/* Custom Calendar Popover */}
-                {type === 'date' && isCalendarOpen && !disabled && (
-                    <div className="absolute top-full left-0 mt-2 z-[100]">
+                {type === "date" && isCalendarOpen && !disabled && createPortal(
+                    <div
+                        ref={popupRef}
+                        className="fixed z-[9999]"
+                        style={popupStyle}
+                    >
                         <Calendar 
-                            selectedDate={value && typeof value === 'string' && isValid(parseISO(value)) ? parseISO(value) : new Date()} 
+                            selectedDate={value && typeof value === "string" && isValid(parseISO(value)) ? parseISO(value) : new Date()} 
                             onDateSelect={handleDateSelect}
                             onClose={() => setIsCalendarOpen(false)}
                         />
-                    </div>
+                    </div>,
+                    document.body
                 )}
             </div>
         </div>

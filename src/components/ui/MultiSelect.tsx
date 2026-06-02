@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Search, Check, X, Tag } from 'lucide-react';
-import { ICONS } from '../../constants/icons';
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Search, Check, X, Tag } from "lucide-react";
+import { ICONS } from "../../constants/icons";
 
 export interface SelectOption {
     id: string;
@@ -17,7 +18,7 @@ interface MultiSelectProps {
     placeholder?: string;
     className?: string;
     disabled?: boolean;
-    size?: 'sm' | 'md' | 'lg';
+    size?: "sm" | "md" | "lg";
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -25,14 +26,16 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     value,
     onChange,
     options,
-    placeholder = 'Sélectionner...',
-    className = '',
+    placeholder = "Sélectionner...",
+    className = "",
     disabled = false,
-    size = 'md',
+    size = "md",
 }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState("");
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
 
     const sizes = {
         sm: "h-8 px-3 text-xs",
@@ -40,14 +43,58 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         lg: "h-11 px-3 text-base",
     };
 
+    useLayoutEffect(() => {
+        const updatePosition = () => {
+            if (isOpen && wrapperRef.current) {
+                const rect = wrapperRef.current.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const spaceBelow = viewportHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                const popupHeight = 240;
+
+                const showAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+                const maxHeight = showAbove ? spaceAbove - 16 : viewportHeight - rect.bottom - 16;
+
+                setPopupStyle({
+                    position: "fixed",
+                    left: rect.left,
+                    width: rect.width,
+                    ...(showAbove
+                        ? { bottom: viewportHeight - rect.top + 4, maxHeight: Math.min(maxHeight, 240) }
+                        : { top: rect.bottom + 4, maxHeight: Math.min(maxHeight, 240) }
+                    ),
+                    zIndex: 9999,
+                    display: "flex",
+                    flexDirection: "column",
+                });
+            }
+        };
+
+        if (isOpen) {
+            updatePosition();
+            window.addEventListener("resize", updatePosition);
+            window.addEventListener("scroll", updatePosition, true);
+        }
+
+        return () => {
+            window.removeEventListener("resize", updatePosition);
+            window.removeEventListener("scroll", updatePosition, true);
+        };
+    }, [isOpen]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+            if (
+                wrapperRef.current &&
+                !wrapperRef.current.contains(event.target as Node) &&
+                popupRef.current &&
+                !popupRef.current.contains(event.target as Node)
+            ) {
                 setIsOpen(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     const filteredOptions = options.filter(opt =>
@@ -129,10 +176,14 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''} ml-2 shrink-0 app-multiselect-arrow`} />
             </button>
 
-            {isOpen && (
-                <div className="dropdown-menu absolute z-[100] w-full mt-1 max-h-60 flex flex-col app-multiselect-dropdown">
+            {isOpen && createPortal(
+                <div
+                    ref={popupRef}
+                    className="dropdown-menu fixed z-[9999] flex flex-col app-multiselect-dropdown"
+                    style={popupStyle}
+                >
                     {/* Content */}
-                    <div className="app-selector-bg flex flex-col max-h-60 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="app-selector-bg flex flex-col scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200" style={{ maxHeight: popupStyle.maxHeight || 240 }}>
                         <div className="select-header p-2 border-b border-black/[0.05] dark:border-white/10 sticky top-0 group-[.retro]:bg-[#FFF8DC] group-[.retro]:border-[#808080] app-multiselect-search-header">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 app-multiselect-search-icon" />
@@ -161,8 +212,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                                             type="button"
                                             onClick={() => handleSelect(option.id)}
                                             className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors cursor-pointer app-multiselect-option ${isSelected
-                                                ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 app-option-selected'
-                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                ? "bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 app-option-selected"
+                                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                 }`}
                                         >
                                             <div className="flex items-center gap-2 app-option-content">
@@ -182,7 +233,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
             </div>
         </div>
