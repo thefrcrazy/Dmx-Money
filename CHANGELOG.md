@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.11 - 2026-06-06
+
+- Correction des selectors dans les formulaires : les listes ne sont plus coupées par les popups.
+- Positionnement flottant partagé pour les selects simples et multi-selects, avec prise en compte du viewport mobile et des limites de formulaire.
+- Ajout d'un verrou anti-clipping pendant l'ouverture des selectors pour éviter les conflits avec les animations et `overflow` des modales.
+
 ## 1.0.10 - 2026-06-02
 
 - Refonte visuelle du changelog desktop et mobile avec une présentation plus compacte et plus minimaliste.

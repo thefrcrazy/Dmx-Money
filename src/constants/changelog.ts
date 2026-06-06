@@ -12,6 +12,28 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.11",
+        date: "2026-06-06",
+        title: "Selectors non coupés",
+        changes: [
+            "Correction des selectors dans les formulaires : les listes ne sont plus coupées par les popups.",
+            "Positionnement flottant partagé pour les selects simples et multi-selects, avec prise en compte du viewport mobile et des limites de formulaire.",
+            "Ajout d'un verrou anti-clipping pendant l'ouverture des selectors pour éviter les conflits avec les animations et l'overflow des modales."
+        ],
+        features: [
+            {
+                title: "Formulaires plus fiables",
+                description: "Les listes de sélection restent visibles dans les popups, même près du bas du formulaire.",
+                icon: "CheckCircle2"
+            },
+            {
+                title: "Positionnement intelligent",
+                description: "Les selectors s'adaptent au viewport et s'ouvrent dans le sens qui garde les options accessibles.",
+                icon: "ChevronDown"
+            }
+        ]
+    },
+    {
         version: "1.0.10",
         date: "2026-06-02",
         title: "Changelog plus lisible",
