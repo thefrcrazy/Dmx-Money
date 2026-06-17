@@ -1,26 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
 import CategoryPieChart from '../features/analytics/CategoryPieChart';
 import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { useBank } from '../context/BankContext';
+import { useSettings } from '../context/SettingsContext';
 import { format, subMonths, eachMonthOfInterval, subWeeks, subYears, isWithinInterval, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChevronDown } from 'lucide-react';
+import { AnalyticsTimeRange } from '../types';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
 
-type TimeRange = 'week' | 'month' | '2months' | '3months' | '6months' | '9months' | 'year' | 'custom';
+const ANALYTICS_TIME_RANGES: AnalyticsTimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
 
-const ANALYTICS_TIME_RANGE_STORAGE_KEY = 'dmxmoney.analytics.timeRange';
-const ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY = 'dmxmoney.analytics.customStartDate';
-const ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY = 'dmxmoney.analytics.customEndDate';
-const ANALYTICS_MONTH_START_STORAGE_KEY = 'dmxmoney.analytics.monthStartsOnFirst';
-const ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY = 'dmxmoney.analytics.hiddenExpenseCategories';
-const ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY = 'dmxmoney.analytics.hiddenIncomeCategories';
-
-const ANALYTICS_TIME_RANGES: TimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
-
-const ANALYTICS_TIME_RANGE_LABELS: Record<TimeRange, string> = {
+const ANALYTICS_TIME_RANGE_LABELS: Record<AnalyticsTimeRange, string> = {
     week: 'Semaine',
     month: 'Mois',
     '2months': '2 Mois',
@@ -33,50 +26,6 @@ const ANALYTICS_TIME_RANGE_LABELS: Record<TimeRange, string> = {
 
 const getDefaultCustomStartDate = () => format(subMonths(new Date(), 1), 'yyyy-MM-dd');
 const getDefaultCustomEndDate = () => format(new Date(), 'yyyy-MM-dd');
-
-const getStoredAnalyticsTimeRange = (): TimeRange => {
-    try {
-        const stored = localStorage.getItem(ANALYTICS_TIME_RANGE_STORAGE_KEY) as TimeRange | null;
-        return stored && ANALYTICS_TIME_RANGES.includes(stored) ? stored : 'year';
-    } catch {
-        return 'year';
-    }
-};
-
-const getStoredAnalyticsCustomStartDate = () => {
-    try {
-        return localStorage.getItem(ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY) || getDefaultCustomStartDate();
-    } catch {
-        return getDefaultCustomStartDate();
-    }
-};
-
-const getStoredAnalyticsCustomEndDate = () => {
-    try {
-        return localStorage.getItem(ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY) || getDefaultCustomEndDate();
-    } catch {
-        return getDefaultCustomEndDate();
-    }
-};
-
-const getStoredAnalyticsMonthStartsOnFirst = () => {
-    try {
-        const stored = localStorage.getItem(ANALYTICS_MONTH_START_STORAGE_KEY);
-        return stored === null ? true : stored === 'true';
-    } catch {
-        return true;
-    }
-};
-
-const getStoredStringArray = (key: string) => {
-    try {
-        const stored = localStorage.getItem(key);
-        const parsed = stored ? JSON.parse(stored) : [];
-        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
-    } catch {
-        return [];
-    }
-};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -105,6 +54,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 const Analytics: React.FC = () => {
     const { transactions: allTransactions, accounts: allAccounts, categories, filterAccount } = useBank();
+    const { settings, updateSettings } = useSettings();
+    const timeRange = settings.analyticsTimeRange || 'year';
+    const customStartDate = settings.analyticsCustomStartDate || getDefaultCustomStartDate();
+    const customEndDate = settings.analyticsCustomEndDate || getDefaultCustomEndDate();
+    const monthStartsOnFirst = settings.analyticsMonthStartsOnFirst ?? true;
+    const hiddenExpenseCategories = settings.analyticsHiddenExpenseCategories || [];
+    const hiddenIncomeCategories = settings.analyticsHiddenIncomeCategories || [];
 
     const transactions = useMemo(() =>
         filterAccount.length === 0 ? allTransactions : allTransactions.filter(t => filterAccount.includes(t.accountId)),
@@ -114,37 +70,37 @@ const Analytics: React.FC = () => {
         filterAccount.length === 0 ? allAccounts : allAccounts.filter(a => filterAccount.includes(a.id)),
         [allAccounts, filterAccount]);
 
-    const [timeRange, setTimeRange] = useState<TimeRange>(getStoredAnalyticsTimeRange);
     const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
-    const [customStartDate, setCustomStartDate] = useState(getStoredAnalyticsCustomStartDate);
-    const [customEndDate, setCustomEndDate] = useState(getStoredAnalyticsCustomEndDate);
-    const [monthStartsOnFirst, setMonthStartsOnFirst] = useState(getStoredAnalyticsMonthStartsOnFirst);
-    const [hiddenExpenseCategories, setHiddenExpenseCategories] = useState<string[]>(() => getStoredStringArray(ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY));
-    const [hiddenIncomeCategories, setHiddenIncomeCategories] = useState<string[]>(() => getStoredStringArray(ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY));
 
-    useEffect(() => {
-        localStorage.setItem(ANALYTICS_TIME_RANGE_STORAGE_KEY, timeRange);
-    }, [timeRange]);
+    const setTimeRange = (analyticsTimeRange: AnalyticsTimeRange) => {
+        void updateSettings({ analyticsTimeRange });
+    };
 
-    useEffect(() => {
-        localStorage.setItem(ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY, customStartDate);
-    }, [customStartDate]);
+    const setCustomStartDate = (analyticsCustomStartDate: string) => {
+        void updateSettings({ analyticsCustomStartDate });
+    };
 
-    useEffect(() => {
-        localStorage.setItem(ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY, customEndDate);
-    }, [customEndDate]);
+    const setCustomEndDate = (analyticsCustomEndDate: string) => {
+        void updateSettings({ analyticsCustomEndDate });
+    };
 
-    useEffect(() => {
-        localStorage.setItem(ANALYTICS_MONTH_START_STORAGE_KEY, String(monthStartsOnFirst));
-    }, [monthStartsOnFirst]);
+    const setMonthStartsOnFirst = (analyticsMonthStartsOnFirst: boolean) => {
+        void updateSettings({ analyticsMonthStartsOnFirst });
+    };
 
-    useEffect(() => {
-        localStorage.setItem(ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY, JSON.stringify(hiddenExpenseCategories));
-    }, [hiddenExpenseCategories]);
+    const setHiddenExpenseCategories = (updater: string[] | ((current: string[]) => string[])) => {
+        const analyticsHiddenExpenseCategories = typeof updater === 'function'
+            ? updater(hiddenExpenseCategories)
+            : updater;
+        void updateSettings({ analyticsHiddenExpenseCategories });
+    };
 
-    useEffect(() => {
-        localStorage.setItem(ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY, JSON.stringify(hiddenIncomeCategories));
-    }, [hiddenIncomeCategories]);
+    const setHiddenIncomeCategories = (updater: string[] | ((current: string[]) => string[])) => {
+        const analyticsHiddenIncomeCategories = typeof updater === 'function'
+            ? updater(hiddenIncomeCategories)
+            : updater;
+        void updateSettings({ analyticsHiddenIncomeCategories });
+    };
 
     const dateRange = useMemo(() => {
         const today = new Date();

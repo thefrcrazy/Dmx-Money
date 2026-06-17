@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.12 - 2026-06-17
+
+- Synchronisation des transactions fictives de Prédictions entre desktop et PWA mobile.
+- Synchronisation du seuil d'alerte et des préférences de période de Prédictions.
+- Synchronisation des préférences d'Analyses : période, dates personnalisées, démarrage au 1er du mois et catégories masquées.
+- Synchronisation de la plage d'affichage de l'Échéancier.
+- Migration automatique des anciennes préférences stockées localement vers les paramètres synchronisés.
+
 ## 1.0.11 - 2026-06-06
 
 - Correction des selectors dans les formulaires : les listes ne sont plus coupées par les popups.

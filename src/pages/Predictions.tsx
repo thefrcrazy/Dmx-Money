@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useBank } from '../context/BankContext';
 import { useToast } from '../context/ToastContext';
+import { useSettings } from '../context/SettingsContext';
 import { format, addMonths, endOfMonth, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ArrowRightLeft, Edit2, Plus, Trash2, TrendingDown, TrendingUp, ChevronDown } from 'lucide-react';
@@ -10,22 +11,8 @@ import Button from '../components/ui/Button';
 import FormPopup from '../components/ui/FormPopup';
 import Input from '../components/ui/Input';
 import SearchableSelect from '../components/ui/SearchableSelect';
-import { TransactionType } from '../types';
+import { PredictionFakeTransaction, PredictionTimeRange, TransactionType } from '../types';
 import { formatCurrency } from '../utils/format';
-
-type PredictionTimeRange = 'week' | 'month' | '2months' | '3months' | '6months' | '9months' | 'year' | 'custom';
-
-interface PredictionFakeTransaction {
-    id: string;
-    date: string;
-    accountId: string;
-    type: TransactionType;
-    amount: number;
-    category: string;
-    description: string;
-    enabled: boolean;
-    toAccountId?: string;
-}
 
 interface FakeTransactionFormData {
     date: string;
@@ -49,12 +36,6 @@ interface AlertCrossingMarker {
         value: number;
     }>;
 }
-
-const PREDICTION_TIME_RANGE_STORAGE_KEY = 'dmxmoney.predictions.timeRange';
-const PREDICTION_CUSTOM_END_DATE_STORAGE_KEY = 'dmxmoney.predictions.customEndDate';
-const PREDICTION_ALERT_THRESHOLD_STORAGE_KEY = 'dmxmoney.predictions.alertThreshold';
-const PREDICTION_MONTH_START_STORAGE_KEY = 'dmxmoney.predictions.monthStartsOnFirst';
-const PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY = 'dmxmoney.predictions.fakeTransactions';
 
 const PREDICTION_TIME_RANGES: PredictionTimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
 
@@ -80,79 +61,7 @@ const PREDICTION_TITLE_LABELS: Record<PredictionTimeRange, string> = {
     custom: 'personnalisée'
 };
 
-const getStoredPredictionTimeRange = (): PredictionTimeRange => {
-    try {
-        const stored = localStorage.getItem(PREDICTION_TIME_RANGE_STORAGE_KEY) as PredictionTimeRange | null;
-        return stored && PREDICTION_TIME_RANGES.includes(stored) ? stored : 'year';
-    } catch {
-        return 'year';
-    }
-};
-
 const getDefaultCustomEndDate = () => format(addMonths(new Date(), 1), 'yyyy-MM-dd');
-
-const getStoredCustomEndDate = () => {
-    try {
-        return localStorage.getItem(PREDICTION_CUSTOM_END_DATE_STORAGE_KEY) || getDefaultCustomEndDate();
-    } catch {
-        return getDefaultCustomEndDate();
-    }
-};
-
-const getStoredAlertThreshold = () => {
-    try {
-        const stored = Number(localStorage.getItem(PREDICTION_ALERT_THRESHOLD_STORAGE_KEY));
-        return Number.isFinite(stored) ? stored : 0;
-    } catch {
-        return 0;
-    }
-};
-
-const getStoredMonthStartsOnFirst = () => {
-    try {
-        const stored = localStorage.getItem(PREDICTION_MONTH_START_STORAGE_KEY);
-        return stored === null ? true : stored === 'true';
-    } catch {
-        return true;
-    }
-};
-
-const isPredictionFakeTransaction = (value: unknown): value is PredictionFakeTransaction => {
-    if (!value || typeof value !== 'object') return false;
-
-    const item = value as Partial<PredictionFakeTransaction>;
-    return (
-        typeof item.id === 'string'
-        && typeof item.date === 'string'
-        && typeof item.accountId === 'string'
-        && (item.type === 'income' || item.type === 'expense' || item.type === 'transfer')
-        && typeof item.amount === 'number'
-        && Number.isFinite(item.amount)
-        && item.amount > 0
-        && typeof item.description === 'string'
-        && typeof item.category === 'string'
-        && (item.enabled === undefined || typeof item.enabled === 'boolean')
-    );
-};
-
-const getStoredFakeTransactions = (): PredictionFakeTransaction[] => {
-    try {
-        const stored = localStorage.getItem(PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY);
-        if (!stored) return [];
-
-        const parsed = JSON.parse(stored);
-        if (!Array.isArray(parsed)) return [];
-
-        return parsed
-            .filter(isPredictionFakeTransaction)
-            .map(transaction => ({
-                ...transaction,
-                enabled: transaction.enabled !== false
-            }));
-    } catch {
-        return [];
-    }
-};
 
 const parseLocalDate = (value: string) => {
     const [year, month, day] = value.split('-').map(Number);
@@ -240,12 +149,13 @@ const CustomTooltip = ({ active, payload, negativeMarkerByDate, alertThreshold }
 const Predictions: React.FC = () => {
     const { accounts: allAccounts, scheduled: allScheduled, transactions: allTransactions, categories, filterAccount } = useBank();
     const { showToast } = useToast();
-    const [timeRange, setTimeRange] = useState<PredictionTimeRange>(getStoredPredictionTimeRange);
+    const { settings, updateSettings } = useSettings();
+    const timeRange = settings.predictionTimeRange || 'year';
+    const customEndDate = settings.predictionCustomEndDate || getDefaultCustomEndDate();
+    const alertThreshold = settings.predictionAlertThreshold || 0;
+    const monthStartsOnFirst = settings.predictionMonthStartsOnFirst ?? true;
+    const fakeTransactions = settings.predictionFakeTransactions || [];
     const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
-    const [customEndDate, setCustomEndDate] = useState(getStoredCustomEndDate);
-    const [alertThreshold, setAlertThreshold] = useState(getStoredAlertThreshold);
-    const [monthStartsOnFirst, setMonthStartsOnFirst] = useState(getStoredMonthStartsOnFirst);
-    const [fakeTransactions, setFakeTransactions] = useState<PredictionFakeTransaction[]>(getStoredFakeTransactions);
     const [isFakeTransactionModalOpen, setIsFakeTransactionModalOpen] = useState(false);
     const [editingFakeTransaction, setEditingFakeTransaction] = useState<PredictionFakeTransaction | null>(null);
     const [fakeTransactionForm, setFakeTransactionForm] = useState<FakeTransactionFormData>({
@@ -286,32 +196,37 @@ const Predictions: React.FC = () => {
         color: account.color
     })), [allAccounts]);
 
+    const setTimeRange = (predictionTimeRange: PredictionTimeRange) => {
+        void updateSettings({ predictionTimeRange });
+    };
+
+    const setCustomEndDate = (predictionCustomEndDate: string) => {
+        void updateSettings({ predictionCustomEndDate });
+    };
+
+    const setAlertThreshold = (predictionAlertThreshold: number) => {
+        void updateSettings({ predictionAlertThreshold });
+    };
+
+    const setMonthStartsOnFirst = (predictionMonthStartsOnFirst: boolean) => {
+        void updateSettings({ predictionMonthStartsOnFirst });
+    };
+
+    const setFakeTransactions = (
+        updater: PredictionFakeTransaction[] | ((current: PredictionFakeTransaction[]) => PredictionFakeTransaction[])
+    ) => {
+        const predictionFakeTransactions = typeof updater === 'function'
+            ? updater(fakeTransactions)
+            : updater;
+        void updateSettings({ predictionFakeTransactions });
+    };
+
     // Calculate current total balance
     const currentTotalBalance = useMemo(() => {
         const initialBalanceSum = accounts.reduce((sum, acc) => sum + acc.initialBalance, 0);
         const transactionsSum = transactions.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0);
         return initialBalanceSum + transactionsSum;
     }, [accounts, transactions]);
-
-    useEffect(() => {
-        localStorage.setItem(PREDICTION_TIME_RANGE_STORAGE_KEY, timeRange);
-    }, [timeRange]);
-
-    useEffect(() => {
-        localStorage.setItem(PREDICTION_CUSTOM_END_DATE_STORAGE_KEY, customEndDate);
-    }, [customEndDate]);
-
-    useEffect(() => {
-        localStorage.setItem(PREDICTION_ALERT_THRESHOLD_STORAGE_KEY, String(alertThreshold));
-    }, [alertThreshold]);
-
-    useEffect(() => {
-        localStorage.setItem(PREDICTION_MONTH_START_STORAGE_KEY, String(monthStartsOnFirst));
-    }, [monthStartsOnFirst]);
-
-    useEffect(() => {
-        localStorage.setItem(PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY, JSON.stringify(fakeTransactions));
-    }, [fakeTransactions]);
 
     const todayInputValue = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 

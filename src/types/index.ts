@@ -1,4 +1,7 @@
 export type TransactionType = 'income' | 'expense' | 'transfer';
+export type PredictionTimeRange = 'week' | 'month' | '2months' | '3months' | '6months' | '9months' | 'year' | 'custom';
+export type AnalyticsTimeRange = PredictionTimeRange;
+export type ScheduledDueRange = 'all' | 'month' | '2months' | '3months' | '6months' | 'year';
 export type Periodicity =
     | 'once'
     | 'daily'
@@ -34,6 +37,18 @@ export interface Transaction {
     checked: boolean;
     isTransfer?: boolean;
     linkedTransactionId?: string; // For transfers
+}
+
+export interface PredictionFakeTransaction {
+    id: string;
+    date: string;
+    accountId: string;
+    type: TransactionType;
+    amount: number;
+    category: string;
+    description: string;
+    enabled: boolean;
+    toAccountId?: string;
 }
 
 export interface ScheduledTransaction {
@@ -123,6 +138,18 @@ export interface Settings {
     lastSeenVersion?: string;
     dismissedBudgetSuggestions?: string[];
     dismissedScheduledSuggestions?: string[];
+    predictionTimeRange?: PredictionTimeRange;
+    predictionCustomEndDate?: string;
+    predictionAlertThreshold?: number;
+    predictionMonthStartsOnFirst?: boolean;
+    predictionFakeTransactions?: PredictionFakeTransaction[];
+    analyticsTimeRange?: AnalyticsTimeRange;
+    analyticsCustomStartDate?: string;
+    analyticsCustomEndDate?: string;
+    analyticsMonthStartsOnFirst?: boolean;
+    analyticsHiddenExpenseCategories?: string[];
+    analyticsHiddenIncomeCategories?: string[];
+    scheduledDueRange?: ScheduledDueRange;
 }
 
 export interface SettingsContextType {
@@ -141,4 +168,5 @@ export interface SettingsContextType {
     updateLastSeenVersion: (version: string) => Promise<void>;
     updateDismissedBudgetSuggestions: (keys: string[]) => Promise<void>;
     updateDismissedScheduledSuggestions: (keys: string[]) => Promise<void>;
+    updateSettings: (patch: Partial<Settings>) => Promise<void>;
 }

@@ -12,6 +12,30 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.12",
+        date: "2026-06-17",
+        title: "Préférences métier synchronisées",
+        changes: [
+            "Synchronisation des transactions fictives de Prédictions entre desktop et PWA mobile.",
+            "Synchronisation du seuil d'alerte et des préférences de période de Prédictions.",
+            "Synchronisation des préférences d'Analyses : période, dates personnalisées, démarrage au 1er du mois et catégories masquées.",
+            "Synchronisation de la plage d'affichage de l'Échéancier.",
+            "Migration automatique des anciennes préférences stockées localement vers les paramètres synchronisés."
+        ],
+        features: [
+            {
+                title: "Prédictions alignées",
+                description: "Les simulations et seuils affichent le même résultat sur desktop et sur la PWA.",
+                icon: "TrendingUp"
+            },
+            {
+                title: "Préférences partagées",
+                description: "Analyses et Échéancier conservent leurs réglages entre les appareils appairés.",
+                icon: "RefreshCw"
+            }
+        ]
+    },
+    {
         version: "1.0.11",
         date: "2026-06-06",
         title: "Selectors non coupés",

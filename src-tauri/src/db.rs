@@ -145,7 +145,19 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
             \"secureBridgeManagedRegisteredAt\" TEXT,
             \"secureBridgeManagedDeviceSecret\" TEXT,
             \"dismissedBudgetSuggestions\" TEXT,
-            \"dismissedScheduledSuggestions\" TEXT
+            \"dismissedScheduledSuggestions\" TEXT,
+            \"predictionTimeRange\" TEXT NOT NULL DEFAULT 'year',
+            \"predictionCustomEndDate\" TEXT,
+            \"predictionAlertThreshold\" REAL NOT NULL DEFAULT 0,
+            \"predictionMonthStartsOnFirst\" BOOLEAN NOT NULL DEFAULT 1,
+            \"predictionFakeTransactions\" TEXT,
+            \"analyticsTimeRange\" TEXT NOT NULL DEFAULT 'year',
+            \"analyticsCustomStartDate\" TEXT,
+            \"analyticsCustomEndDate\" TEXT,
+            \"analyticsMonthStartsOnFirst\" BOOLEAN NOT NULL DEFAULT 1,
+            \"analyticsHiddenExpenseCategories\" TEXT,
+            \"analyticsHiddenIncomeCategories\" TEXT,
+            \"scheduledDueRange\" TEXT NOT NULL DEFAULT 'all'
         )",
     )
     .execute(&mut *tx)
@@ -428,6 +440,54 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         (
             "dismissedScheduledSuggestions",
             "ALTER TABLE settings ADD COLUMN \"dismissedScheduledSuggestions\" TEXT",
+        ),
+        (
+            "predictionTimeRange",
+            "ALTER TABLE settings ADD COLUMN \"predictionTimeRange\" TEXT NOT NULL DEFAULT 'year'",
+        ),
+        (
+            "predictionCustomEndDate",
+            "ALTER TABLE settings ADD COLUMN \"predictionCustomEndDate\" TEXT",
+        ),
+        (
+            "predictionAlertThreshold",
+            "ALTER TABLE settings ADD COLUMN \"predictionAlertThreshold\" REAL NOT NULL DEFAULT 0",
+        ),
+        (
+            "predictionMonthStartsOnFirst",
+            "ALTER TABLE settings ADD COLUMN \"predictionMonthStartsOnFirst\" BOOLEAN NOT NULL DEFAULT 1",
+        ),
+        (
+            "predictionFakeTransactions",
+            "ALTER TABLE settings ADD COLUMN \"predictionFakeTransactions\" TEXT",
+        ),
+        (
+            "analyticsTimeRange",
+            "ALTER TABLE settings ADD COLUMN \"analyticsTimeRange\" TEXT NOT NULL DEFAULT 'year'",
+        ),
+        (
+            "analyticsCustomStartDate",
+            "ALTER TABLE settings ADD COLUMN \"analyticsCustomStartDate\" TEXT",
+        ),
+        (
+            "analyticsCustomEndDate",
+            "ALTER TABLE settings ADD COLUMN \"analyticsCustomEndDate\" TEXT",
+        ),
+        (
+            "analyticsMonthStartsOnFirst",
+            "ALTER TABLE settings ADD COLUMN \"analyticsMonthStartsOnFirst\" BOOLEAN NOT NULL DEFAULT 1",
+        ),
+        (
+            "analyticsHiddenExpenseCategories",
+            "ALTER TABLE settings ADD COLUMN \"analyticsHiddenExpenseCategories\" TEXT",
+        ),
+        (
+            "analyticsHiddenIncomeCategories",
+            "ALTER TABLE settings ADD COLUMN \"analyticsHiddenIncomeCategories\" TEXT",
+        ),
+        (
+            "scheduledDueRange",
+            "ALTER TABLE settings ADD COLUMN \"scheduledDueRange\" TEXT NOT NULL DEFAULT 'all'",
         ),
     ] {
         let exists: bool =

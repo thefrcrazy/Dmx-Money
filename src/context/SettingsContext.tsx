@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Settings, SettingsContextType } from '../types';
+import { PredictionFakeTransaction, PredictionTimeRange, ScheduledDueRange, Settings, SettingsContextType } from '../types';
 import { dbService } from '../services/db';
 import { generatePalette, formatRgb } from '../utils/colors';
 import { LATEST_VERSION } from '../constants/changelog';
@@ -38,12 +38,83 @@ const DEFAULT_SETTINGS: Settings = {
 
 const DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedBudgetSuggestions';
 const DISMISSED_SCHEDULED_SUGGESTIONS_STORAGE_KEY = 'dmxmoney.dismissedScheduledSuggestions';
+const PREDICTION_TIME_RANGE_STORAGE_KEY = 'dmxmoney.predictions.timeRange';
+const PREDICTION_CUSTOM_END_DATE_STORAGE_KEY = 'dmxmoney.predictions.customEndDate';
+const PREDICTION_ALERT_THRESHOLD_STORAGE_KEY = 'dmxmoney.predictions.alertThreshold';
+const PREDICTION_MONTH_START_STORAGE_KEY = 'dmxmoney.predictions.monthStartsOnFirst';
+const PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY = 'dmxmoney.predictions.fakeTransactions';
+const ANALYTICS_TIME_RANGE_STORAGE_KEY = 'dmxmoney.analytics.timeRange';
+const ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY = 'dmxmoney.analytics.customStartDate';
+const ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY = 'dmxmoney.analytics.customEndDate';
+const ANALYTICS_MONTH_START_STORAGE_KEY = 'dmxmoney.analytics.monthStartsOnFirst';
+const ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY = 'dmxmoney.analytics.hiddenExpenseCategories';
+const ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY = 'dmxmoney.analytics.hiddenIncomeCategories';
+const SCHEDULED_DUE_RANGE_STORAGE_KEY = 'dmxmoney.scheduled.dueRange';
+
+const TIME_RANGES: PredictionTimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
+const SCHEDULED_DUE_RANGES: ScheduledDueRange[] = ['all', 'month', '2months', '3months', '6months', 'year'];
+
+const formatDateInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const addMonths = (date: Date, months: number) => {
+    const next = new Date(date);
+    next.setMonth(next.getMonth() + months);
+    return next;
+};
+
+const getDefaultPredictionCustomEndDate = () => formatDateInput(addMonths(new Date(), 1));
+const getDefaultAnalyticsCustomStartDate = () => formatDateInput(addMonths(new Date(), -1));
+const getDefaultAnalyticsCustomEndDate = () => formatDateInput(new Date());
+
+const isPredictionTimeRange = (value: unknown): value is PredictionTimeRange => (
+    typeof value === 'string' && TIME_RANGES.includes(value as PredictionTimeRange)
+);
+
+const isScheduledDueRange = (value: unknown): value is ScheduledDueRange => (
+    typeof value === 'string' && SCHEDULED_DUE_RANGES.includes(value as ScheduledDueRange)
+);
+
+const isPredictionFakeTransaction = (value: unknown): value is PredictionFakeTransaction => {
+    if (!value || typeof value !== 'object') return false;
+    const item = value as Partial<PredictionFakeTransaction>;
+    return (
+        typeof item.id === 'string'
+        && typeof item.date === 'string'
+        && typeof item.accountId === 'string'
+        && (item.type === 'income' || item.type === 'expense' || item.type === 'transfer')
+        && typeof item.amount === 'number'
+        && Number.isFinite(item.amount)
+        && item.amount > 0
+        && typeof item.description === 'string'
+        && typeof item.category === 'string'
+        && (item.enabled === undefined || typeof item.enabled === 'boolean')
+    );
+};
 
 const normalizeSettings = (settings: Settings | null | undefined): Settings => ({
     ...DEFAULT_SETTINGS,
     ...(settings || {}),
     dismissedBudgetSuggestions: settings?.dismissedBudgetSuggestions || [],
-    dismissedScheduledSuggestions: settings?.dismissedScheduledSuggestions || []
+    dismissedScheduledSuggestions: settings?.dismissedScheduledSuggestions || [],
+    predictionTimeRange: isPredictionTimeRange(settings?.predictionTimeRange) ? settings.predictionTimeRange : 'year',
+    predictionCustomEndDate: settings?.predictionCustomEndDate || getDefaultPredictionCustomEndDate(),
+    predictionAlertThreshold: Number.isFinite(settings?.predictionAlertThreshold) ? Number(settings?.predictionAlertThreshold) : 0,
+    predictionMonthStartsOnFirst: settings?.predictionMonthStartsOnFirst ?? true,
+    predictionFakeTransactions: (settings?.predictionFakeTransactions || [])
+        .filter(isPredictionFakeTransaction)
+        .map(transaction => ({ ...transaction, enabled: transaction.enabled !== false })),
+    analyticsTimeRange: isPredictionTimeRange(settings?.analyticsTimeRange) ? settings.analyticsTimeRange : 'year',
+    analyticsCustomStartDate: settings?.analyticsCustomStartDate || getDefaultAnalyticsCustomStartDate(),
+    analyticsCustomEndDate: settings?.analyticsCustomEndDate || getDefaultAnalyticsCustomEndDate(),
+    analyticsMonthStartsOnFirst: settings?.analyticsMonthStartsOnFirst ?? true,
+    analyticsHiddenExpenseCategories: settings?.analyticsHiddenExpenseCategories || [],
+    analyticsHiddenIncomeCategories: settings?.analyticsHiddenIncomeCategories || [],
+    scheduledDueRange: isScheduledDueRange(settings?.scheduledDueRange) ? settings.scheduledDueRange : 'all'
 });
 
 const parseStoredSuggestionKeys = (value: string | null) => {
@@ -70,6 +141,49 @@ const mergeSuggestionKeys = (...sources: Array<string[] | undefined>) => (
     Array.from(new Set(sources.flatMap(source => source || [])))
 );
 
+const readAndClearStoredValue = (key: string) => {
+    try {
+        const value = localStorage.getItem(key);
+        localStorage.removeItem(key);
+        return value;
+    } catch {
+        return null;
+    }
+};
+
+const readAndClearStoredStringArray = (key: string) => {
+    const value = readAndClearStoredValue(key);
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+const readAndClearStoredFakeTransactions = () => {
+    const value = readAndClearStoredValue(PREDICTION_FAKE_TRANSACTIONS_STORAGE_KEY);
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .filter(isPredictionFakeTransaction)
+            .map(transaction => ({ ...transaction, enabled: transaction.enabled !== false }));
+    } catch {
+        return [];
+    }
+};
+
+const mergeFakeTransactions = (...sources: Array<PredictionFakeTransaction[] | undefined>) => {
+    const byId = new Map<string, PredictionFakeTransaction>();
+    sources.flatMap(source => source || []).forEach(transaction => {
+        byId.set(transaction.id, transaction);
+    });
+    return Array.from(byId.values());
+};
+
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -88,7 +202,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     });
 
-    const migrateLocalDismissedSuggestions = (initial: Settings) => {
+    const migrateLocalSettings = (savedSettings: Settings | null) => {
+        const initial = normalizeSettings(savedSettings);
         const dismissedBudgetSuggestions = mergeSuggestionKeys(
             initial.dismissedBudgetSuggestions,
             readAndClearStoredSuggestionKeys(DISMISSED_BUDGET_SUGGESTIONS_STORAGE_KEY)
@@ -98,19 +213,57 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             readAndClearStoredSuggestionKeys(DISMISSED_SCHEDULED_SUGGESTIONS_STORAGE_KEY)
         );
 
-        if (
-            dismissedBudgetSuggestions.length === (initial.dismissedBudgetSuggestions || []).length
-            && dismissedScheduledSuggestions.length === (initial.dismissedScheduledSuggestions || []).length
-        ) {
-            return initial;
-        }
+        const localPredictionTimeRange = readAndClearStoredValue(PREDICTION_TIME_RANGE_STORAGE_KEY);
+        const localPredictionCustomEndDate = readAndClearStoredValue(PREDICTION_CUSTOM_END_DATE_STORAGE_KEY);
+        const localPredictionAlertThreshold = Number(readAndClearStoredValue(PREDICTION_ALERT_THRESHOLD_STORAGE_KEY));
+        const localPredictionMonthStartsOnFirst = readAndClearStoredValue(PREDICTION_MONTH_START_STORAGE_KEY);
+        const localPredictionFakeTransactions = readAndClearStoredFakeTransactions();
+        const localAnalyticsTimeRange = readAndClearStoredValue(ANALYTICS_TIME_RANGE_STORAGE_KEY);
+        const localAnalyticsCustomStartDate = readAndClearStoredValue(ANALYTICS_CUSTOM_START_DATE_STORAGE_KEY);
+        const localAnalyticsCustomEndDate = readAndClearStoredValue(ANALYTICS_CUSTOM_END_DATE_STORAGE_KEY);
+        const localAnalyticsMonthStartsOnFirst = readAndClearStoredValue(ANALYTICS_MONTH_START_STORAGE_KEY);
+        const localAnalyticsHiddenExpenseCategories = readAndClearStoredStringArray(ANALYTICS_HIDDEN_EXPENSE_CATEGORIES_STORAGE_KEY);
+        const localAnalyticsHiddenIncomeCategories = readAndClearStoredStringArray(ANALYTICS_HIDDEN_INCOME_CATEGORIES_STORAGE_KEY);
+        const localScheduledDueRange = readAndClearStoredValue(SCHEDULED_DUE_RANGE_STORAGE_KEY);
 
         const migrated = {
             ...initial,
             dismissedBudgetSuggestions,
-            dismissedScheduledSuggestions
+            dismissedScheduledSuggestions,
+            predictionTimeRange: isPredictionTimeRange(localPredictionTimeRange) && initial.predictionTimeRange === 'year'
+                ? localPredictionTimeRange
+                : initial.predictionTimeRange,
+            predictionCustomEndDate: localPredictionCustomEndDate && initial.predictionCustomEndDate === getDefaultPredictionCustomEndDate()
+                ? localPredictionCustomEndDate
+                : initial.predictionCustomEndDate,
+            predictionAlertThreshold: Number.isFinite(localPredictionAlertThreshold) && initial.predictionAlertThreshold === 0
+                ? localPredictionAlertThreshold
+                : initial.predictionAlertThreshold,
+            predictionMonthStartsOnFirst: localPredictionMonthStartsOnFirst !== null && initial.predictionMonthStartsOnFirst === true
+                ? localPredictionMonthStartsOnFirst === 'true'
+                : initial.predictionMonthStartsOnFirst,
+            predictionFakeTransactions: mergeFakeTransactions(initial.predictionFakeTransactions, localPredictionFakeTransactions),
+            analyticsTimeRange: isPredictionTimeRange(localAnalyticsTimeRange) && initial.analyticsTimeRange === 'year'
+                ? localAnalyticsTimeRange
+                : initial.analyticsTimeRange,
+            analyticsCustomStartDate: localAnalyticsCustomStartDate && initial.analyticsCustomStartDate === getDefaultAnalyticsCustomStartDate()
+                ? localAnalyticsCustomStartDate
+                : initial.analyticsCustomStartDate,
+            analyticsCustomEndDate: localAnalyticsCustomEndDate && initial.analyticsCustomEndDate === getDefaultAnalyticsCustomEndDate()
+                ? localAnalyticsCustomEndDate
+                : initial.analyticsCustomEndDate,
+            analyticsMonthStartsOnFirst: localAnalyticsMonthStartsOnFirst !== null && initial.analyticsMonthStartsOnFirst === true
+                ? localAnalyticsMonthStartsOnFirst === 'true'
+                : initial.analyticsMonthStartsOnFirst,
+            analyticsHiddenExpenseCategories: mergeSuggestionKeys(initial.analyticsHiddenExpenseCategories, localAnalyticsHiddenExpenseCategories),
+            analyticsHiddenIncomeCategories: mergeSuggestionKeys(initial.analyticsHiddenIncomeCategories, localAnalyticsHiddenIncomeCategories),
+            scheduledDueRange: isScheduledDueRange(localScheduledDueRange) && initial.scheduledDueRange === 'all'
+                ? localScheduledDueRange
+                : initial.scheduledDueRange
         };
-        dbService.saveSettings(migrated).catch(() => { });
+        if (JSON.stringify(migrated) !== JSON.stringify(initial)) {
+            dbService.saveSettings(migrated).catch(() => { });
+        }
         return migrated;
     };
 
@@ -244,7 +397,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         dbService.getSettings()
             .then(savedSettings => {
                 clearTimeout(fallbackTimer);
-                const initial = migrateLocalDismissedSuggestions(normalizeSettings(savedSettings));
+                const initial = migrateLocalSettings(savedSettings);
                 finishInitialLoad(initial);
             })
             .catch(() => {
@@ -458,6 +611,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             updateDismissedScheduledSuggestions: async (keys) => {
                 setSettings(prev => {
                     const next = { ...prev, dismissedScheduledSuggestions: keys };
+                    dbService.saveSettings(next).catch(() => { });
+                    return next;
+                });
+            },
+            updateSettings: async (patch) => {
+                setSettings(prev => {
+                    const next = normalizeSettings({ ...prev, ...patch });
+                    applyVisualSettings(next);
                     dbService.saveSettings(next).catch(() => { });
                     return next;
                 });

@@ -550,6 +550,30 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
         dismissed_budget_suggestions: Option<String>,
         #[sqlx(rename = "dismissedScheduledSuggestions")]
         dismissed_scheduled_suggestions: Option<String>,
+        #[sqlx(rename = "predictionTimeRange")]
+        prediction_time_range: Option<String>,
+        #[sqlx(rename = "predictionCustomEndDate")]
+        prediction_custom_end_date: Option<String>,
+        #[sqlx(rename = "predictionAlertThreshold")]
+        prediction_alert_threshold: f64,
+        #[sqlx(rename = "predictionMonthStartsOnFirst")]
+        prediction_month_starts_on_first: bool,
+        #[sqlx(rename = "predictionFakeTransactions")]
+        prediction_fake_transactions: Option<String>,
+        #[sqlx(rename = "analyticsTimeRange")]
+        analytics_time_range: Option<String>,
+        #[sqlx(rename = "analyticsCustomStartDate")]
+        analytics_custom_start_date: Option<String>,
+        #[sqlx(rename = "analyticsCustomEndDate")]
+        analytics_custom_end_date: Option<String>,
+        #[sqlx(rename = "analyticsMonthStartsOnFirst")]
+        analytics_month_starts_on_first: bool,
+        #[sqlx(rename = "analyticsHiddenExpenseCategories")]
+        analytics_hidden_expense_categories: Option<String>,
+        #[sqlx(rename = "analyticsHiddenIncomeCategories")]
+        analytics_hidden_income_categories: Option<String>,
+        #[sqlx(rename = "scheduledDueRange")]
+        scheduled_due_range: Option<String>,
     }
 
     match sqlx::query_as::<_, SettingsRow>("SELECT * FROM settings WHERE id = 1")
@@ -588,6 +612,18 @@ pub async fn get_settings(pool: State<'_, DbPool>) -> Result<Option<Settings>, S
                 component_padding: row.component_padding,
                 dismissed_budget_suggestions: row.dismissed_budget_suggestions,
                 dismissed_scheduled_suggestions: row.dismissed_scheduled_suggestions,
+                prediction_time_range: row.prediction_time_range,
+                prediction_custom_end_date: row.prediction_custom_end_date,
+                prediction_alert_threshold: Some(row.prediction_alert_threshold),
+                prediction_month_starts_on_first: Some(row.prediction_month_starts_on_first),
+                prediction_fake_transactions: row.prediction_fake_transactions,
+                analytics_time_range: row.analytics_time_range,
+                analytics_custom_start_date: row.analytics_custom_start_date,
+                analytics_custom_end_date: row.analytics_custom_end_date,
+                analytics_month_starts_on_first: Some(row.analytics_month_starts_on_first),
+                analytics_hidden_expense_categories: row.analytics_hidden_expense_categories,
+                analytics_hidden_income_categories: row.analytics_hidden_income_categories,
+                scheduled_due_range: row.scheduled_due_range,
             }))
         }
         None => Ok(None),
@@ -615,8 +651,17 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
         .unwrap_or_else(|| "modern".to_string());
 
     sqlx::query(
-        "INSERT INTO settings (id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\", \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\", \"dismissedBudgetSuggestions\", \"dismissedScheduledSuggestions\")
-         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        "INSERT INTO settings (
+            id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\",
+            \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\", \"customGroupsOrder\",
+            \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\",
+            \"dismissedBudgetSuggestions\", \"dismissedScheduledSuggestions\", \"predictionTimeRange\",
+            \"predictionCustomEndDate\", \"predictionAlertThreshold\", \"predictionMonthStartsOnFirst\",
+            \"predictionFakeTransactions\", \"analyticsTimeRange\", \"analyticsCustomStartDate\",
+            \"analyticsCustomEndDate\", \"analyticsMonthStartsOnFirst\", \"analyticsHiddenExpenseCategories\",
+            \"analyticsHiddenIncomeCategories\", \"scheduledDueRange\"
+        )
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
          ON CONFLICT(id) DO UPDATE SET
             theme = $1,
             \"primaryColor\" = $2,
@@ -633,7 +678,19 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
             \"componentSpacing\" = $13,
             \"componentPadding\" = $14,
             \"dismissedBudgetSuggestions\" = $15,
-            \"dismissedScheduledSuggestions\" = $16"
+            \"dismissedScheduledSuggestions\" = $16,
+            \"predictionTimeRange\" = $17,
+            \"predictionCustomEndDate\" = $18,
+            \"predictionAlertThreshold\" = $19,
+            \"predictionMonthStartsOnFirst\" = $20,
+            \"predictionFakeTransactions\" = $21,
+            \"analyticsTimeRange\" = $22,
+            \"analyticsCustomStartDate\" = $23,
+            \"analyticsCustomEndDate\" = $24,
+            \"analyticsMonthStartsOnFirst\" = $25,
+            \"analyticsHiddenExpenseCategories\" = $26,
+            \"analyticsHiddenIncomeCategories\" = $27,
+            \"scheduledDueRange\" = $28"
     )
     .bind(settings.theme)
     .bind(settings.primary_color)
@@ -651,6 +708,18 @@ pub async fn save_settings(pool: State<'_, DbPool>, settings: Settings) -> Resul
     .bind(settings.component_padding)
     .bind(settings.dismissed_budget_suggestions)
     .bind(settings.dismissed_scheduled_suggestions)
+    .bind(settings.prediction_time_range.unwrap_or_else(|| "year".to_string()))
+    .bind(settings.prediction_custom_end_date)
+    .bind(settings.prediction_alert_threshold.unwrap_or(0.0))
+    .bind(settings.prediction_month_starts_on_first.unwrap_or(true))
+    .bind(settings.prediction_fake_transactions)
+    .bind(settings.analytics_time_range.unwrap_or_else(|| "year".to_string()))
+    .bind(settings.analytics_custom_start_date)
+    .bind(settings.analytics_custom_end_date)
+    .bind(settings.analytics_month_starts_on_first.unwrap_or(true))
+    .bind(settings.analytics_hidden_expense_categories)
+    .bind(settings.analytics_hidden_income_categories)
+    .bind(settings.scheduled_due_range.unwrap_or_else(|| "all".to_string()))
     .execute(&*pool)
     .await
     .map_err(|e| map_db_error(e, "sauvegarde des paramètres"))?;

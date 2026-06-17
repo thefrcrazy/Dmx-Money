@@ -11,7 +11,7 @@ import FormPopup from '../components/ui/FormPopup';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import SearchableSelect, { SelectOption } from '../components/ui/SearchableSelect';
 import MultiSelect from '../components/ui/MultiSelect';
-import { ScheduledTransaction, Transaction, TransactionType, Periodicity } from '../types';
+import { ScheduledDueRange, ScheduledTransaction, Transaction, TransactionType, Periodicity } from '../types';
 import { ICONS } from '../constants/icons';
 import Table from '../components/ui/Table';
 import Input from '../components/ui/Input';
@@ -36,10 +36,6 @@ interface MonthlySuggestion extends Omit<ScheduledTransaction, 'id'> {
     suggestionKey: string;
     occurrenceCount: number;
 }
-
-type ScheduledDueRange = 'all' | 'month' | '2months' | '3months' | '6months' | 'year';
-
-const SCHEDULED_DUE_RANGE_STORAGE_KEY = 'dmxmoney.scheduled.dueRange';
 
 const SCHEDULED_DUE_RANGES: ScheduledDueRange[] = ['all', 'month', '2months', '3months', '6months', 'year'];
 
@@ -100,15 +96,6 @@ const addMonthsSafely = (date: Date, months: number) => {
     return new Date(date.getFullYear(), targetMonth, Math.min(date.getDate(), daysInTargetMonth));
 };
 
-const getStoredScheduledDueRange = (): ScheduledDueRange => {
-    try {
-        const stored = localStorage.getItem(SCHEDULED_DUE_RANGE_STORAGE_KEY) as ScheduledDueRange | null;
-        return stored && SCHEDULED_DUE_RANGES.includes(stored) ? stored : 'all';
-    } catch {
-        return 'all';
-    }
-};
-
 const mergeSuggestionKeys = (...sources: Array<string[] | undefined>) => (
     Array.from(new Set(sources.flatMap(source => source || [])))
 );
@@ -131,12 +118,12 @@ const getRecurrenceIdentity = (item: RecurrenceIdentityInput) => [
 const Scheduled: React.FC = () => {
     const { accounts, transactions, scheduled, categories, budgets, addScheduled, updateScheduled, deleteScheduled, filterAccount } = useBank();
     const { showToast } = useToast();
-    const { settings, updateDismissedScheduledSuggestions } = useSettings();
+    const { settings, updateDismissedScheduledSuggestions, updateSettings } = useSettings();
+    const dueRange = settings.scheduledDueRange || 'all';
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<ScheduledTransaction | null>(null);
     const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [dueRange, setDueRange] = useState<ScheduledDueRange>(getStoredScheduledDueRange);
     const [isDueRangeDropdownOpen, setIsDueRangeDropdownOpen] = useState(false);
     const [filterCategories, setFilterCategories] = useState<string[]>([]);
     const [filterFrequencies, setFilterFrequencies] = useState<string[]>([]);
@@ -145,9 +132,9 @@ const Scheduled: React.FC = () => {
         [settings.dismissedScheduledSuggestions]
     );
 
-    useEffect(() => {
-        localStorage.setItem(SCHEDULED_DUE_RANGE_STORAGE_KEY, dueRange);
-    }, [dueRange]);
+    const setDueRange = (scheduledDueRange: ScheduledDueRange) => {
+        void updateSettings({ scheduledDueRange });
+    };
 
     const accountMap = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
     const categoryMap = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);

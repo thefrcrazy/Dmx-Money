@@ -15,13 +15,26 @@ import {
 
 type InvokeFn = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-interface RawSettings extends Omit<Settings, 'accountGroups' | 'customGroups' | 'customGroupsOrder' | 'accountsOrder' | 'dismissedBudgetSuggestions' | 'dismissedScheduledSuggestions'> {
+interface RawSettings extends Omit<Settings,
+    | 'accountGroups'
+    | 'customGroups'
+    | 'customGroupsOrder'
+    | 'accountsOrder'
+    | 'dismissedBudgetSuggestions'
+    | 'dismissedScheduledSuggestions'
+    | 'predictionFakeTransactions'
+    | 'analyticsHiddenExpenseCategories'
+    | 'analyticsHiddenIncomeCategories'
+> {
     accountGroups?: string | Settings['accountGroups'] | null;
     customGroups?: string | Settings['customGroups'] | null;
     customGroupsOrder?: string | Settings['customGroupsOrder'] | null;
     accountsOrder?: string | Settings['accountsOrder'] | null;
     dismissedBudgetSuggestions?: string | Settings['dismissedBudgetSuggestions'] | null;
     dismissedScheduledSuggestions?: string | Settings['dismissedScheduledSuggestions'] | null;
+    predictionFakeTransactions?: string | Settings['predictionFakeTransactions'] | null;
+    analyticsHiddenExpenseCategories?: string | Settings['analyticsHiddenExpenseCategories'] | null;
+    analyticsHiddenIncomeCategories?: string | Settings['analyticsHiddenIncomeCategories'] | null;
 }
 
 interface SyncStatus {
@@ -81,7 +94,10 @@ const parseSettings = (res: RawSettings | null): Settings | null => {
         customGroupsOrder: parseMaybeJson<Settings['customGroupsOrder']>(res.customGroupsOrder),
         accountsOrder: parseMaybeJson<Settings['accountsOrder']>(res.accountsOrder),
         dismissedBudgetSuggestions: parseMaybeJson<Settings['dismissedBudgetSuggestions']>(res.dismissedBudgetSuggestions) || [],
-        dismissedScheduledSuggestions: parseMaybeJson<Settings['dismissedScheduledSuggestions']>(res.dismissedScheduledSuggestions) || []
+        dismissedScheduledSuggestions: parseMaybeJson<Settings['dismissedScheduledSuggestions']>(res.dismissedScheduledSuggestions) || [],
+        predictionFakeTransactions: parseMaybeJson<Settings['predictionFakeTransactions']>(res.predictionFakeTransactions) || [],
+        analyticsHiddenExpenseCategories: parseMaybeJson<Settings['analyticsHiddenExpenseCategories']>(res.analyticsHiddenExpenseCategories) || [],
+        analyticsHiddenIncomeCategories: parseMaybeJson<Settings['analyticsHiddenIncomeCategories']>(res.analyticsHiddenIncomeCategories) || []
     };
 };
 
@@ -92,7 +108,10 @@ const serializeSettings = (settings: Settings): RawSettings => ({
     customGroupsOrder: settings.customGroupsOrder ? JSON.stringify(settings.customGroupsOrder) : null,
     accountsOrder: settings.accountsOrder ? JSON.stringify(settings.accountsOrder) : null,
     dismissedBudgetSuggestions: JSON.stringify(settings.dismissedBudgetSuggestions || []),
-    dismissedScheduledSuggestions: JSON.stringify(settings.dismissedScheduledSuggestions || [])
+    dismissedScheduledSuggestions: JSON.stringify(settings.dismissedScheduledSuggestions || []),
+    predictionFakeTransactions: JSON.stringify(settings.predictionFakeTransactions || []),
+    analyticsHiddenExpenseCategories: JSON.stringify(settings.analyticsHiddenExpenseCategories || []),
+    analyticsHiddenIncomeCategories: JSON.stringify(settings.analyticsHiddenIncomeCategories || [])
 });
 
 export class DatabaseService {

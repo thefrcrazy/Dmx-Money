@@ -154,4 +154,28 @@ pub struct Settings {
     pub dismissed_budget_suggestions: Option<String>, // JSON string
     #[serde(rename = "dismissedScheduledSuggestions")]
     pub dismissed_scheduled_suggestions: Option<String>, // JSON string
+    #[serde(rename = "predictionTimeRange")]
+    pub prediction_time_range: Option<String>,
+    #[serde(rename = "predictionCustomEndDate")]
+    pub prediction_custom_end_date: Option<String>,
+    #[serde(rename = "predictionAlertThreshold")]
+    pub prediction_alert_threshold: Option<f64>,
+    #[serde(rename = "predictionMonthStartsOnFirst")]
+    pub prediction_month_starts_on_first: Option<bool>,
+    #[serde(rename = "predictionFakeTransactions")]
+    pub prediction_fake_transactions: Option<String>, // JSON string
+    #[serde(rename = "analyticsTimeRange")]
+    pub analytics_time_range: Option<String>,
+    #[serde(rename = "analyticsCustomStartDate")]
+    pub analytics_custom_start_date: Option<String>,
+    #[serde(rename = "analyticsCustomEndDate")]
+    pub analytics_custom_end_date: Option<String>,
+    #[serde(rename = "analyticsMonthStartsOnFirst")]
+    pub analytics_month_starts_on_first: Option<bool>,
+    #[serde(rename = "analyticsHiddenExpenseCategories")]
+    pub analytics_hidden_expense_categories: Option<String>, // JSON string
+    #[serde(rename = "analyticsHiddenIncomeCategories")]
+    pub analytics_hidden_income_categories: Option<String>, // JSON string
+    #[serde(rename = "scheduledDueRange")]
+    pub scheduled_due_range: Option<String>,
 }
