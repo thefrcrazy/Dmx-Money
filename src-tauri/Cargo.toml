@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.0.12"
+version = "1.0.13"
 description = "DmxMoney"
 authors = ["Maxim Collignon"]
 license = "MIT"
@@ -22,7 +22,7 @@ log = "0.4"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
-tauri = { version = "2.11", features = ["devtools"] }
+tauri = { version = "2.11", features = ["devtools", "tray-icon"] }
 tauri-plugin-log = "2.8"
 tauri-plugin-fs = "2.5"
 tauri-plugin-os = "2.3"

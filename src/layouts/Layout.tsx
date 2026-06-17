@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, LayoutDashboard, PieChart, TrendingUp, Settings, Receipt, CalendarClock, Tag, Calculator, ChevronLeft, ChevronRight, MoreHorizontal, X, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Wallet, LayoutDashboard, PieChart, TrendingUp, Settings, Receipt, CalendarClock, Tag, Calculator, ChevronLeft, ChevronRight, MoreHorizontal, X, RefreshCw, Wifi, WifiOff, Power } from 'lucide-react';
 import { useBank } from '../context/BankContext';
 import { useUpdater } from '../hooks/useUpdater';
 import MultiSelect from '../components/ui/MultiSelect';
@@ -15,6 +15,11 @@ interface LayoutProps {
   activePage: string;
   setActivePage: (page: string) => void;
 }
+
+type TrayNavigationPayload = string | {
+  page?: string;
+  accountId?: string | null;
+};
 
 const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) => {
   const { accounts, filterAccount, setFilterAccount, mobileConnectionState } = useBank();
@@ -35,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
   const pullGestureModeRef = React.useRef<'pending' | 'pull' | 'ignore'>('ignore');
   const isMobileMode = isMobileCompanion();
   const showTitleBar = hasTauriRuntime();
+  const showQuitAction = showTitleBar && !isMobileMode;
   const pullThreshold = 96;
 
   const hasAccountFilter = ['dashboard', 'transactions', 'budget', 'analytics', 'predictions', 'scheduled'].includes(activePage);
@@ -46,6 +52,36 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
       app.getVersion().then(setAppVersion).catch(() => { });
     });
   }, []);
+
+  React.useEffect(() => {
+    if (!hasTauriRuntime()) return;
+
+    let unlisten: (() => void) | undefined;
+
+    import('@tauri-apps/api/event')
+      .then(({ listen }) => listen<TrayNavigationPayload>('dmxmoney-navigate-to-page', (event) => {
+        const payload = event.payload;
+        const page = typeof payload === 'string' ? payload : payload?.page;
+
+        if (page) {
+          if (typeof payload !== 'string') {
+            setFilterAccount(payload.accountId ? [payload.accountId] : []);
+          }
+          setActivePage(page);
+          setIsMobileMenuOpen(false);
+        }
+      }))
+      .then((cleanup) => {
+        unlisten = cleanup;
+      })
+      .catch((error) => {
+        console.error('Failed to listen for tray navigation:', error);
+      });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [setActivePage, setFilterAccount]);
 
   const navGroups = [
     {
@@ -103,6 +139,17 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
     setActivePage(page);
     setIsMobileMenuOpen(false);
   };
+
+  const handleQuitApp = React.useCallback(async () => {
+    if (!hasTauriRuntime()) return;
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('quit_app');
+    } catch (error) {
+      console.error('Failed to quit DmxMoney:', error);
+    }
+  }, []);
 
   const setPullDistanceValue = (value: number) => {
     pullDistanceRef.current = value;
@@ -334,6 +381,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                 </button>
               );
             })}
+            {showQuitAction && (
+              <button
+                onClick={() => void handleQuitApp()}
+                onMouseEnter={(event) => showSidebarTooltip('Quitter', event.currentTarget)}
+                onMouseLeave={hideSidebarTooltip}
+                onFocus={(event) => showSidebarTooltip('Quitter', event.currentTarget)}
+                onBlur={hideSidebarTooltip}
+                aria-label="Quitter"
+                className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 ${isCollapsed ? 'justify-center px-0' : ''}`}
+              >
+                <Power className="w-4 h-4 shrink-0" />
+                {!isCollapsed && <span className="min-w-0 truncate">Quitter</span>}
+              </button>
+            )}
           </div>
           {!isCollapsed && (
             <div className="mt-4 text-[9px] text-gray-400 text-center font-bold uppercase tracking-widest opacity-60 animate-in fade-in duration-500">
@@ -580,6 +641,21 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage }) 
                   );
                 })}
               </div>
+              {showQuitAction && (
+                <div className="px-4 pb-4">
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      void handleQuitApp();
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/15 bg-red-500/10 px-4 py-3 text-sm font-extrabold text-red-600 dark:text-red-400 transition-all tap-bounce hover:bg-red-500/15"
+                    aria-label="Quitter"
+                  >
+                    <Power className="w-4 h-4 shrink-0" />
+                    Quitter
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </>

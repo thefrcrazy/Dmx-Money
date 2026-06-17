@@ -12,6 +12,29 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.13",
+        date: "2026-06-17",
+        title: "Mode arrière-plan et tray natif",
+        changes: [
+            "Fermeture de la fenêtre principale sans arrêter l'application afin de garder le serveur compagnon actif en arrière-plan.",
+            "Ajout d'un menu tray natif avec ouverture au clic gauche, raccourcis de navigation, accès mobile, paramètres et action Quitter.",
+            "Affichage rapide des comptes dans le tray avec une ligne Tous et les soldes actuels par compte.",
+            "Ajout d'un bouton Quitter dans la navigation desktop, masqué sur la PWA et branché sur une commande Rust dédiée."
+        ],
+        features: [
+            {
+                title: "App toujours active",
+                description: "Le compagnon mobile peut rester disponible tant que DmxMoney tourne en arrière-plan.",
+                icon: "Activity"
+            },
+            {
+                title: "Tray plus utile",
+                description: "Le menu système donne accès aux comptes, raccourcis et actions essentielles sans rouvrir toute l'interface.",
+                icon: "Menu"
+            }
+        ]
+    },
+    {
         version: "1.0.12",
         date: "2026-06-17",
         title: "Préférences métier synchronisées",

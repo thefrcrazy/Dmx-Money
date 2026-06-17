@@ -1,3 +1,4 @@
+mod background;
 mod commands;
 mod db;
 mod mobile_companion;
@@ -39,15 +40,16 @@ pub fn run() {
                     .traffic_light_position(LogicalPosition::new(12.0, 34.0));
             }
 
-            let window = window_builder.build().expect("failed to build window");
-
-            // Explicitly set shadow
-            let _ = window.set_shadow(true);
-
             let handle = app.handle();
             let pool = tauri::async_runtime::block_on(db::init_db(handle))
                 .expect("failed to initialize database");
             app.manage(pool.clone());
+
+            let window = window_builder.build().expect("failed to build window");
+            background::install(app, &window, pool.clone())?;
+
+            // Explicitly set shadow
+            let _ = window.set_shadow(true);
 
             let mobile_state =
                 mobile_companion::MobileCompanionState::new(pool.clone(), app.handle().clone());
@@ -85,8 +87,15 @@ pub fn run() {
             mobile_companion::get_secure_bridge_status,
             mobile_companion::set_secure_bridge_enabled,
             mobile_companion::regenerate_secure_pairing_token,
-            mobile_companion::revoke_mobile_passkey
+            mobile_companion::revoke_mobile_passkey,
+            background::quit_app
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Reopen { .. }) {
+                background::show_main_window(app_handle);
+            }
+        });
 }
