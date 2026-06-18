@@ -12,6 +12,29 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.14",
+        date: "2026-06-18",
+        title: "Nouveautés synchronisées sans boucle",
+        changes: [
+            "Correction de la réapparition répétée des nouveautés lors du passage entre la PWA mobile et l'application desktop.",
+            "La version déjà consultée ne peut plus régresser lorsqu'un appareil synchronise des paramètres plus anciens.",
+            "Fusion sécurisée de l'état de lecture entre le cache mobile, l'API compagnon et la base desktop.",
+            "Renouvellement du cache PWA pour distribuer immédiatement le correctif aux applications installées."
+        ],
+        features: [
+            {
+                title: "Lecture mémorisée",
+                description: "Une nouveauté validée reste validée sur les appareils synchronisés.",
+                icon: "CheckCircle2"
+            },
+            {
+                title: "Sync protégée",
+                description: "Un cache ancien ne peut plus réactiver une note de version déjà consultée.",
+                icon: "RefreshCw"
+            }
+        ]
+    },
+    {
         version: "1.0.13",
         date: "2026-06-17",
         title: "Mode arrière-plan et tray natif",

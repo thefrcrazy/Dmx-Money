@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.14 - 2026-06-18
+
+- Correction de la réapparition répétée des nouveautés lors du passage entre la PWA mobile et l'application desktop.
+- La version déjà consultée ne peut plus régresser lorsqu'un appareil synchronise des paramètres plus anciens.
+- Fusion sécurisée de l'état de lecture entre le cache mobile, l'API compagnon et la base desktop.
+- Renouvellement du cache PWA pour distribuer immédiatement le correctif aux applications installées.
+
+## 1.0.13 - 2026-06-17
+
+- Fermeture de la fenêtre principale sans arrêter l'application afin de garder le serveur compagnon actif en arrière-plan.
+- Ajout d'un menu tray natif avec ouverture au clic gauche, raccourcis de navigation, accès mobile, paramètres et action Quitter.
+- Affichage rapide des comptes dans le tray avec une ligne Tous et les soldes actuels par compte.
+- Ajout d'un bouton Quitter dans la navigation desktop, masqué sur la PWA et branché sur une commande Rust dédiée.
+
 ## 1.0.12 - 2026-06-17
 
 - Synchronisation des transactions fictives de Prédictions entre desktop et PWA mobile.
