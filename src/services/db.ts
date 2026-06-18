@@ -12,6 +12,7 @@ import {
     markMobilePasskeyReady,
     setMobileCsrfToken
 } from '../utils/runtime';
+import { selectNewestVersion } from '../utils/version';
 
 type InvokeFn = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -784,13 +785,37 @@ export class DatabaseService {
 
     // Settings
     async getSettings(): Promise<Settings | null> {
+        let cachedSettings: Settings | null = null;
+        if (this.usesHttp()) {
+            try {
+                cachedSettings = parseSettings(
+                    await offlineStore.getData('settings') as RawSettings | null
+                );
+            } catch {
+                // A broken local cache must not block a fresh server read.
+            }
+        }
+
         try {
             const res = this.usesHttp()
                 ? await this.getMobileData('settings', '/api/settings') as RawSettings | null
                 : await this.invoke<RawSettings | null>('get_settings');
-            return parseSettings(res);
+            const parsed = parseSettings(res);
+            if (!parsed) return cachedSettings;
+
+            const merged = {
+                ...parsed,
+                lastSeenVersion: selectNewestVersion(
+                    cachedSettings?.lastSeenVersion,
+                    parsed.lastSeenVersion
+                )
+            };
+            if (this.usesHttp()) {
+                await offlineStore.setData('settings', merged);
+            }
+            return merged;
         } catch {
-            return null;
+            return cachedSettings;
         }
     }
 

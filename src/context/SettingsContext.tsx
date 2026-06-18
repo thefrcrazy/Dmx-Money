@@ -5,6 +5,7 @@ import { generatePalette, formatRgb } from '../utils/colors';
 import { LATEST_VERSION } from '../constants/changelog';
 import { LOGO_PATH, publicAsset } from '../utils/assets';
 import { hasTauriRuntime } from '../utils/runtime';
+import { selectNewestVersion } from '../utils/version';
 
 const iconCache: Record<string, Uint8Array> = {};
 
@@ -419,8 +420,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 .then(savedSettings => {
                     if (!savedSettings) return;
                     const next = normalizeSettings(savedSettings);
-                    applyVisualSettings(next);
-                    setSettings(next);
+                    setSettings(current => {
+                        const merged = {
+                            ...next,
+                            lastSeenVersion: selectNewestVersion(
+                                current.lastSeenVersion,
+                                next.lastSeenVersion
+                            )
+                        };
+                        settingsRef.current = merged;
+                        applyVisualSettings(merged);
+                        return merged;
+                    });
                 })
                 .catch(() => { });
         };
@@ -596,7 +607,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             },
             updateLastSeenVersion: async (version) => {
                 setSettings(prev => {
-                    const next = { ...prev, lastSeenVersion: version };
+                    const next = {
+                        ...prev,
+                        lastSeenVersion: selectNewestVersion(prev.lastSeenVersion, version)
+                    };
+                    settingsRef.current = next;
                     dbService.saveSettings(next).catch(() => { });
                     return next;
                 });

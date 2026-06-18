@@ -4,6 +4,7 @@ mod db;
 mod mobile_companion;
 mod models;
 mod secure_bridge;
+mod versioning;
 
 use tauri::{LogicalPosition, Manager, WebviewWindowBuilder};
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::versioning::newest_seen_version;
 
 pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings>, String> {
     #[derive(sqlx::FromRow)]
@@ -112,6 +113,18 @@ pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings
 }
 
 pub(super) async fn save_settings_record(pool: &DbPool, settings: Settings) -> Result<(), String> {
+    let current_last_seen_version = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT \"lastSeenVersion\" FROM settings WHERE id = 1",
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| map_db_error(e, "lecture de la version déjà vue"))?
+    .flatten();
+    let last_seen_version = newest_seen_version(
+        current_last_seen_version,
+        settings.last_seen_version.clone(),
+    );
+
     let (pos_x, pos_y) = if let Some(pos) = settings.window_position {
         (Some(pos.x), Some(pos.y))
     } else {
@@ -181,7 +194,7 @@ pub(super) async fn save_settings_record(pool: &DbPool, settings: Settings) -> R
     .bind(settings.custom_groups)
     .bind(settings.custom_groups_order)
     .bind(settings.accounts_order)
-    .bind(settings.last_seen_version)
+    .bind(last_seen_version)
     .bind(settings.component_spacing)
     .bind(settings.component_padding)
     .bind(settings.dismissed_budget_suggestions)
