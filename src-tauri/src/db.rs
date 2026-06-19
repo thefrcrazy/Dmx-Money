@@ -43,7 +43,7 @@ pub async fn init_db(app_handle: &tauri::AppHandle) -> Result<DbPool, String> {
     Ok(pool)
 }
 
-async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
+pub(crate) async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -157,7 +157,9 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
             \"analyticsMonthStartsOnFirst\" BOOLEAN NOT NULL DEFAULT 1,
             \"analyticsHiddenExpenseCategories\" TEXT,
             \"analyticsHiddenIncomeCategories\" TEXT,
-            \"scheduledDueRange\" TEXT NOT NULL DEFAULT 'all'
+            \"scheduledDueRange\" TEXT NOT NULL DEFAULT 'all',
+            \"settingsRevision\" INTEGER NOT NULL DEFAULT 0,
+            \"settingsFieldVersions\" TEXT NOT NULL DEFAULT '{}'
         )",
     )
     .execute(&mut *tx)
@@ -488,6 +490,14 @@ async fn create_tables(pool: &DbPool) -> Result<(), sqlx::Error> {
         (
             "scheduledDueRange",
             "ALTER TABLE settings ADD COLUMN \"scheduledDueRange\" TEXT NOT NULL DEFAULT 'all'",
+        ),
+        (
+            "settingsRevision",
+            "ALTER TABLE settings ADD COLUMN \"settingsRevision\" INTEGER NOT NULL DEFAULT 0",
+        ),
+        (
+            "settingsFieldVersions",
+            "ALTER TABLE settings ADD COLUMN \"settingsFieldVersions\" TEXT NOT NULL DEFAULT '{}'",
         ),
     ] {
         let exists: bool =

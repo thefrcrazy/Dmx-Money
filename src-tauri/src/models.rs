@@ -127,6 +127,8 @@ pub struct WindowSize {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(rename = "settingsRevision")]
+    pub settings_revision: Option<i64>,
     pub theme: String,
     #[serde(rename = "primaryColor")]
     pub primary_color: String,

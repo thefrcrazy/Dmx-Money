@@ -6,6 +6,12 @@ import { LATEST_VERSION } from '../constants/changelog';
 import { LOGO_PATH, publicAsset } from '../utils/assets';
 import { hasTauriRuntime } from '../utils/runtime';
 import { selectNewestVersion } from '../utils/version';
+import {
+    applySettingsMutation,
+    createSettingsMutation,
+    hasSettingsMutationChanges,
+    SettingsMutation,
+} from '../services/settingsSync';
 
 const iconCache: Record<string, Uint8Array> = {};
 
@@ -26,6 +32,7 @@ const loadIcon = async (isDark: boolean): Promise<Uint8Array | null> => {
 };
 
 const DEFAULT_SETTINGS: Settings = {
+    settingsRevision: 0,
     theme: 'system',
     primaryColor: 'default',
     windowPosition: null,
@@ -194,6 +201,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const isLoadedRef = useRef(false);
     const isRestoringRef = useRef(false);
     const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
+    const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+    const pendingMutationsRef = useRef(new Map<number, SettingsMutation>());
+    const nextMutationIdRef = useRef(0);
 
     const [isSystemDark] = useState(() => {
         try {
@@ -202,6 +212,42 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             return false;
         }
     });
+
+    const persistSettingsMutation = (
+        mutation: SettingsMutation,
+        localSettings: Settings,
+    ) => {
+        if (!hasSettingsMutationChanges(mutation)) return Promise.resolve();
+
+        const mutationId = ++nextMutationIdRef.current;
+        pendingMutationsRef.current.set(mutationId, mutation);
+        const operation = saveChainRef.current
+            .catch(() => undefined)
+            .then(() => dbService.patchSettings(mutation, localSettings));
+        saveChainRef.current = operation.catch(() => undefined);
+
+        return operation.finally(() => {
+            pendingMutationsRef.current.delete(mutationId);
+        });
+    };
+
+    const applySettingsPatch = (
+        patch: Partial<Settings>,
+        applyVisual = false,
+    ) => {
+        const previous = settingsRef.current;
+        const next = normalizeSettings({ ...previous, ...patch });
+        const mutation = createSettingsMutation(
+            previous,
+            next,
+            Object.keys(patch) as Array<keyof Settings>,
+        );
+
+        settingsRef.current = next;
+        setSettings(next);
+        if (applyVisual) applyVisualSettings(next);
+        return persistSettingsMutation(mutation, next);
+    };
 
     const migrateLocalSettings = (savedSettings: Settings | null) => {
         const initial = normalizeSettings(savedSettings);
@@ -263,7 +309,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 : initial.scheduledDueRange
         };
         if (JSON.stringify(migrated) !== JSON.stringify(initial)) {
-            dbService.saveSettings(migrated).catch(() => { });
+            const changedKeys = (Object.keys(migrated) as Array<keyof Settings>)
+                .filter(key => JSON.stringify(initial[key]) !== JSON.stringify(migrated[key]));
+            const mutation = createSettingsMutation(initial, migrated, changedKeys);
+            persistSettingsMutation(mutation, migrated).catch(() => { });
         }
         return migrated;
     };
@@ -379,6 +428,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             completed = true;
 
             applyVisualSettings(initial);
+            settingsRef.current = initial;
             setSettings(initial);
             isLoadedRef.current = true;
 
@@ -421,13 +471,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     if (!savedSettings) return;
                     const next = normalizeSettings(savedSettings);
                     setSettings(current => {
-                        const merged = {
+                        const serverMerged = {
                             ...next,
                             lastSeenVersion: selectNewestVersion(
                                 current.lastSeenVersion,
                                 next.lastSeenVersion
                             )
                         };
+                        const merged = Array.from(pendingMutationsRef.current.values())
+                            .reduce(applySettingsMutation, serverMerged);
                         settingsRef.current = merged;
                         applyVisualSettings(merged);
                         return merged;
@@ -499,145 +551,56 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const debouncedSaveWindowPosition = (x: number, y: number) => {
         if (savePositionTimeoutRef.current) clearTimeout(savePositionTimeoutRef.current);
         savePositionTimeoutRef.current = setTimeout(() => {
-            setSettings(prev => {
-                const updated = { ...prev, windowPosition: { x, y } };
-                dbService.saveSettings(updated).catch(() => { });
-                return updated;
-            });
+            applySettingsPatch({ windowPosition: { x, y } }).catch(() => { });
         }, 1000);
     };
 
     const debouncedSaveWindowSize = (width: number, height: number) => {
         if (saveSizeTimeoutRef.current) clearTimeout(saveSizeTimeoutRef.current);
         saveSizeTimeoutRef.current = setTimeout(() => {
-            setSettings(prev => {
-                const updated = { ...prev, windowSize: { width, height } };
-                dbService.saveSettings(updated).catch(() => { });
-                return updated;
-            });
+            applySettingsPatch({ windowSize: { width, height } }).catch(() => { });
         }, 1000);
     };
 
     return (
         <SettingsContext.Provider value={{
             settings,
-            updateTheme: async (theme) => {
-                setSettings(prev => {
-                    const next = { ...prev, theme };
-                    applyVisualSettings(next);
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
+            updateTheme: theme => applySettingsPatch({ theme }, true),
+            updatePrimaryColor: color => applySettingsPatch({ primaryColor: color }, true),
+            updateWindowPosition: (x, y) => applySettingsPatch({ windowPosition: { x, y } }),
+            updateWindowSize: (width, height) => applySettingsPatch({ windowSize: { width, height } }),
+            updateAccountGroup: (id, group) => {
+                const groups = { ...(settingsRef.current.accountGroups || {}) };
+                if (group) groups[id] = group; else delete groups[id];
+                return applySettingsPatch({ accountGroups: groups });
             },
-            updatePrimaryColor: async (color) => {
-                setSettings(prev => {
-                    const next = { ...prev, primaryColor: color };
-                    applyVisualSettings(next);
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
+            updateCustomGroups: groups => applySettingsPatch({ customGroups: groups }),
+            renameCustomGroup: (oldName, newName) => {
+                const current = settingsRef.current;
+                const customGroups = (current.customGroups || []).map(group => group === oldName ? newName : group);
+                const accountGroups = { ...(current.accountGroups || {}) };
+                Object.keys(accountGroups).forEach(id => {
+                    if (accountGroups[id] === oldName) accountGroups[id] = newName;
                 });
+                return applySettingsPatch({ customGroups, accountGroups });
             },
-            updateWindowPosition: async (x, y) => {
-                setSettings(prev => {
-                    const next = { ...prev, windowPosition: { x, y } };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateWindowSize: async (width, height) => {
-                setSettings(prev => {
-                    const next = { ...prev, windowSize: { width, height } };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateAccountGroup: async (id, group) => {
-                setSettings(prev => {
-                    const groups = { ...(prev.accountGroups || {}) };
-                    if (group) groups[id] = group; else delete groups[id];
-                    const next = { ...prev, accountGroups: groups };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateCustomGroups: async (groups) => {
-                setSettings(prev => {
-                    const next = { ...prev, customGroups: groups };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            renameCustomGroup: async (oldName, newName) => {
-                setSettings(prev => {
-                    const customGroups = (prev.customGroups || []).map(g => g === oldName ? newName : g);
-                    const accountGroups = { ...(prev.accountGroups || {}) };
-                    Object.keys(accountGroups).forEach(id => { if (accountGroups[id] === oldName) accountGroups[id] = newName; });
-                    const next = { ...prev, customGroups, accountGroups };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateCustomGroupsOrder: async (order) => {
-                setSettings(prev => {
-                    const next = { ...prev, customGroupsOrder: order };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateAccountsOrder: async (order) => {
-                setSettings(prev => {
-                    const next = { ...prev, accountsOrder: order };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateComponentSpacing: async (spacing) => {
-                setSettings(prev => {
-                    const next = { ...prev, componentSpacing: spacing };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateComponentPadding: async (padding) => {
-                setSettings(prev => {
-                    const next = { ...prev, componentPadding: padding };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateLastSeenVersion: async (version) => {
-                setSettings(prev => {
-                    const next = {
-                        ...prev,
-                        lastSeenVersion: selectNewestVersion(prev.lastSeenVersion, version)
-                    };
-                    settingsRef.current = next;
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateDismissedBudgetSuggestions: async (keys) => {
-                setSettings(prev => {
-                    const next = { ...prev, dismissedBudgetSuggestions: keys };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateDismissedScheduledSuggestions: async (keys) => {
-                setSettings(prev => {
-                    const next = { ...prev, dismissedScheduledSuggestions: keys };
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            },
-            updateSettings: async (patch) => {
-                setSettings(prev => {
-                    const next = normalizeSettings({ ...prev, ...patch });
-                    applyVisualSettings(next);
-                    dbService.saveSettings(next).catch(() => { });
-                    return next;
-                });
-            }
+            updateCustomGroupsOrder: order => applySettingsPatch({ customGroupsOrder: order }),
+            updateAccountsOrder: order => applySettingsPatch({ accountsOrder: order }),
+            updateComponentSpacing: spacing => applySettingsPatch({ componentSpacing: spacing }),
+            updateComponentPadding: padding => applySettingsPatch({ componentPadding: padding }),
+            updateLastSeenVersion: version => applySettingsPatch({
+                lastSeenVersion: selectNewestVersion(settingsRef.current.lastSeenVersion, version)
+            }),
+            updateDismissedBudgetSuggestions: keys => applySettingsPatch({
+                dismissedBudgetSuggestions: keys
+            }),
+            updateDismissedScheduledSuggestions: keys => applySettingsPatch({
+                dismissedScheduledSuggestions: keys
+            }),
+            updateSettings: patch => applySettingsPatch(patch, (
+                Object.prototype.hasOwnProperty.call(patch, 'theme')
+                || Object.prototype.hasOwnProperty.call(patch, 'primaryColor')
+            ))
         }}>
             <div className={`transition-opacity duration-700 ${!isInitialLoadDone ? 'opacity-0' : 'opacity-100'}`}>
                 {children}

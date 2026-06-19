@@ -341,6 +341,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     try {
                         const status = await dbService.getSyncStatus();
                         lastDataVersionRef.current = status.dataVersion;
+                        notifySettingsRefresh();
                         setMobileConnectionState('connected');
                     } catch (error) {
                         if (!dbService.isOfflineError(error)) throw error;
@@ -373,6 +374,7 @@ export const BankProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await loadBankData({ processScheduled: true });
             const status = await dbService.getSyncStatus();
             lastDataVersionRef.current = status.dataVersion;
+            notifySettingsRefresh();
             setMobileConnectionState('connected');
         } catch (error) {
             console.error("Failed to connect mobile companion:", error);

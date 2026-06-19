@@ -16,6 +16,7 @@ export interface OfflineMutation {
     method: string;
     body?: string;
     createdAt: number;
+    sequence?: number;
 }
 
 type OfflineDataMap = {
@@ -41,6 +42,7 @@ const DATA_STORE = 'data';
 const MUTATION_STORE = 'mutations';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let mutationSequence = 0;
 
 const currentScope = () => getMobileApiBaseUrl() || 'unpaired';
 const scopedKey = (key: OfflineDataKey, scope = currentScope()) => `${scope}:${key}`;
@@ -130,6 +132,7 @@ export const offlineStore = {
             method,
             body,
             createdAt: Date.now(),
+            sequence: ++mutationSequence,
         } satisfies OfflineMutation);
         await transactionDone(transaction);
     },
@@ -144,7 +147,11 @@ export const offlineStore = {
         const scope = currentScope();
         return mutations
             .filter(mutation => mutation.scope === scope)
-            .sort((a, b) => a.createdAt - b.createdAt);
+            .sort((a, b) => (
+                a.createdAt - b.createdAt
+                || (a.sequence || 0) - (b.sequence || 0)
+                || a.id.localeCompare(b.id)
+            ));
     },
 
     async removeMutation(id: string): Promise<void> {

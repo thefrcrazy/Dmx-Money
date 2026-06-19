@@ -12,6 +12,30 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.15",
+        date: "2026-06-19",
+        title: "Synchronisation sans écrasement",
+        changes: [
+            "Remplacement des sauvegardes complètes des paramètres par des mutations partielles ciblées.",
+            "Détection des conflits par champ afin qu'un appareil hors ligne ne remplace pas une valeur modifiée ailleurs.",
+            "Fusion des transactions fictives par identifiant et protection contre les suppressions obsolètes.",
+            "Conservation additive des suggestions ignorées et des catégories masquées entre desktop et PWA.",
+            "Ordonnancement et regroupement de la file hors ligne avant la resynchronisation locale."
+        ],
+        features: [
+            {
+                title: "Aucune suppression implicite",
+                description: "Les anciennes données mobiles ne peuvent plus effacer les réglages plus récents.",
+                icon: "Shield"
+            },
+            {
+                title: "Conflits maîtrisés",
+                description: "Une modification distante est conservée lorsque la valeur locale est devenue obsolète.",
+                icon: "ArrowRightLeft"
+            }
+        ]
+    },
+    {
         version: "1.0.14",
         date: "2026-06-18",
         title: "Nouveautés synchronisées sans boucle",

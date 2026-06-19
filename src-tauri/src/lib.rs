@@ -4,6 +4,7 @@ mod db;
 mod mobile_companion;
 mod models;
 mod secure_bridge;
+mod settings_sync;
 mod versioning;
 
 use tauri::{LogicalPosition, Manager, WebviewWindowBuilder};
@@ -84,6 +85,7 @@ pub fn run() {
             commands::import_data,
             commands::get_settings,
             commands::save_settings,
+            commands::patch_settings,
             mobile_companion::get_mobile_companion_status,
             mobile_companion::get_secure_bridge_status,
             mobile_companion::set_secure_bridge_enabled,

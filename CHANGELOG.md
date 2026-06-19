@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.15 - 2026-06-19
+
+- Remplacement des sauvegardes complètes des paramètres par des mutations partielles ciblées.
+- Détection des conflits par champ afin qu'un appareil hors ligne ne remplace pas une valeur modifiée ailleurs.
+- Fusion des transactions fictives par identifiant et protection contre les suppressions obsolètes.
+- Conservation additive des suggestions ignorées et des catégories masquées entre desktop et PWA.
+- Ordonnancement et regroupement de la file hors ligne avant la resynchronisation locale.
+
 ## 1.0.14 - 2026-06-18
 
 - Correction de la réapparition répétée des nouveautés lors du passage entre la PWA mobile et l'application desktop.

@@ -1,9 +1,10 @@
 use super::*;
-use crate::versioning::newest_seen_version;
 
 pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings>, String> {
     #[derive(sqlx::FromRow)]
     struct SettingsRow {
+        #[sqlx(rename = "settingsRevision")]
+        settings_revision: i64,
         theme: String,
         #[sqlx(rename = "primaryColor")]
         primary_color: String,
@@ -82,6 +83,7 @@ pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings
             };
 
         Settings {
+            settings_revision: Some(row.settings_revision),
             theme: row.theme,
             primary_color: row.primary_color,
             display_style: Some(row.display_style),
@@ -110,110 +112,4 @@ pub(super) async fn get_settings_record(pool: &DbPool) -> Result<Option<Settings
             scheduled_due_range: row.scheduled_due_range,
         }
     }))
-}
-
-pub(super) async fn save_settings_record(pool: &DbPool, settings: Settings) -> Result<(), String> {
-    let current_last_seen_version = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT \"lastSeenVersion\" FROM settings WHERE id = 1",
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| map_db_error(e, "lecture de la version déjà vue"))?
-    .flatten();
-    let last_seen_version = newest_seen_version(
-        current_last_seen_version,
-        settings.last_seen_version.clone(),
-    );
-
-    let (pos_x, pos_y) = if let Some(pos) = settings.window_position {
-        (Some(pos.x), Some(pos.y))
-    } else {
-        (None, None)
-    };
-
-    let (size_w, size_h) = if let Some(size) = settings.window_size {
-        (Some(size.width), Some(size.height))
-    } else {
-        (None, None)
-    };
-
-    let display_style = settings
-        .display_style
-        .unwrap_or_else(|| "modern".to_string());
-
-    sqlx::query(
-        "INSERT INTO settings (
-            id, theme, \"primaryColor\", \"displayStyle\", \"windowPositionX\", \"windowPositionY\",
-            \"windowSizeWidth\", \"windowSizeHeight\", \"accountGroups\", \"customGroups\",
-            \"customGroupsOrder\", \"accountsOrder\", \"lastSeenVersion\", \"componentSpacing\", \"componentPadding\",
-            \"dismissedBudgetSuggestions\", \"dismissedScheduledSuggestions\", \"predictionTimeRange\",
-            \"predictionCustomEndDate\", \"predictionAlertThreshold\", \"predictionMonthStartsOnFirst\",
-            \"predictionFakeTransactions\", \"analyticsTimeRange\", \"analyticsCustomStartDate\",
-            \"analyticsCustomEndDate\", \"analyticsMonthStartsOnFirst\", \"analyticsHiddenExpenseCategories\",
-            \"analyticsHiddenIncomeCategories\", \"scheduledDueRange\"
-        )
-         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
-         ON CONFLICT(id) DO UPDATE SET
-            theme = $1,
-            \"primaryColor\" = $2,
-            \"displayStyle\" = $3,
-            \"windowPositionX\" = $4,
-            \"windowPositionY\" = $5,
-            \"windowSizeWidth\" = $6,
-            \"windowSizeHeight\" = $7,
-            \"accountGroups\" = $8,
-            \"customGroups\" = $9,
-            \"customGroupsOrder\" = $10,
-            \"accountsOrder\" = $11,
-            \"lastSeenVersion\" = $12,
-            \"componentSpacing\" = $13,
-            \"componentPadding\" = $14,
-            \"dismissedBudgetSuggestions\" = $15,
-            \"dismissedScheduledSuggestions\" = $16,
-            \"predictionTimeRange\" = $17,
-            \"predictionCustomEndDate\" = $18,
-            \"predictionAlertThreshold\" = $19,
-            \"predictionMonthStartsOnFirst\" = $20,
-            \"predictionFakeTransactions\" = $21,
-            \"analyticsTimeRange\" = $22,
-            \"analyticsCustomStartDate\" = $23,
-            \"analyticsCustomEndDate\" = $24,
-            \"analyticsMonthStartsOnFirst\" = $25,
-            \"analyticsHiddenExpenseCategories\" = $26,
-            \"analyticsHiddenIncomeCategories\" = $27,
-            \"scheduledDueRange\" = $28",
-    )
-    .bind(settings.theme)
-    .bind(settings.primary_color)
-    .bind(display_style)
-    .bind(pos_x)
-    .bind(pos_y)
-    .bind(size_w)
-    .bind(size_h)
-    .bind(settings.account_groups)
-    .bind(settings.custom_groups)
-    .bind(settings.custom_groups_order)
-    .bind(settings.accounts_order)
-    .bind(last_seen_version)
-    .bind(settings.component_spacing)
-    .bind(settings.component_padding)
-    .bind(settings.dismissed_budget_suggestions)
-    .bind(settings.dismissed_scheduled_suggestions)
-    .bind(settings.prediction_time_range.unwrap_or_else(|| "year".to_string()))
-    .bind(settings.prediction_custom_end_date)
-    .bind(settings.prediction_alert_threshold.unwrap_or(0.0))
-    .bind(settings.prediction_month_starts_on_first.unwrap_or(true))
-    .bind(settings.prediction_fake_transactions)
-    .bind(settings.analytics_time_range.unwrap_or_else(|| "year".to_string()))
-    .bind(settings.analytics_custom_start_date)
-    .bind(settings.analytics_custom_end_date)
-    .bind(settings.analytics_month_starts_on_first.unwrap_or(true))
-    .bind(settings.analytics_hidden_expense_categories)
-    .bind(settings.analytics_hidden_income_categories)
-    .bind(settings.scheduled_due_range.unwrap_or_else(|| "all".to_string()))
-    .execute(pool)
-    .await
-    .map_err(|e| map_db_error(e, "sauvegarde des paramètres"))?;
-
-    Ok(())
 }

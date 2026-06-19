@@ -13,11 +13,12 @@ use self::categories::{delete_category, insert_category, list_categories, update
 use self::scheduled::{
     delete_scheduled, insert_scheduled, list_scheduled, process_due_scheduled, update_scheduled,
 };
-use self::settings::{get_settings_record, save_settings_record};
+use self::settings::get_settings_record;
 use self::transactions::{
     delete_transaction, insert_transaction, insert_transfer, list_transactions, update_transaction,
     TransferPayload,
 };
+use crate::settings_sync::{apply_settings_patch, legacy_mobile_settings_patch, SettingsPatch};
 
 pub(super) async fn route_api_request(
     pool: &DbPool,
@@ -128,8 +129,17 @@ pub(super) async fn route_api_request(
         }
         ("GET", "settings") => Ok((json_response(200, get_settings_record(pool).await?), false)),
         ("PUT", "settings") => {
-            save_settings_record(pool, parse_json(&request.body)?).await?;
-            Ok((json_response(200, json!({ "ok": true })), true))
+            let result = apply_settings_patch(
+                pool,
+                legacy_mobile_settings_patch(parse_json(&request.body)?),
+            )
+            .await?;
+            Ok((json_response(200, result), true))
+        }
+        ("PATCH", "settings") => {
+            let patch: SettingsPatch = parse_json(&request.body)?;
+            let result = apply_settings_patch(pool, patch).await?;
+            Ok((json_response(200, result), true))
         }
         _ => Ok((error_response(404, "Route introuvable"), false)),
     }

@@ -87,7 +87,7 @@ pub(super) fn write_response(
 
     if secure_app_origin.is_none() || allow_origin.is_some() {
         headers.push_str(&format!(
-            "Access-Control-Allow-Origin: {}\r\nAccess-Control-Allow-Headers: Content-Type, Accept, Origin, X-Requested-With, X-Dmx-Csrf, Access-Control-Request-Private-Network\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Max-Age: 86400\r\n",
+            "Access-Control-Allow-Origin: {}\r\nAccess-Control-Allow-Headers: Content-Type, Accept, Origin, X-Requested-With, X-Dmx-Csrf, Access-Control-Request-Private-Network\r\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Max-Age: 86400\r\n",
             allow_origin.as_deref().unwrap_or("*")
         ));
     }

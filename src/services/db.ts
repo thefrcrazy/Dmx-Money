@@ -13,6 +13,13 @@ import {
     setMobileCsrfToken
 } from '../utils/runtime';
 import { selectNewestVersion } from '../utils/version';
+import {
+    applySettingsMutation,
+    createSettingsMutation,
+    hasSettingsMutationChanges,
+    mergeSettingsMutations,
+    SettingsMutation,
+} from './settingsSync';
 
 type InvokeFn = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -41,6 +48,12 @@ interface RawSettings extends Omit<Settings,
 interface SyncStatus {
     ok: boolean;
     dataVersion: number;
+}
+
+interface SettingsPatchResult {
+    ok: boolean;
+    revision: number;
+    conflicts: string[];
 }
 
 class MobileNetworkError extends Error {
@@ -114,6 +127,62 @@ const serializeSettings = (settings: Settings): RawSettings => ({
     analyticsHiddenExpenseCategories: JSON.stringify(settings.analyticsHiddenExpenseCategories || []),
     analyticsHiddenIncomeCategories: JSON.stringify(settings.analyticsHiddenIncomeCategories || [])
 });
+
+const serializeSettingsValues = (
+    values: SettingsMutation['values'] | SettingsMutation['expectedValues'],
+) => {
+    if (!values) return undefined;
+    const serialized: Record<string, unknown> = { ...values };
+
+    const serializeJsonField = (key: keyof RawSettings) => {
+        if (!Object.prototype.hasOwnProperty.call(values, key)) return;
+        const value = values[key as keyof typeof values];
+        serialized[key] = value === null || value === undefined ? null : JSON.stringify(value);
+    };
+
+    serializeJsonField('accountGroups');
+    serializeJsonField('customGroups');
+    serializeJsonField('customGroupsOrder');
+    serializeJsonField('accountsOrder');
+    return serialized;
+};
+
+const serializeSettingsMutation = (mutation: SettingsMutation) => ({
+    ...mutation,
+    values: serializeSettingsValues(mutation.values),
+    expectedValues: serializeSettingsValues(mutation.expectedValues),
+});
+
+const parseQueuedSettingsMutation = (body?: string): SettingsMutation | null => {
+    if (!body) return null;
+    try {
+        const parsed = JSON.parse(body) as SettingsMutation;
+        return typeof parsed === 'object' && parsed !== null ? parsed : null;
+    } catch {
+        return null;
+    }
+};
+
+const legacySettingsToMutation = (body?: string): SettingsMutation | null => {
+    if (!body) return null;
+    try {
+        const settings = parseSettings(JSON.parse(body) as RawSettings);
+        if (!settings) return null;
+        return {
+            schemaVersion: 1,
+            baseRevision: settings.settingsRevision || 0,
+            values: {
+                lastSeenVersion: settings.lastSeenVersion,
+            },
+            dismissedBudgetSuggestionsAdd: settings.dismissedBudgetSuggestions,
+            dismissedScheduledSuggestionsAdd: settings.dismissedScheduledSuggestions,
+            analyticsHiddenExpenseCategoriesAdd: settings.analyticsHiddenExpenseCategories,
+            analyticsHiddenIncomeCategoriesAdd: settings.analyticsHiddenIncomeCategories,
+        };
+    } catch {
+        return null;
+    }
+};
 
 export class DatabaseService {
     private invokeFn: Promise<InvokeFn> | null = null;
@@ -549,12 +618,48 @@ export class DatabaseService {
 
         this.flushPromise = (async () => {
             const mutations = await offlineStore.listMutations();
-            for (const mutation of mutations) {
+            for (let index = 0; index < mutations.length;) {
+                const mutation = mutations[index];
+                if (mutation.path === '/api/settings' && mutation.method === 'PATCH') {
+                    const ids: string[] = [];
+                    let merged: SettingsMutation | null = null;
+                    let refreshSettings = false;
+
+                    while (index < mutations.length) {
+                        const candidate = mutations[index];
+                        if (candidate.path !== '/api/settings' || candidate.method !== 'PATCH') break;
+                        const parsed = parseQueuedSettingsMutation(candidate.body);
+                        if (parsed) {
+                            merged = merged ? mergeSettingsMutations(merged, parsed) : parsed;
+                        }
+                        ids.push(candidate.id);
+                        index += 1;
+                    }
+
+                    if (merged && hasSettingsMutationChanges(merged)) {
+                        const mutationToSend = {
+                            ...merged,
+                            baseRevision: merged.baseRevision,
+                        };
+                        await this.request<SettingsPatchResult>('/api/settings', {
+                            method: 'PATCH',
+                            body: JSON.stringify(serializeSettingsMutation(mutationToSend)),
+                        }, this.requestTimeoutMs);
+                        refreshSettings = true;
+                    }
+                    for (const id of ids) await offlineStore.removeMutation(id);
+                    if (refreshSettings) {
+                        window.dispatchEvent(new CustomEvent('dmxmoney-settings-refresh'));
+                    }
+                    continue;
+                }
+
                 await this.request(mutation.path, {
                     method: mutation.method,
                     body: mutation.body,
                 }, this.requestTimeoutMs);
                 await offlineStore.removeMutation(mutation.id);
+                index += 1;
             }
         })().finally(() => {
             this.flushPromise = null;
@@ -802,35 +907,92 @@ export class DatabaseService {
                 : await this.invoke<RawSettings | null>('get_settings');
             const parsed = parseSettings(res);
             if (!parsed) return cachedSettings;
-
-            const merged = {
+            const merged: Settings = {
                 ...parsed,
                 lastSeenVersion: selectNewestVersion(
                     cachedSettings?.lastSeenVersion,
                     parsed.lastSeenVersion
                 )
             };
-            if (this.usesHttp()) {
-                await offlineStore.setData('settings', merged);
+            const pendingMutations = this.usesHttp()
+                ? await offlineStore.listMutations()
+                : [];
+            const pendingSettingsMutations = pendingMutations
+                .filter(mutation => mutation.path === '/api/settings')
+                .map(mutation => (
+                    mutation.method === 'PATCH'
+                        ? parseQueuedSettingsMutation(mutation.body)
+                        : mutation.method === 'PUT'
+                            ? legacySettingsToMutation(mutation.body)
+                            : null
+                ))
+                .filter((mutation): mutation is SettingsMutation => mutation !== null);
+            const withPendingChanges = pendingMutations.reduce<Settings>((current, mutation) => {
+                if (mutation.path !== '/api/settings') return current;
+                const pending = mutation.method === 'PATCH'
+                    ? parseQueuedSettingsMutation(mutation.body)
+                    : mutation.method === 'PUT'
+                        ? legacySettingsToMutation(mutation.body)
+                        : null;
+                return pending ? applySettingsMutation(current, pending) : current;
+            }, merged);
+            if (pendingSettingsMutations.length > 0) {
+                withPendingChanges.settingsRevision = Math.min(
+                    parsed.settingsRevision || 0,
+                    ...pendingSettingsMutations.map(mutation => mutation.baseRevision),
+                );
             }
-            return merged;
+            if (this.usesHttp()) {
+                await offlineStore.setData('settings', withPendingChanges);
+            }
+            return withPendingChanges;
         } catch {
             return cachedSettings;
         }
     }
 
     async saveSettings(settings: Settings): Promise<void> {
-        const settingsToSend = serializeSettings(settings);
+        const current = await this.getSettings();
+        if (!current) {
+            const settingsToSend = serializeSettings(settings);
+            await this.invoke('save_settings', { settings: settingsToSend });
+            return;
+        }
+
+        const changedKeys = (Object.keys(settings) as Array<keyof Settings>)
+            .filter(key => key !== 'settingsRevision' && JSON.stringify(current[key]) !== JSON.stringify(settings[key]));
+        const mutation = createSettingsMutation(current, settings, changedKeys);
+        await this.patchSettings(mutation, settings);
+    }
+
+    async patchSettings(mutation: SettingsMutation, localSettings: Settings): Promise<void> {
+        if (!hasSettingsMutationChanges(mutation)) return;
 
         if (this.usesHttp()) {
-            const body = JSON.stringify(settingsToSend);
-            await this.commitMobileMutation('/api/settings', 'PUT', body, () =>
-                offlineStore.setData('settings', settings)
+            const serialized = serializeSettingsMutation(mutation);
+            await this.commitMobileMutation(
+                '/api/settings',
+                'PATCH',
+                JSON.stringify(serialized),
+                () => offlineStore.setData('settings', localSettings),
             );
             return;
         }
 
-        await this.invoke('save_settings', { settings: settingsToSend });
+        const mutationToSend = {
+            ...mutation,
+            baseRevision: mutation.baseRevision,
+        };
+        const result = await this.invoke<SettingsPatchResult>('patch_settings', {
+            patch: serializeSettingsMutation(mutationToSend),
+        });
+        if (result.conflicts.length === 0) {
+            localSettings.settingsRevision = result.revision;
+        } else {
+            window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('dmxmoney-settings-refresh'));
+            }, 0);
+        }
     }
 
     async getSyncStatus(): Promise<SyncStatus> {
