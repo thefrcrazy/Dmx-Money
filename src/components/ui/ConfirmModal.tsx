@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { TriangleAlert } from 'lucide-react';
 import Button from './Button';
+import FormPopup from './FormPopup';
+import { isMobileCompanion } from '../../utils/runtime';
 
 interface ConfirmModalProps {
     isOpen: boolean;
@@ -23,13 +25,61 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     cancelLabel = 'Annuler',
     isDangerous = false
 }) => {
+    const mobileMode = isMobileCompanion();
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
-        if (isOpen) window.addEventListener('keydown', handleEscape);
+        if (isOpen && !mobileMode) window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
-    }, [isOpen, onClose]);
+    }, [isOpen, mobileMode, onClose]);
+
+    const handleConfirm = () => {
+        onConfirm();
+        onClose();
+    };
+
+    if (mobileMode) {
+        return (
+            <FormPopup
+                isOpen={isOpen}
+                onClose={onClose}
+                title={title}
+                maxWidth="md"
+            >
+                <div className="space-y-6 px-2 pb-1">
+                    <div className="flex items-start gap-4">
+                        {isDangerous && (
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
+                                <TriangleAlert className="h-6 w-6 text-red-600 dark:text-red-400" />
+                            </div>
+                        )}
+                        <p className={`text-[15px] leading-6 text-gray-600 dark:text-gray-300 ${isDangerous ? 'pt-1' : ''}`}>
+                            {message}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Button
+                            variant="secondary"
+                            fullWidth
+                            onClick={onClose}
+                        >
+                            {cancelLabel}
+                        </Button>
+                        <Button
+                            variant={isDangerous ? 'danger' : 'primary'}
+                            fullWidth
+                            onClick={handleConfirm}
+                        >
+                            {confirmLabel}
+                        </Button>
+                    </div>
+                </div>
+            </FormPopup>
+        );
+    }
 
     if (!isOpen) return null;
 
@@ -64,10 +114,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                         </Button>
                         <Button
                             variant={isDangerous ? 'danger' : 'primary'}
-                            onClick={() => {
-                                onConfirm();
-                                onClose();
-                            }}
+                            onClick={handleConfirm}
                         >
                             {confirmLabel}
                         </Button>

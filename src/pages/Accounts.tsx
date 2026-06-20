@@ -32,6 +32,7 @@ import MultiSelect from '../components/ui/MultiSelect';
 import SortableGroupItem from '../features/accounts/SortableGroupItem';
 import AccountCard from '../features/accounts/AccountCard';
 import { COLORS } from '../constants/icons';
+import { isMobileCompanion } from '../utils/runtime';
 
 const normalizeSearchValue = (value: unknown) => String(value ?? '')
     .toLowerCase()
@@ -88,6 +89,7 @@ const Accounts: React.FC = () => {
 
     const [activeId, setActiveId] = useState<string | null>(null);
     const [activeType, setActiveType] = useState<'group' | 'account' | null>(null);
+    const mobileMode = isMobileCompanion();
 
     const accounts = useMemo(() => {
         const searchTokens = normalizeSearchValue(searchTerm).split(/\s+/).filter(Boolean);
@@ -116,9 +118,14 @@ const Accounts: React.FC = () => {
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
+            activationConstraint: mobileMode
+                ? {
+                    delay: 250,
+                    tolerance: 8,
+                }
+                : {
+                    distance: 8,
+                },
         }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
