@@ -12,6 +12,30 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.16",
+        date: "2026-06-20",
+        title: "Interactions mobiles plus naturelles",
+        changes: [
+            "Les confirmations de suppression utilisent maintenant la même feuille mobile que les formulaires d'ajout.",
+            "Les dialogues mobiles restent correctement ancrés en bas et au-dessus de la barre de navigation.",
+            "Le glisser-déposer tactile démarre après un court maintien afin de préserver le défilement normal.",
+            "Suppression d'une ancienne copie locale inutilisée du module Rust d'arrière-plan.",
+            "Renouvellement du cache PWA pour distribuer immédiatement les corrections."
+        ],
+        features: [
+            {
+                title: "Confirmations cohérentes",
+                description: "Les actions sensibles reprennent le même comportement que les autres feuilles mobiles.",
+                icon: "CheckCircle2"
+            },
+            {
+                title: "Drag tactile maîtrisé",
+                description: "Un maintien volontaire déclenche le déplacement sans gêner le scroll.",
+                icon: "Smartphone"
+            }
+        ]
+    },
+    {
         version: "1.0.15",
         date: "2026-06-19",
         title: "Synchronisation sans écrasement",

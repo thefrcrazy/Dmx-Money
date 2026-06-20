@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.16 - 2026-06-20
+
+- Les confirmations de suppression utilisent maintenant la même feuille mobile que les formulaires d'ajout.
+- Les dialogues mobiles restent correctement ancrés en bas et au-dessus de la barre de navigation.
+- Le glisser-déposer tactile démarre après un court maintien afin de préserver le défilement normal.
+- Suppression d'une ancienne copie locale inutilisée du module Rust d'arrière-plan.
+- Renouvellement du cache PWA pour distribuer immédiatement les corrections.
+
 ## 1.0.15 - 2026-06-19
 
 - Remplacement des sauvegardes complètes des paramètres par des mutations partielles ciblées.
