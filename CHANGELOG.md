@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.19 - 2026-07-04
+
+- Correction de l'activation du compagnon mobile quand le pont HTTPS possède déjà un DNS et un certificat valides.
+- L'application n'essaie plus de reprovisionner le pont si le trousseau macOS refuse temporairement le secret device mais que le certificat local est prêt.
+- Le statut du pont reconnaît maintenant une configuration existante récupérable sans afficher un faux état de provisioning.
+
 ## 1.0.18 - 2026-07-03
 
 - Correction d'un blocage d'activation du compagnon mobile lorsque le pont HTTPS possédait déjà un appareil local valide.

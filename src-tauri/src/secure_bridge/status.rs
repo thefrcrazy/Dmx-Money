@@ -9,6 +9,9 @@ pub async fn build_status(
 ) -> Result<SecureBridgeStatus, String> {
     let settings = load_settings(pool).await?;
     let managed_credential_ready = has_managed_device_secret();
+    let certificate_ready = certificate_paths(app_handle, settings.device_id.as_deref())
+        .map(|paths| paths.cert.exists() && paths.key.exists())
+        .unwrap_or(false);
     let configured = settings
         .domain
         .as_deref()
@@ -24,10 +27,7 @@ pub async fn build_status(
             .as_deref()
             .map(|host| !host.is_empty())
             .unwrap_or(false)
-        && managed_credential_ready;
-    let certificate_ready = certificate_paths(app_handle, settings.device_id.as_deref())
-        .map(|paths| paths.cert.exists() && paths.key.exists())
-        .unwrap_or(false);
+        && (managed_credential_ready || certificate_ready);
     let api_url = settings
         .local_host
         .as_ref()

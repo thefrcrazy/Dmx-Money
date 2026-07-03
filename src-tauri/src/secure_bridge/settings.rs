@@ -6,7 +6,7 @@ pub async fn ensure_auto_configuration(
 ) -> Result<(), String> {
     let current = load_settings(pool).await?;
     let has_secret = has_managed_device_secret();
-    let has_config = current
+    let has_bridge_identity = current
         .domain
         .as_deref()
         .map(|value| !value.is_empty())
@@ -20,8 +20,13 @@ pub async fn ensure_auto_configuration(
             .local_host
             .as_deref()
             .map(|value| !value.is_empty())
-            .unwrap_or(false)
-        && has_secret;
+            .unwrap_or(false);
+    let has_valid_certificate = current
+        .certificate_expires_at
+        .as_deref()
+        .map(|value| !is_past(value))
+        .unwrap_or(false);
+    let has_config = has_bridge_identity && (has_secret || has_valid_certificate);
 
     if has_config {
         return Ok(());

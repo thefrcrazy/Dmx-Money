@@ -12,6 +12,28 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.19",
+        date: "2026-07-04",
+        title: "Pont mobile sans reprovisionnement",
+        changes: [
+            "Correction de l'activation du compagnon mobile quand le pont HTTPS possède déjà un DNS et un certificat valides.",
+            "L'application n'essaie plus de reprovisionner le pont si le trousseau macOS refuse temporairement le secret device mais que le certificat local est prêt.",
+            "Le statut du pont reconnaît maintenant une configuration existante récupérable sans afficher un faux état de provisioning."
+        ],
+        features: [
+            {
+                title: "Activation directe",
+                description: "Un pont déjà certifié peut redémarrer sans repasser par Cloudflare.",
+                icon: "ShieldCheck"
+            },
+            {
+                title: "Moins de faux blocages",
+                description: "Un accès trousseau temporairement refusé ne force plus un reprovisionnement inutile.",
+                icon: "RefreshCw"
+            }
+        ]
+    },
+    {
         version: "1.0.18",
         date: "2026-07-03",
         title: "Activation mobile réparée",
