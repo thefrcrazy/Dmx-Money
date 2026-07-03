@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.18 - 2026-07-03
+
+- Correction d'un blocage d'activation du compagnon mobile lorsque le pont HTTPS possédait déjà un appareil local valide.
+- Réparation automatique des champs de configuration du pont depuis le device existant au lieu de reprovisionner inutilement.
+- Conservation du modèle Worker fermé : le provisioning Cloudflare reste protégé par secret serveur.
+- Rotation du secret de provisioning local/Cloudflare pour réaligner l'installation desktop actuelle.
+
 ## 1.0.17 - 2026-07-03
 
 - Correction de la récupération du pont mobile HTTPS après plusieurs jours sans synchronisation.

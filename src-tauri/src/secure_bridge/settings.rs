@@ -27,7 +27,80 @@ pub async fn ensure_auto_configuration(
         return Ok(());
     }
 
+    if has_secret
+        && current
+            .device_id
+            .as_deref()
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+    {
+        repair_managed_configuration(pool, &current).await?;
+        return Ok(());
+    }
+
     provision_managed_device(pool, &current, true).await?;
+
+    Ok(())
+}
+
+async fn repair_managed_configuration(
+    pool: &DbPool,
+    current: &SecureBridgeSettings,
+) -> Result<(), String> {
+    let device_id = current
+        .device_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "Device ID DmxMoney Bridge manquant.".to_string())?;
+    let domain = current
+        .domain
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(normalize_domain)
+        .transpose()?
+        .unwrap_or_else(|| DEFAULT_BRIDGE_DOMAIN.to_string());
+    let app_url = current
+        .app_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(normalize_url)
+        .transpose()?
+        .unwrap_or_else(|| {
+            format!(
+                "{}/mobile",
+                managed_service_base_url(current.managed_service_url.as_deref())
+            )
+        });
+    let local_host = current
+        .local_host
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(normalize_host)
+        .transpose()?
+        .unwrap_or_else(|| format!("{DEFAULT_DEVICE_PREFIX}-{device_id}.sync.{domain}"));
+
+    sqlx::query(
+        "UPDATE settings SET
+            \"secureBridgeDomain\" = $1,
+            \"secureBridgeAppUrl\" = $2,
+            \"secureBridgeLocalHost\" = $3,
+            \"secureBridgeManagedServiceUrl\" = $4,
+            \"secureBridgeLastError\" = NULL
+         WHERE id = 1",
+    )
+    .bind(domain)
+    .bind(app_url)
+    .bind(local_host)
+    .bind(managed_service_base_url(
+        current.managed_service_url.as_deref(),
+    ))
+    .execute(pool)
+    .await
+    .map_err(|e| map_db_error(e, "réparation du pont sécurisé"))?;
 
     Ok(())
 }

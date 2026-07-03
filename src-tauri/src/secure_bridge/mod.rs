@@ -32,6 +32,8 @@ const CHALLENGE_TTL_MINUTES: i64 = 5;
 const CERT_RENEW_WINDOW_DAYS: i64 = 30;
 const DEFAULT_MANAGED_SERVICE_URL: &str = "https://dmxmoney.develop-max.com";
 const LEGACY_MANAGED_SERVICE_URL: &str = "https://bridge.dmxmoney.app";
+const DEFAULT_BRIDGE_DOMAIN: &str = "develop-max.com";
+const DEFAULT_DEVICE_PREFIX: &str = "dmx";
 
 mod auth;
 mod certificates;
