@@ -398,8 +398,8 @@ const Analytics: React.FC = () => {
                         </label>
                     )}
                 </div>
-                <div className="h-80" style={{ minHeight: '320px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-80 min-w-0" style={{ minHeight: '320px' }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <AreaChart data={balanceHistory}>
                             <defs>
                                 {accounts.map((acc, index) => (
@@ -451,8 +451,8 @@ const Analytics: React.FC = () => {
             {/* Monthly Bar Chart */}
             <div className="app-card p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Revenus vs Dépenses</h3>
-                <div className="h-80" style={{ minHeight: '320px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-80 min-w-0" style={{ minHeight: '320px' }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={monthlyData}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />

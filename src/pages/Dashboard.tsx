@@ -273,7 +273,7 @@ const Dashboard: React.FC = () => {
                 <Card title="Budget" icon={DollarSign} action={<span className="text-[10px] bg-gray-100 dark:bg-neutral-700 px-2 py-0.5 rounded-full text-gray-500">Ce mois-ci</span>}>
                     <div className="min-h-[200px] flex flex-col items-center justify-center">
                         <div className="relative w-28 h-28 flex items-center justify-center mb-4">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                 <PieChart>
                                     <Pie data={[{ value: budgetExpenses }, { value: Math.max(0, totalBudgeted - budgetExpenses) }]} innerRadius={35} outerRadius={45} startAngle={90} endAngle={-270} dataKey="value" stroke="none">
                                         <Cell fill={budgetRemaining >= 0 ? "#10b981" : "#ef4444"} />

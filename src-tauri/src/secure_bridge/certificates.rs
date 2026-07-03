@@ -68,7 +68,7 @@ pub async fn refresh_infrastructure(
         let record_id = match managed_update_dns(&settings, &local_host, &local_ip).await {
             Ok(record_id) => record_id,
             Err(error) if is_missing_managed_secret_error(&error) => {
-                provision_managed_device(pool, &settings, false).await?;
+                provision_managed_device(pool, &settings, true).await?;
                 settings = load_settings(pool).await?;
                 local_host = settings
                     .local_host

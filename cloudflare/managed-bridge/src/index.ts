@@ -73,7 +73,7 @@ export default {
         if (rateLimit) {
           return rateLimit;
         }
-        return registerDevice(request, env);
+        return await registerDevice(request, env);
       }
 
       const device = await authorizeDevice(request, env, route.deviceId);
@@ -82,12 +82,12 @@ export default {
       }
 
       if (route.name === "dns") {
-        return updateDeviceDns(request, env, device.record);
+        return await updateDeviceDns(request, env, device.record);
       }
       if (route.name === "txt") {
-        return presentAcmeTxt(request, env, device.record);
+        return await presentAcmeTxt(request, env, device.record);
       }
-      return deleteAcmeTxt(request, env, device.record);
+      return await deleteAcmeTxt(request, env, device.record);
     } catch (error) {
       console.error("managed_bridge_error", safeError(error));
       return jsonResponse({ error: "internal_error" }, 500);
@@ -228,7 +228,7 @@ async function registerDevice(request: Request, env: Env): Promise<Response> {
   const body = await readJson<{ existingDeviceId?: string; localIp?: string }>(request);
   const existing = normalizeId(body.existingDeviceId);
   const reusable = existing ? await env.DEVICES.get<DeviceRecord>(deviceKey(existing), "json") : null;
-  const id = existing && !reusable ? existing : crypto.randomUUID().replaceAll("-", "").slice(0, 20);
+  const id = existing || crypto.randomUUID().replaceAll("-", "").slice(0, 20);
   const secret = randomBase64Url(32);
   const domain = normalizeDomain(env.BRIDGE_DOMAIN);
   const appUrl = normalizeAppUrl(env.PWA_URL);
@@ -241,8 +241,9 @@ async function registerDevice(request: Request, env: Env): Promise<Response> {
     domain,
     appUrl,
     localHost,
-    txtRecordIds: [],
-    createdAt: now,
+    aRecordId: reusable?.aRecordId,
+    txtRecordIds: reusable?.txtRecordIds || [],
+    createdAt: reusable?.createdAt || now,
     updatedAt: now,
     lastLocalIp: isPrivateIp(body.localIp || "") ? body.localIp : undefined,
   };
@@ -376,11 +377,29 @@ async function upsertDnsRecord(
   };
   const path = input.id ? `/dns_records/${input.id}` : "/dns_records";
   const method = input.id ? "PUT" : "POST";
-  const result = await cloudflareFetch<CloudflareDnsRecord>(env, path, {
-    method,
-    body: JSON.stringify(payload),
-  });
+  let result: CloudflareDnsRecord;
+  try {
+    result = await cloudflareFetch<CloudflareDnsRecord>(env, path, {
+      method,
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    if (!input.id || !isMissingDnsRecordError(error)) {
+      throw error;
+    }
+    result = await cloudflareFetch<CloudflareDnsRecord>(env, "/dns_records", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
   return result.id;
+}
+
+function isMissingDnsRecordError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return /Record does not exist|object identifier is invalid/i.test(error.message);
 }
 
 async function cloudflareFetch<T = unknown>(

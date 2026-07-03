@@ -68,10 +68,10 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = React.memo(({
     return (
         <div className="app-card p-6 app-chart-card">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4 app-chart-title">{title}</h3>
-            <div className="h-80 app-chart-container" style={{ minHeight: '320px' }}>
+            <div className="h-80 min-w-0 app-chart-container" style={{ minHeight: '320px' }}>
 
                 {hasVisibleData ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={chartData}

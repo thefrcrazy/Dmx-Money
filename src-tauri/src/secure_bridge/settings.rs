@@ -27,7 +27,7 @@ pub async fn ensure_auto_configuration(
         return Ok(());
     }
 
-    provision_managed_device(pool, &current, has_secret).await?;
+    provision_managed_device(pool, &current, true).await?;
 
     Ok(())
 }
@@ -35,9 +35,9 @@ pub async fn ensure_auto_configuration(
 pub(super) async fn provision_managed_device(
     pool: &DbPool,
     current: &SecureBridgeSettings,
-    reuse_existing_device: bool,
+    preserve_existing_device: bool,
 ) -> Result<(), String> {
-    let registration = managed_register_device(if reuse_existing_device {
+    let registration = managed_register_device(if preserve_existing_device {
         current.device_id.as_deref()
     } else {
         None

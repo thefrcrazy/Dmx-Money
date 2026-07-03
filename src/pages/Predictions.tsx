@@ -897,8 +897,8 @@ const Predictions: React.FC = () => {
                     )}
                 </div>
 
-                <div className="h-96" style={{ minHeight: '384px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-96 min-w-0" style={{ minHeight: '384px' }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <AreaChart data={predictionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                             <defs>
                                 {accounts.map(acc => (
