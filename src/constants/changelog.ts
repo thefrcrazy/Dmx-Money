@@ -12,6 +12,31 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.17",
+        date: "2026-07-03",
+        title: "Pont mobile récupérable",
+        changes: [
+            "Correction de la récupération du pont mobile HTTPS après plusieurs jours sans synchronisation.",
+            "Conservation du même appareil et du même sous-domaine local lors d'un reprovisionnement sécurisé.",
+            "Recréation automatique du record DNS Cloudflare si l'ancien identifiant est périmé ou supprimé.",
+            "Restauration du déploiement Worker avec la zone Cloudflare correcte pour les mises à jour DNS.",
+            "Renouvellement du cache PWA afin de distribuer immédiatement le correctif mobile.",
+            "Correction des warnings Recharts lorsque des graphiques sont rendus dans un conteneur responsive sans largeur stable."
+        ],
+        features: [
+            {
+                title: "Reconnexion mobile",
+                description: "Le pont sécurisé peut récupérer une installation existante sans casser l'appairage PWA.",
+                icon: "RefreshCw"
+            },
+            {
+                title: "DNS robuste",
+                description: "Un record Cloudflare périmé est recréé automatiquement au lieu de bloquer la sync.",
+                icon: "Shield"
+            }
+        ]
+    },
+    {
         version: "1.0.16",
         date: "2026-06-20",
         title: "Interactions mobiles plus naturelles",

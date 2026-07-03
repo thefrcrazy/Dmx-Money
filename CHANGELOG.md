@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.17 - 2026-07-03
+
+- Correction de la récupération du pont mobile HTTPS après plusieurs jours sans synchronisation.
+- Conservation du même appareil et du même sous-domaine local lors d'un reprovisionnement sécurisé.
+- Recréation automatique du record DNS Cloudflare si l'ancien identifiant est périmé ou supprimé.
+- Restauration du déploiement Worker avec la zone Cloudflare correcte pour les mises à jour DNS.
+- Renouvellement du cache PWA afin de distribuer immédiatement le correctif mobile.
+- Correction des warnings Recharts lorsque des graphiques sont rendus dans un conteneur responsive sans largeur stable.
+
 ## 1.0.16 - 2026-06-20
 
 - Les confirmations de suppression utilisent maintenant la même feuille mobile que les formulaires d'ajout.
