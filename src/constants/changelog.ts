@@ -12,6 +12,28 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.20",
+        date: "2026-07-04",
+        title: "Pont mobile sans fausse alerte",
+        changes: [
+            "Suppression du faux bandeau d'erreur 401 quand le pont HTTPS est déjà actif et utilisable.",
+            "Réutilisation du DNS et du certificat existants si le refresh managé est refusé mais que l'infrastructure locale est saine.",
+            "Nettoyage automatique de l'ancienne erreur de provisioning lors de l'activation d'un pont déjà configuré."
+        ],
+        features: [
+            {
+                title: "Erreur obsolète masquée",
+                description: "Le statut ne remonte plus un ancien 401 quand l'API HTTPS locale fonctionne.",
+                icon: "CheckCircle2"
+            },
+            {
+                title: "Refresh plus tolérant",
+                description: "Un pont déjà certifié reste utilisable même si le service managé refuse un reprovisionnement inutile.",
+                icon: "ShieldCheck"
+            }
+        ]
+    },
+    {
         version: "1.0.19",
         date: "2026-07-04",
         title: "Pont mobile sans reprovisionnement",

@@ -43,10 +43,18 @@ pub async fn build_status(
             format!("{app_url}#pairing={raw}&api={api_url}")
         });
 
+    let active = settings.enabled && active && certificate_ready;
+    let last_error = settings.last_error.filter(|error| {
+        !(active
+            && (error.contains("pont managé non autorisé")
+                || error.contains("401 Unauthorized")
+                || error.contains("Secret DmxMoney Bridge absent")))
+    });
+
     Ok(SecureBridgeStatus {
         enabled: settings.enabled,
         configured,
-        active: settings.enabled && active && certificate_ready,
+        active,
         domain: settings.domain,
         app_url: settings.app_url,
         local_host: settings.local_host,
@@ -63,6 +71,6 @@ pub async fn build_status(
         managed_service_url: managed_service_base_url(settings.managed_service_url.as_deref()),
         managed_credential_ready,
         passkeys: list_passkeys(pool).await?,
-        last_error: settings.last_error,
+        last_error,
     })
 }

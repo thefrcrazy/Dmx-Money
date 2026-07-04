@@ -29,6 +29,9 @@ pub async fn ensure_auto_configuration(
     let has_config = has_bridge_identity && (has_secret || has_valid_certificate);
 
     if has_config {
+        let _ = sqlx::query("UPDATE settings SET \"secureBridgeLastError\" = NULL WHERE id = 1")
+            .execute(pool)
+            .await;
         return Ok(());
     }
 

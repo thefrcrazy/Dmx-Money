@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.20 - 2026-07-04
+
+- Suppression du faux bandeau d'erreur 401 quand le pont HTTPS est déjà actif et utilisable.
+- Réutilisation du DNS et du certificat existants si le refresh managé est refusé mais que l'infrastructure locale est saine.
+- Nettoyage automatique de l'ancienne erreur de provisioning lors de l'activation d'un pont déjà configuré.
+
 ## 1.0.19 - 2026-07-04
 
 - Correction de l'activation du compagnon mobile quand le pont HTTPS possède déjà un DNS et un certificat valides.

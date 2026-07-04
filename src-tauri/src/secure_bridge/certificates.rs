@@ -66,31 +66,51 @@ pub async fn refresh_infrastructure(
         let local_ip = crate::mobile_companion::detect_local_ip();
 
         let record_id = match managed_update_dns(&settings, &local_host, &local_ip).await {
-            Ok(record_id) => record_id,
+            Ok(record_id) => Some(record_id),
             Err(error) if is_missing_managed_secret_error(&error) => {
-                provision_managed_device(pool, &settings, true).await?;
-                settings = load_settings(pool).await?;
-                local_host = settings
-                    .local_host
-                    .clone()
-                    .ok_or_else(|| "Hôte local sécurisé manquant.".to_string())?;
-                managed_update_dns(&settings, &local_host, &local_ip).await?
+                match provision_managed_device(pool, &settings, true).await {
+                    Ok(_) => {
+                        settings = load_settings(pool).await?;
+                        local_host = settings
+                            .local_host
+                            .clone()
+                            .ok_or_else(|| "Hôte local sécurisé manquant.".to_string())?;
+                        Some(managed_update_dns(&settings, &local_host, &local_ip).await?)
+                    }
+                    Err(provision_error)
+                        if can_reuse_existing_bridge(app_handle, &settings, force_certificate) =>
+                    {
+                        log::warn!(
+                            "Secure bridge managed refresh skipped; existing DNS/certificate are usable: {provision_error}"
+                        );
+                        None
+                    }
+                    Err(provision_error) => return Err(provision_error),
+                }
+            }
+            Err(error) if can_reuse_existing_bridge(app_handle, &settings, force_certificate) => {
+                log::warn!(
+                    "Secure bridge DNS refresh skipped; existing DNS/certificate are usable: {error}"
+                );
+                None
             }
             Err(error) => return Err(error),
         };
-        let now = Utc::now().to_rfc3339();
-        sqlx::query(
-            "UPDATE settings SET
-                \"secureBridgeDnsRecordId\" = $1,
-                \"secureBridgeDnsLastUpdatedAt\" = $2,
-                \"secureBridgeLastError\" = NULL
-             WHERE id = 1",
-        )
-        .bind(record_id)
-        .bind(now)
-        .execute(pool)
-        .await
-        .map_err(|e| map_db_error(e, "sauvegarde DNS sécurisé"))?;
+        if let Some(record_id) = record_id {
+            let now = Utc::now().to_rfc3339();
+            sqlx::query(
+                "UPDATE settings SET
+                    \"secureBridgeDnsRecordId\" = $1,
+                    \"secureBridgeDnsLastUpdatedAt\" = $2,
+                    \"secureBridgeLastError\" = NULL
+                 WHERE id = 1",
+            )
+            .bind(record_id)
+            .bind(now)
+            .execute(pool)
+            .await
+            .map_err(|e| map_db_error(e, "sauvegarde DNS sécurisé"))?;
+        }
 
         ensure_certificate(pool, app_handle, &settings, &local_host, force_certificate).await
     }
@@ -104,6 +124,38 @@ pub async fn refresh_infrastructure(
     }
 
     result
+}
+
+fn can_reuse_existing_bridge(
+    app_handle: &AppHandle,
+    settings: &SecureBridgeSettings,
+    force_certificate: bool,
+) -> bool {
+    if force_certificate {
+        return false;
+    }
+
+    let has_dns = settings
+        .dns_record_id
+        .as_deref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    let has_host = settings
+        .local_host
+        .as_deref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    let certificate_fresh = settings
+        .certificate_expires_at
+        .as_deref()
+        .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+        .map(|value| value.with_timezone(&Utc) >= Utc::now() + ChronoDuration::days(7))
+        .unwrap_or(false);
+    let has_certificate_files = certificate_paths(app_handle, settings.device_id.as_deref())
+        .map(|paths| paths.cert.exists() && paths.key.exists())
+        .unwrap_or(false);
+
+    has_dns && has_host && certificate_fresh && has_certificate_files
 }
 
 async fn ensure_certificate(
