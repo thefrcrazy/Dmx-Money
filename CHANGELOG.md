@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.21 - 2026-09-01
+
+- Le QR d'appairage se génère à nouveau quand le service managé refuse le provisionnement : un pont déjà certifié n'est plus bloqué par un 401.
+- Un appareil déjà enregistré peut renouveler ses accès avec son propre secret, sans dépendre du secret de provisionnement partagé.
+- Un identifiant d'appareil existant n'est plus remplacé : le sous-domaine local et le certificat en place sont conservés au lieu d'être orphelins.
+- Renouvellement automatique du DNS et du certificat toutes les 6 heures, pour survivre à un changement d'IP locale ou à plusieurs semaines sans ouvrir l'application.
+- Le serveur local redémarre tout seul après un renouvellement de certificat au lieu de servir l'ancienne chaîne.
+- La PWA retrouve le desktop quand celui-ci revient sur un autre port, et rejoue les modifications faites hors ligne au lieu de les abandonner.
+- Deux mobiles peuvent rester appairés en même temps, même s'ils partagent un trousseau de clés d'accès ; leurs noms ne s'écrasent plus entre eux.
+- Prédictions : les retraits sont calculés avant les revenus d'une même journée, avec un indicateur de point bas pour éviter les frais de découvert même quand la journée se termine en positif.
+
 ## 1.0.20 - 2026-07-04
 
 - Suppression du faux bandeau d'erreur 401 quand le pont HTTPS est déjà actif et utilisable.

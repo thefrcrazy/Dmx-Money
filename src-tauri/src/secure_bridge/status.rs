@@ -44,12 +44,14 @@ pub async fn build_status(
         });
 
     let active = settings.enabled && active && certificate_ready;
-    let last_error = settings.last_error.filter(|error| {
-        !(active
-            && (error.contains("pont managé non autorisé")
-                || error.contains("401 Unauthorized")
-                || error.contains("Secret DmxMoney Bridge absent")))
-    });
+    // A renewal that could not run is worth showing, but not as a failure: the
+    // pairing QR and the paired mobiles keep working on the current certificate.
+    let last_error = settings.last_error;
+    let degraded = active
+        && last_error
+            .as_deref()
+            .map(|error| error.contains("Le pont local continue de fonctionner"))
+            .unwrap_or(false);
 
     Ok(SecureBridgeStatus {
         enabled: settings.enabled,
@@ -72,5 +74,6 @@ pub async fn build_status(
         managed_credential_ready,
         passkeys: list_passkeys(pool).await?,
         last_error,
+        degraded,
     })
 }

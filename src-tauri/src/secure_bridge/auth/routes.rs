@@ -183,7 +183,6 @@ async fn register_options(
     let session = authorize_session_for_auth(pool, headers).await?;
     let settings = load_settings(pool).await?;
     let webauthn = build_webauthn(&settings)?;
-    let existing = list_active_credentials(pool).await?;
     let user_id = settings
         .device_id
         .as_deref()
@@ -191,6 +190,7 @@ async fn register_options(
         .as_bytes()
         .to_vec();
     let label = payload.device_label.unwrap_or_else(|| "Mobile".to_string());
+    let existing = list_active_credentials_for_device(pool, &label).await?;
     let (challenge, state) =
         webauthn.start_registration(&user_id, "dmxmoney-mobile", &label, &existing);
     let challenge_id =

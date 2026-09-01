@@ -43,6 +43,25 @@ pub async fn load_tls_config(
     Ok(Some(Arc::new(config)))
 }
 
+/// Cheap identity of the TLS material currently on disk. It changes whenever the
+/// certificate is renewed or reissued for another host, which is what tells the
+/// running listener it has to be restarted.
+pub fn certificate_fingerprint(
+    app_handle: &AppHandle,
+    settings: &SecureBridgeSettings,
+) -> Option<String> {
+    let paths = certificate_paths(app_handle, settings.device_id.as_deref())?;
+    let metadata = fs::metadata(&paths.cert).ok()?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0);
+    let host = settings.local_host.as_deref().unwrap_or_default();
+    Some(format!("{host}:{}:{modified}", metadata.len()))
+}
+
 pub async fn refresh_infrastructure(
     pool: &DbPool,
     app_handle: &AppHandle,
@@ -54,16 +73,15 @@ pub async fn refresh_infrastructure(
         return Ok(());
     }
 
-    let _ = sqlx::query("UPDATE settings SET \"secureBridgeLastError\" = NULL WHERE id = 1")
-        .execute(pool)
-        .await;
-
-    let result = async {
+    // `Ok(Some(reason))` means the bridge stays usable but the managed renewal was
+    // skipped, so the reason is kept visible instead of being silently cleared.
+    let result: Result<Option<String>, String> = async {
         let mut local_host = settings
             .local_host
             .clone()
             .ok_or_else(|| "Hôte local sécurisé manquant.".to_string())?;
         let local_ip = crate::mobile_companion::detect_local_ip();
+        let mut degraded: Option<String> = None;
 
         let record_id = match managed_update_dns(&settings, &local_host, &local_ip).await {
             Ok(record_id) => Some(record_id),
@@ -83,6 +101,7 @@ pub async fn refresh_infrastructure(
                         log::warn!(
                             "Secure bridge managed refresh skipped; existing DNS/certificate are usable: {provision_error}"
                         );
+                        degraded = Some(provision_error);
                         None
                     }
                     Err(provision_error) => return Err(provision_error),
@@ -92,6 +111,7 @@ pub async fn refresh_infrastructure(
                 log::warn!(
                     "Secure bridge DNS refresh skipped; existing DNS/certificate are usable: {error}"
                 );
+                degraded = Some(error);
                 None
             }
             Err(error) => return Err(error),
@@ -101,8 +121,7 @@ pub async fn refresh_infrastructure(
             sqlx::query(
                 "UPDATE settings SET
                     \"secureBridgeDnsRecordId\" = $1,
-                    \"secureBridgeDnsLastUpdatedAt\" = $2,
-                    \"secureBridgeLastError\" = NULL
+                    \"secureBridgeDnsLastUpdatedAt\" = $2
                  WHERE id = 1",
             )
             .bind(record_id)
@@ -112,18 +131,44 @@ pub async fn refresh_infrastructure(
             .map_err(|e| map_db_error(e, "sauvegarde DNS sécurisé"))?;
         }
 
-        ensure_certificate(pool, app_handle, &settings, &local_host, force_certificate).await
+        ensure_certificate(pool, app_handle, &settings, &local_host, force_certificate).await?;
+        Ok(degraded)
     }
     .await;
 
-    if let Err(error) = &result {
-        let _ = sqlx::query("UPDATE settings SET \"secureBridgeLastError\" = $1 WHERE id = 1")
-            .bind(error)
-            .execute(pool)
-            .await;
+    match result {
+        Ok(None) => {
+            clear_last_error(pool).await;
+            Ok(())
+        }
+        Ok(Some(reason)) => {
+            record_last_error(pool, &degraded_provisioning_message(&reason)).await;
+            Ok(())
+        }
+        // A refused or unreachable managed service must not take down a bridge the
+        // paired mobiles can still reach: keep serving the valid certificate and
+        // surface the reason instead of failing the whole command.
+        Err(error) if serves_valid_certificate(app_handle, &settings) => {
+            log::warn!("Secure bridge refresh degraded, existing certificate still valid: {error}");
+            record_last_error(pool, &degraded_provisioning_message(&error)).await;
+            Ok(())
+        }
+        Err(error) => {
+            record_last_error(pool, &error).await;
+            Err(error)
+        }
     }
+}
 
-    result
+/// The certificate on disk is still trusted by the mobiles, so the local HTTPS
+/// bridge keeps working even if DNS or renewal cannot be reached right now.
+fn serves_valid_certificate(app_handle: &AppHandle, settings: &SecureBridgeSettings) -> bool {
+    can_serve_locally(app_handle, settings)
+        && settings
+            .certificate_expires_at
+            .as_deref()
+            .map(|value| !is_past(value))
+            .unwrap_or(false)
 }
 
 fn can_reuse_existing_bridge(
@@ -223,7 +268,7 @@ async fn ensure_certificate(
             cleanup_txt_records(settings, &mut txt_record_ids).await;
             return Err(error);
         }
-        thread::sleep(Duration::from_secs(10));
+        tokio::time::sleep(Duration::from_secs(10)).await;
         if let Err(error) = order.set_challenge_ready(&challenge.url).await {
             cleanup_txt_records(settings, &mut txt_record_ids).await;
             return Err(format!("Validation DNS-01 impossible: {error}"));
@@ -241,7 +286,7 @@ async fn ensure_certificate(
                 cleanup_txt_records(settings, &mut txt_record_ids).await;
                 return Err("Challenge DNS-01 refusé par Let's Encrypt.".to_string());
             }
-            thread::sleep(Duration::from_secs(5));
+            tokio::time::sleep(Duration::from_secs(5)).await;
         }
     }
 
@@ -267,7 +312,7 @@ async fn ensure_certificate(
             cleanup_txt_records(settings, &mut txt_record_ids).await;
             return Err("Commande ACME invalide.".to_string());
         }
-        thread::sleep(Duration::from_secs(5));
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     if order.state().status != OrderStatus::Valid {
@@ -287,7 +332,7 @@ async fn ensure_certificate(
             cert_pem = Some(cert);
             break;
         }
-        thread::sleep(Duration::from_secs(5));
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     let cert_pem = cert_pem.ok_or_else(|| "Certificat ACME non disponible.".to_string())?;
@@ -375,7 +420,7 @@ async fn wait_for_dns_txt(name: &str, expected_value: &str) -> Result<(), String
         }
 
         let delay = if attempt < 6 { 5 } else { 10 };
-        thread::sleep(Duration::from_secs(delay));
+        tokio::time::sleep(Duration::from_secs(delay)).await;
     }
 
     let detail = if last_seen.is_empty() {

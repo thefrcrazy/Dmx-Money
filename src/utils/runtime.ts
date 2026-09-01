@@ -1,7 +1,58 @@
 const MOBILE_PAIRING_KEY = 'dmxmoney.securePairingToken';
 const MOBILE_API_BASE_KEY = 'dmxmoney.secureApiBaseUrl';
+const MOBILE_PREVIOUS_API_BASE_KEY = 'dmxmoney.securePreviousApiBaseUrl';
 const MOBILE_CSRF_KEY = 'dmxmoney.secureCsrfToken';
 const MOBILE_PASSKEY_READY_KEY = 'dmxmoney.securePasskeyReady';
+
+const normalizeApiBaseUrl = (value: string) => value.trim().replace(/\/$/, '');
+
+/** Enough history to survive a few reconnections before anything is flushed. */
+const MAX_PREVIOUS_API_BASE_URLS = 5;
+
+const readPreviousApiBaseUrls = (): string[] => {
+    try {
+        const raw = localStorage.getItem(MOBILE_PREVIOUS_API_BASE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * The offline cache and the queued mutations are keyed by the API base URL, so a
+ * desktop that comes back on another port (or after a re-provisioning) would
+ * otherwise strand everything the mobile changed while it was away. Remember the
+ * URLs we are leaving so the pending work can be carried over to the new one --
+ * a list, because the endpoint can move again before anything is flushed.
+ */
+export const setMobileApiBaseUrl = (value: string) => {
+    if (typeof window === 'undefined') return;
+
+    const next = normalizeApiBaseUrl(value);
+    if (!next) return;
+
+    const current = localStorage.getItem(MOBILE_API_BASE_KEY);
+    if (current && current !== next) {
+        const previous = readPreviousApiBaseUrls().filter(url => url !== current && url !== next);
+        localStorage.setItem(
+            MOBILE_PREVIOUS_API_BASE_KEY,
+            JSON.stringify([...previous, current].slice(-MAX_PREVIOUS_API_BASE_URLS)),
+        );
+    }
+    localStorage.setItem(MOBILE_API_BASE_KEY, next);
+};
+
+export const getMobilePreviousApiBaseUrls = () => {
+    if (typeof window === 'undefined') return [];
+    const current = localStorage.getItem(MOBILE_API_BASE_KEY);
+    return readPreviousApiBaseUrls().filter(url => url !== current);
+};
+
+export const clearMobilePreviousApiBaseUrls = () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(MOBILE_PREVIOUS_API_BASE_KEY);
+};
 
 const getHashParamsFromValue = (value: string) => {
     const trimmed = value.trim();
@@ -65,7 +116,7 @@ export const initializeMobileCompanionToken = () => {
     }
 
     if (pairing) localStorage.setItem(MOBILE_PAIRING_KEY, pairing);
-    if (api) localStorage.setItem(MOBILE_API_BASE_KEY, api.replace(/\/$/, ''));
+    if (api) setMobileApiBaseUrl(api);
 
     if (pairing || api) {
         window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
@@ -90,7 +141,7 @@ export const applyMobileCompanionPairingUrl = (value: string) => {
     }
 
     if (pairing) localStorage.setItem(MOBILE_PAIRING_KEY, pairing);
-    if (api) localStorage.setItem(MOBILE_API_BASE_KEY, api.replace(/\/$/, ''));
+    if (api) setMobileApiBaseUrl(api);
 
     return { ok: true, error: null };
 };

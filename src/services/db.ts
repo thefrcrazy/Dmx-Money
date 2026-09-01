@@ -3,13 +3,16 @@ import { offlineStore, OfflineDataKey } from './offlineStore';
 import {
     clearMobileCompanionLocalState,
     clearMobilePairingToken,
+    clearMobilePreviousApiBaseUrls,
     getMobileApiBaseUrl,
     getMobileCsrfToken,
     getMobilePairingToken,
+    getMobilePreviousApiBaseUrls,
     hasTauriRuntime,
     isMobileCompanion,
     isStandalonePwa,
     markMobilePasskeyReady,
+    setMobileApiBaseUrl,
     setMobileCsrfToken
 } from '../utils/runtime';
 import { selectNewestVersion } from '../utils/version';
@@ -188,8 +191,14 @@ export class DatabaseService {
     private invokeFn: Promise<InvokeFn> | null = null;
     private flushPromise: Promise<void> | null = null;
     private sessionPromise: Promise<void> | null = null;
+    private recoveryPromise: Promise<boolean> | null = null;
+    private lastRecoveryAt = 0;
     private readonly requestTimeoutMs = 2500;
     private readonly statusTimeoutMs = 2500;
+    private readonly probeTimeoutMs = 1500;
+    /** The desktop walks up from its preferred port when that port is taken. */
+    private readonly portSweepRange = 6;
+    private readonly recoveryCooldownMs = 30_000;
 
     async init(): Promise<void> {
         await this.getAccounts();
@@ -217,6 +226,7 @@ export class DatabaseService {
         init: RequestInit = {},
         timeoutMs = this.requestTimeoutMs,
         retrySession = true,
+        allowRecovery = true,
     ): Promise<T> {
         const apiBaseUrl = getMobileApiBaseUrl();
         const method = init.method || 'GET';
@@ -229,7 +239,7 @@ export class DatabaseService {
         if (path.startsWith('/api/') && method !== 'GET' && !csrfToken) {
             if (retrySession) {
                 await this.ensureSecureMobileSession();
-                return this.request<T>(path, init, timeoutMs, false);
+                return this.request<T>(path, init, timeoutMs, false, allowRecovery);
             }
             throw new MobileNetworkError('Session mobile à reconnecter.');
         }
@@ -256,13 +266,19 @@ export class DatabaseService {
             });
             text = await response.text();
         } catch (error) {
-            if (error instanceof DOMException && error.name === 'AbortError') {
-                throw new MobileNetworkError('Serveur mobile local indisponible ou trop lent.');
+            const unreachable = (error instanceof DOMException && error.name === 'AbortError')
+                || error instanceof TypeError;
+            if (!unreachable) throw error;
+
+            window.clearTimeout(timeoutId);
+            // The desktop may have come back on another port. Find it again and
+            // replay the request instead of stranding the mobile offline.
+            if (allowRecovery && await this.recoverMobileApiBaseUrl()) {
+                return this.request<T>(path, init, timeoutMs, retrySession, false);
             }
-            if (error instanceof TypeError) {
-                throw new MobileNetworkError(error.message);
-            }
-            throw error;
+            throw error instanceof DOMException
+                ? new MobileNetworkError('Serveur mobile local indisponible ou trop lent.')
+                : new MobileNetworkError((error as TypeError).message);
         } finally {
             window.clearTimeout(timeoutId);
         }
@@ -278,7 +294,7 @@ export class DatabaseService {
                 setMobileCsrfToken(null);
                 if (retrySession && path.startsWith('/api/')) {
                     await this.ensureSecureMobileSession();
-                    return this.request<T>(path, init, timeoutMs, false);
+                    return this.request<T>(path, init, timeoutMs, false, allowRecovery);
                 }
             }
             throw new Error(message);
@@ -286,6 +302,103 @@ export class DatabaseService {
 
         if (!text) return undefined as T;
         return JSON.parse(text) as T;
+    }
+
+    /**
+     * The pairing QR pins the desktop's host *and* port, and the desktop walks up
+     * from its preferred port whenever that port is busy. Rather than asking for a
+     * new QR, probe the neighbouring ports on the same bridge host and adopt the
+     * one that answers, carrying the offline queue over with it.
+     */
+    private async recoverMobileApiBaseUrl(): Promise<boolean> {
+        if (!this.usesHttp()) return false;
+        if (this.recoveryPromise) return this.recoveryPromise;
+        if (Date.now() - this.lastRecoveryAt < this.recoveryCooldownMs) return false;
+
+        this.recoveryPromise = (async () => {
+            this.lastRecoveryAt = Date.now();
+            const current = getMobileApiBaseUrl();
+            if (!current) return false;
+
+            let url: URL;
+            try {
+                url = new URL(current);
+            } catch {
+                return false;
+            }
+
+            const basePort = Number(url.port);
+            if (!Number.isInteger(basePort)) return false;
+
+            const candidates: number[] = [];
+            for (let offset = 1; offset <= this.portSweepRange; offset += 1) {
+                candidates.push(basePort + offset, basePort - offset);
+            }
+
+            for (const port of candidates) {
+                if (port < 1 || port > 65535) continue;
+                const candidate = `${url.protocol}//${url.hostname}:${port}`;
+                if (await this.probeMobileBridge(candidate)) {
+                    console.info('Mobile bridge found again on', candidate);
+                    setMobileApiBaseUrl(candidate);
+                    setMobileCsrfToken(null);
+                    this.lastRecoveryAt = 0;
+                    return true;
+                }
+            }
+            return false;
+        })().finally(() => {
+            this.recoveryPromise = null;
+        });
+
+        return this.recoveryPromise;
+    }
+
+    private async probeMobileBridge(baseUrl: string): Promise<boolean> {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), this.probeTimeoutMs);
+        try {
+            const response = await fetch(new URL('/api/status', baseUrl).toString(), {
+                cache: 'no-store',
+                credentials: 'include',
+                signal: controller.signal,
+            });
+            // An unauthenticated /api/status answers 401, which already proves the
+            // bridge is the one listening here. Session cookies ignore ports, so a
+            // 200 is possible too: check it really is our status payload.
+            if (response.status === 401) return true;
+            if (!response.ok) return false;
+            const payload = await response.json().catch(() => null);
+            return typeof payload?.dataVersion === 'number';
+        } catch {
+            return false;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
+
+    /**
+     * Moves the offline cache and the unsent mutations onto the endpoint we are
+     * now talking to, so changes made on the mobile while the desktop was away
+     * are not lost when the bridge comes back at a different address.
+     */
+    private async adoptPendingOfflineWork() {
+        const previousUrls = getMobilePreviousApiBaseUrls();
+        if (previousUrls.length === 0) return;
+
+        try {
+            let migrated = 0;
+            // Oldest first, so the queue keeps its original order.
+            for (const previous of previousUrls) {
+                migrated += await offlineStore.migrateScope(previous);
+            }
+            clearMobilePreviousApiBaseUrls();
+            if (migrated > 0) {
+                console.info(`Mobile offline: ${migrated} modification(s) reprises depuis ${previousUrls.join(', ')}`);
+            }
+        } catch (error) {
+            console.warn('Mobile offline scope migration failed:', error);
+        }
     }
 
     private async ensureSecureMobileSession() {
@@ -617,6 +730,7 @@ export class DatabaseService {
         if (this.flushPromise) return this.flushPromise;
 
         this.flushPromise = (async () => {
+            if (getMobileCsrfToken()) await this.adoptPendingOfflineWork();
             const mutations = await offlineStore.listMutations();
             for (let index = 0; index < mutations.length;) {
                 const mutation = mutations[index];

@@ -41,6 +41,11 @@ use self::settings::{bind_listener, get_data_version, load_mobile_settings, map_
 use self::types::{MobileSettings, ServerRuntime, ServerSecurity};
 use self::url::{percent_decode, strip_query};
 
+/// Delay before the first maintenance pass, so app startup is never blocked by it.
+const MAINTENANCE_START_DELAY_SECS: u64 = 45;
+/// Six hours: often enough to follow a DHCP lease change, cheap enough to ignore.
+const MAINTENANCE_INTERVAL_SECS: u64 = 6 * 60 * 60;
+
 pub use self::state::MobileCompanionState;
 pub use self::types::MobileCompanionStatus;
 

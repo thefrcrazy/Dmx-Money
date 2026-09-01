@@ -4,15 +4,25 @@ import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { format, addMonths, endOfMonth, startOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ArrowRightLeft, Edit2, Plus, Trash2, TrendingDown, TrendingUp, ChevronDown } from 'lucide-react';
+import { ArrowRightLeft, Edit2, Plus, ShieldAlert, Trash2, TrendingDown, TrendingUp, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import Button from '../components/ui/Button';
 import FormPopup from '../components/ui/FormPopup';
 import Input from '../components/ui/Input';
 import SearchableSelect from '../components/ui/SearchableSelect';
 import { PredictionFakeTransaction, PredictionTimeRange, TransactionType } from '../types';
 import { formatCurrency } from '../utils/format';
+import {
+    addDayFlow,
+    applyDayFlow,
+    type CrossingSeverity,
+    type DayFlow,
+    detectClosingCrossing,
+    detectIntradayRisk,
+    emptyDayFlow,
+    highestSeverity,
+} from '../utils/predictions';
 
 interface FakeTransactionFormData {
     date: string;
@@ -29,13 +39,34 @@ interface AlertCrossingMarker {
     fullDate: string;
     labels: string[];
     crossingNames: string[];
-    severity: 'warning' | 'danger';
+    severity: CrossingSeverity | null;
+    /**
+     * Days where the balance only stays safe because an income lands after the
+     * withdrawals. The end-of-day curve looks fine, so without this the risk of
+     * an overdraft fee would be invisible.
+     */
+    intradayNames: string[];
+    intradaySeverity: CrossingSeverity | null;
+    /** End-of-day balance and same-day low, for the series flagged intraday. */
+    intradayBalances: Array<{
+        name: string;
+        low: number;
+        value: number;
+    }>;
     balances: Array<{
         name: string;
         color: string;
         value: number;
     }>;
 }
+
+const lowKey = (key: string) => `${key}__low`;
+
+const markerStroke = (marker: AlertCrossingMarker) => {
+    if (marker.severity === 'danger') return '#ef4444';
+    if (marker.severity === 'warning') return '#f97316';
+    return marker.intradaySeverity === 'danger' ? '#a855f7' : '#eab308';
+};
 
 const PREDICTION_TIME_RANGES: PredictionTimeRange[] = ['week', 'month', '2months', '3months', '6months', '9months', 'year', 'custom'];
 
@@ -101,21 +132,29 @@ const getProjectionEndDate = (timeRange: PredictionTimeRange, customEndDate: str
 
 const CustomTooltip = ({ active, payload, negativeMarkerByDate, alertThreshold }: any) => {
     if (active && payload && payload.length) {
-        const date = payload[0]?.payload?.date;
+        const point = payload[0]?.payload;
+        const date = point?.date;
         const negativeMarker: AlertCrossingMarker | undefined = date ? negativeMarkerByDate?.get(date) : undefined;
         const highlightedNames = new Set(negativeMarker?.crossingNames || []);
+        const intradayNames = new Set(negativeMarker?.intradayNames || []);
+        // The low-point series is read through each account's own row, so it must
+        // not add a duplicate line of its own.
+        const entries = (payload as any[]).filter(entry => !String(entry.dataKey).endsWith('__low'));
+        if (entries.length === 0) return null;
 
         return (
             <div className="app-card p-3 shadow-lg">
-                {payload[0]?.payload?.fullDate && <p className="font-medium text-gray-900 dark:text-gray-200 mb-2">{payload[0].payload.fullDate}</p>}
+                {point?.fullDate && <p className="font-medium text-gray-900 dark:text-gray-200 mb-2">{point.fullDate}</p>}
                 <div className="space-y-1">
-                    {[...payload].sort((a: any, b: any) => b.value - a.value).map((entry: any, index: number) => {
+                    {[...entries].sort((a: any, b: any) => b.value - a.value).map((entry: any, index: number) => {
                         const entryValue = Number(entry.value);
                         const isDangerValue = entryValue < 0;
                         const isWarningValue = !isDangerValue && entryValue < alertThreshold;
                         const isNegativeCrossing = highlightedNames.has(entry.name);
                         const shouldHighlightDanger = isDangerValue || (isNegativeCrossing && negativeMarker?.severity === 'danger');
                         const shouldHighlightWarning = !shouldHighlightDanger && (isWarningValue || isNegativeCrossing);
+                        const lowValue = Number(point?.[lowKey(entry.dataKey)] ?? entryValue);
+                        const showLow = intradayNames.has(entry.name) && lowValue < entryValue;
 
                         return (
                             <div
@@ -125,7 +164,9 @@ const CustomTooltip = ({ active, payload, negativeMarkerByDate, alertThreshold }
                                         ? 'bg-red-500/15 ring-1 ring-red-500/25'
                                         : shouldHighlightWarning
                                             ? 'bg-orange-500/15 ring-1 ring-orange-500/25'
-                                            : ''
+                                            : showLow
+                                                ? 'bg-yellow-500/15 ring-1 ring-yellow-500/25'
+                                                : ''
                                 }`}
                                 style={{
                                     color: shouldHighlightDanger
@@ -135,11 +176,21 @@ const CustomTooltip = ({ active, payload, negativeMarkerByDate, alertThreshold }
                                             : entry.color || entry.stroke
                                 }}
                             >
-                                {entry.name}: {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(entry.value)}
+                                <div>{entry.name}: {formatCurrency(entryValue)}</div>
+                                {showLow && (
+                                    <div className={`text-[11px] font-normal ${lowValue < 0 ? 'text-purple-500 dark:text-purple-300' : 'text-yellow-600 dark:text-yellow-300'}`}>
+                                        Point bas du jour : {formatCurrency(lowValue)} (retraits avant revenus)
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
                 </div>
+                {negativeMarker?.intradaySeverity && (
+                    <p className="mt-2 max-w-[15rem] text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                        Le solde de fin de journée reste au-dessus du seuil, mais il passe en dessous avant l’arrivée des revenus.
+                    </p>
+                )}
             </div>
         );
     }
@@ -156,6 +207,7 @@ const Predictions: React.FC = () => {
     const monthStartsOnFirst = settings.predictionMonthStartsOnFirst ?? true;
     const fakeTransactions = settings.predictionFakeTransactions || [];
     const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
+    const [showIntradayLow, setShowIntradayLow] = useState(true);
     const [isFakeTransactionModalOpen, setIsFakeTransactionModalOpen] = useState(false);
     const [editingFakeTransaction, setEditingFakeTransaction] = useState<PredictionFakeTransaction | null>(null);
     const [fakeTransactionForm, setFakeTransactionForm] = useState<FakeTransactionFormData>({
@@ -250,9 +302,19 @@ const Predictions: React.FC = () => {
         const data = [];
         // Use integers (cents) for calculations to avoid floating point errors
         const currentBalances: Record<string, number> = {};
-        const dailyImpacts: Record<string, Record<string, number>> = {}; // accountId -> date (YYYY-MM-DD) -> amount in cents
+        // accountId -> date (YYYY-MM-DD) -> the day's outgoing and incoming cents,
+        // kept apart so the worst moment of the day can be replayed: banks debit
+        // before they credit, and that is where overdraft fees are triggered.
+        const dailyImpacts: Record<string, Record<string, DayFlow>> = {};
 
         const { today, startDate, endDate, daysToProject } = projectionRange;
+
+        const addImpact = (accountId: string, dateStr: string, amountCents: number) => {
+            const accountImpacts = dailyImpacts[accountId];
+            if (!accountImpacts || amountCents === 0) return;
+
+            addDayFlow(accountImpacts[dateStr] || (accountImpacts[dateStr] = emptyDayFlow()), amountCents);
+        };
 
         // Initialize balances at the beginning of the projection range.
         accounts.forEach(acc => {
@@ -267,11 +329,10 @@ const Predictions: React.FC = () => {
         transactions.forEach(transaction => {
             const transactionDate = parseLocalDate(transaction.date);
             if (transactionDate < startDate || transactionDate > endDate) return;
-            if (!dailyImpacts[transaction.accountId]) return;
 
             const dateStr = format(transactionDate, 'yyyy-MM-dd');
             const amount = Math.round((transaction.type === 'income' ? transaction.amount : -transaction.amount) * 100);
-            dailyImpacts[transaction.accountId][dateStr] = (dailyImpacts[transaction.accountId][dateStr] || 0) + amount;
+            addImpact(transaction.accountId, dateStr, amount);
         });
 
         enabledFakeTransactions.forEach(transaction => {
@@ -282,19 +343,12 @@ const Predictions: React.FC = () => {
             const amountCents = Math.round(transaction.amount * 100);
 
             if (transaction.type === 'transfer') {
-                if (dailyImpacts[transaction.accountId]) {
-                    dailyImpacts[transaction.accountId][dateStr] = (dailyImpacts[transaction.accountId][dateStr] || 0) - amountCents;
-                }
-                if (transaction.toAccountId && dailyImpacts[transaction.toAccountId]) {
-                    dailyImpacts[transaction.toAccountId][dateStr] = (dailyImpacts[transaction.toAccountId][dateStr] || 0) + amountCents;
-                }
+                addImpact(transaction.accountId, dateStr, -amountCents);
+                if (transaction.toAccountId) addImpact(transaction.toAccountId, dateStr, amountCents);
                 return;
             }
 
-            if (!dailyImpacts[transaction.accountId]) return;
-
-            const amount = transaction.type === 'income' ? amountCents : -amountCents;
-            dailyImpacts[transaction.accountId][dateStr] = (dailyImpacts[transaction.accountId][dateStr] || 0) + amount;
+            addImpact(transaction.accountId, dateStr, transaction.type === 'income' ? amountCents : -amountCents);
         });
 
         // Pre-calculate impacts for all scheduled transactions
@@ -321,18 +375,11 @@ const Predictions: React.FC = () => {
                     // Handle different transaction types
                     if (item.type === 'transfer' && item.toAccountId) {
                         // Transfer: Debit from source, credit to destination
-                        if (dailyImpacts[item.accountId]) {
-                            dailyImpacts[item.accountId][dateStr] = (dailyImpacts[item.accountId][dateStr] || 0) - amountCents;
-                        }
-                        if (dailyImpacts[item.toAccountId]) {
-                            dailyImpacts[item.toAccountId][dateStr] = (dailyImpacts[item.toAccountId][dateStr] || 0) + amountCents;
-                        }
+                        addImpact(item.accountId, dateStr, -amountCents);
+                        addImpact(item.toAccountId, dateStr, amountCents);
                     } else {
                         // Standard income or expense
-                        if (dailyImpacts[item.accountId]) {
-                            const amount = item.type === 'income' ? amountCents : -amountCents;
-                            dailyImpacts[item.accountId][dateStr] = (dailyImpacts[item.accountId][dateStr] || 0) + amount;
-                        }
+                        addImpact(item.accountId, dateStr, item.type === 'income' ? amountCents : -amountCents);
                     }
                 }
 
@@ -403,18 +450,24 @@ const Predictions: React.FC = () => {
                 total: 0
             };
 
+            let totalCents = 0;
+            let totalLowCents = 0;
+
             // Apply impacts and calculate totals
             accounts.forEach(acc => {
-                const impactCents = dailyImpacts[acc.id]?.[dateStr] || 0;
-                currentBalances[acc.id] += impactCents;
+                const { low, close } = applyDayFlow(currentBalances[acc.id], dailyImpacts[acc.id]?.[dateStr]);
+                currentBalances[acc.id] = close;
 
                 // Convert back to float for display
-                dayData[acc.id] = currentBalances[acc.id] / 100;
-                dayData.total += currentBalances[acc.id];
+                dayData[acc.id] = close / 100;
+                dayData[lowKey(acc.id)] = low / 100;
+                totalCents += close;
+                totalLowCents += low;
             });
 
-            // Convert total to float
-            dayData.total = dayData.total / 100;
+            // Convert totals to float
+            dayData.total = totalCents / 100;
+            dayData[lowKey('total')] = totalLowCents / 100;
 
             data.push(dayData);
         }
@@ -452,49 +505,66 @@ const Predictions: React.FC = () => {
         const markers = new Map<string, AlertCrossingMarker>();
 
         predictionData.forEach((point, index) => {
-            const crossings = watchedKeys.reduce<Array<{ name: string; severity: 'warning' | 'danger' }>>((acc, key) => {
+            const crossings: Array<{ name: string; severity: CrossingSeverity }> = [];
+            const intradayCrossings: Array<{
+                name: string;
+                severity: CrossingSeverity;
+                low: number;
+                value: number;
+            }> = [];
+
+            watchedKeys.forEach(key => {
                 const value = Number(point[key] ?? 0);
+                const low = Number(point[lowKey(key)] ?? value);
                 const previousValue = index === 0
                     ? 0
                     : Number(predictionData[index - 1]?.[key] ?? 0);
                 const account = accounts.find(item => item.id === key);
                 const name = account?.name || 'Total';
 
-                if (value < 0 && previousValue >= 0) {
-                    acc.push({ name, severity: 'danger' });
-                    return acc;
-                }
+                const closing = detectClosingCrossing(value, previousValue, alertThreshold);
+                if (closing) crossings.push({ name, severity: closing });
 
-                if (alertThreshold > 0 && value < alertThreshold && previousValue >= alertThreshold) {
-                    acc.push({ name, severity: 'warning' });
-                }
+                // Both can hold on the same day: the balance can end under the
+                // safety threshold *and* have dipped below zero earlier, before the
+                // income landed. Flagging only the first would hide the fee risk.
+                const intraday = detectIntradayRisk(low, value, alertThreshold);
+                if (intraday) intradayCrossings.push({ name, severity: intraday, low, value });
+            });
 
-                return acc;
-            }, []);
+            if (crossings.length === 0 && intradayCrossings.length === 0) return;
 
-            if (crossings.length > 0) {
-                const severity = crossings.some(crossing => crossing.severity === 'danger') ? 'danger' : 'warning';
-                const crossingLabels = crossings.map(crossing => crossing.name);
+            const crossingLabels = crossings.map(crossing => crossing.name);
+            const intradayLabels = intradayCrossings.map(crossing => crossing.name);
 
-                markers.set(point.date, {
-                    date: point.date,
-                    fullDate: point.fullDate,
-                    labels: crossingLabels,
-                    crossingNames: crossingLabels,
-                    severity,
-                    balances: accounts.length > 0
-                        ? accounts.map(account => ({
-                            name: account.name,
-                            color: account.color || '#3b82f6',
-                            value: Number(point[account.id] ?? 0)
-                        }))
-                        : [{ name: 'Total', color: '#ef4444', value: Number(point.total ?? 0) }]
-                });
-            }
+            markers.set(point.date, {
+                date: point.date,
+                fullDate: point.fullDate,
+                labels: [...crossingLabels, ...intradayLabels],
+                crossingNames: crossingLabels,
+                severity: highestSeverity(crossings),
+                intradayNames: intradayLabels,
+                intradaySeverity: highestSeverity(intradayCrossings),
+                intradayBalances: intradayCrossings.map(({ name, low, value }) => ({ name, low, value })),
+                balances: accounts.length > 0
+                    ? accounts.map(account => ({
+                        name: account.name,
+                        color: account.color || '#3b82f6',
+                        value: Number(point[account.id] ?? 0)
+                    }))
+                    : [{ name: 'Total', color: '#ef4444', value: Number(point.total ?? 0) }]
+            });
         });
 
         return Array.from(markers.values());
     }, [accounts, alertThreshold, predictionData]);
+
+    /** Days that only look safe on the end-of-day curve. */
+    const intradayRiskDays = useMemo(
+        () => negativeCrossingMarkers.filter(marker => marker.intradaySeverity !== null),
+        [negativeCrossingMarkers],
+    );
+
     const negativeMarkerByDate = useMemo(() => new Map(negativeCrossingMarkers.map(marker => [marker.date, marker])), [negativeCrossingMarkers]);
 
     // Keep the projection axis readable while still showing day labels.
@@ -884,22 +954,36 @@ const Predictions: React.FC = () => {
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Visualisation de la trésorerie jour par jour.</p>
                     </div>
-                    {timeRange !== 'custom' && (
-                        <label className="flex w-fit items-center gap-3 rounded-lg border border-gray-200 dark:border-neutral-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        {timeRange !== 'custom' && (
+                            <label className="flex w-fit items-center gap-3 rounded-lg border border-gray-200 dark:border-neutral-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                    type="checkbox"
+                                    checked={monthStartsOnFirst}
+                                    onChange={(event) => setMonthStartsOnFirst(event.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-neutral-600"
+                                />
+                                Démarrer au 1er du mois
+                            </label>
+                        )}
+                        <label
+                            className="flex w-fit items-center gap-3 rounded-lg border border-gray-200 dark:border-neutral-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-300"
+                            title="Trace le solde de chaque compte une fois les retraits du jour passés, avant l’arrivée des revenus."
+                        >
                             <input
                                 type="checkbox"
-                                checked={monthStartsOnFirst}
-                                onChange={(event) => setMonthStartsOnFirst(event.target.checked)}
+                                checked={showIntradayLow}
+                                onChange={(event) => setShowIntradayLow(event.target.checked)}
                                 className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-neutral-600"
                             />
-                            Démarrer au 1er du mois
+                            Point bas journalier
                         </label>
-                    )}
+                    </div>
                 </div>
 
                 <div className="h-96 min-w-0" style={{ minHeight: '384px' }}>
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <AreaChart data={predictionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <ComposedChart data={predictionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                             <defs>
                                 {accounts.map(acc => (
                                     <linearGradient key={acc.id} id={`color-${acc.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -917,11 +1001,21 @@ const Predictions: React.FC = () => {
                             <YAxis />
                             <Tooltip content={<CustomTooltip negativeMarkerByDate={negativeMarkerByDate} alertThreshold={alertThreshold} />} />
                             <Legend />
+                            <ReferenceLine y={0} stroke="#ef4444" strokeWidth={1} ifOverflow="extendDomain" />
+                            {alertThreshold > 0 && (
+                                <ReferenceLine
+                                    y={alertThreshold}
+                                    stroke="#f97316"
+                                    strokeWidth={1}
+                                    strokeDasharray="6 4"
+                                    ifOverflow="extendDomain"
+                                />
+                            )}
                             {negativeCrossingMarkers.map(marker => (
                                 <ReferenceLine
                                     key={marker.date}
                                     x={marker.date}
-                                    stroke={marker.severity === 'danger' ? '#ef4444' : '#f97316'}
+                                    stroke={markerStroke(marker)}
                                     strokeWidth={2}
                                     strokeDasharray="3 3"
                                     ifOverflow="extendDomain"
@@ -938,10 +1032,92 @@ const Predictions: React.FC = () => {
                                     fillOpacity={1}
                                 />
                             ))}
-                        </AreaChart>
+                            {showIntradayLow && accounts.map(acc => (
+                                <Line
+                                    key={lowKey(acc.id)}
+                                    type="stepAfter"
+                                    dataKey={lowKey(acc.id)}
+                                    name={`${acc.name} — point bas`}
+                                    stroke={acc.color || '#3b82f6'}
+                                    strokeWidth={1.5}
+                                    strokeDasharray="4 3"
+                                    strokeOpacity={0.85}
+                                    dot={false}
+                                    activeDot={false}
+                                    legendType="none"
+                                    tooltipType="none"
+                                />
+                            ))}
+                        </ComposedChart>
                     </ResponsiveContainer>
                 </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
+                    {[
+                        { color: '#ef4444', label: 'Solde négatif en fin de journée' },
+                        { color: '#f97316', label: 'Passage sous le seuil d’alerte' },
+                        { color: '#a855f7', label: 'Point bas négatif, rattrapé par un revenu' },
+                        { color: '#eab308', label: 'Point bas sous le seuil, rattrapé par un revenu' }
+                    ].map(item => (
+                        <span key={item.label} className="flex items-center gap-1.5">
+                            <span className="h-0.5 w-4 rounded-full" style={{ backgroundColor: item.color }} />
+                            {item.label}
+                        </span>
+                    ))}
+                </div>
             </div>
+
+            {intradayRiskDays.length > 0 && (
+                <div className="app-card p-6">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-yellow-500/10 text-yellow-600 dark:text-yellow-400">
+                            <ShieldAlert className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200">
+                                Jours à surveiller ({intradayRiskDays.length})
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Ces jours cumulent un retrait et un revenu. Le solde de fin de journée reste au-dessus du seuil,
+                                mais il passe en dessous avant l’arrivée du revenu — de quoi déclencher des frais côté banque.
+                            </p>
+
+                            <div className="mt-4 overflow-hidden rounded-lg border border-gray-100 dark:border-neutral-800">
+                                <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+                                    {intradayRiskDays.slice(0, 8).map(marker => {
+                                        const isBelowZero = marker.intradaySeverity === 'danger';
+
+                                        return (
+                                            <div key={marker.date} className="flex flex-col gap-2 px-4 py-3">
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-200">{marker.fullDate}</p>
+                                                {marker.intradayBalances.map(balance => (
+                                                    <div key={balance.name} className="flex flex-col gap-x-3 gap-y-0.5 text-xs sm:flex-row sm:items-center sm:justify-between">
+                                                        <span className="text-gray-500 dark:text-gray-400">{balance.name}</span>
+                                                        <span className="flex flex-wrap items-center gap-x-2">
+                                                            <span className={`font-semibold tabular-nums ${isBelowZero ? 'text-purple-600 dark:text-purple-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                                                Point bas {formatCurrency(balance.low)}
+                                                            </span>
+                                                            <span className="text-gray-400">→</span>
+                                                            <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                                                Fin de journée {formatCurrency(balance.value)}
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            {intradayRiskDays.length > 8 && (
+                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    +{intradayRiskDays.length - 8} autre{intradayRiskDays.length - 8 > 1 ? 's' : ''} jour{intradayRiskDays.length - 8 > 1 ? 's' : ''} sur la période.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="app-card p-6">
@@ -972,6 +1148,7 @@ const Predictions: React.FC = () => {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200">Seuil d'alerte</h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                             Le seuil personnalisé s'affiche en orange. Le rouge reste réservé aux soldes négatifs.
+                            Les jours où un retrait passe avant un revenu sont signalés à part, même si la journée se termine au-dessus du seuil.
                         </p>
                     </div>
                     <div className="w-full md:w-56">

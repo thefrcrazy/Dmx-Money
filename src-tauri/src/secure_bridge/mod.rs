@@ -16,7 +16,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::{
-    collections::HashMap, fs, io::BufReader, path::PathBuf, sync::Arc, thread, time::Duration,
+    collections::HashMap, fs, io::BufReader, path::PathBuf, sync::Arc, time::Duration,
 };
 use subtle::ConstantTimeEq;
 use tauri::{AppHandle, Manager};
@@ -46,7 +46,7 @@ mod util;
 pub use self::auth::{
     authorize_api_request, handle_auth_request, regenerate_pairing_token, revoke_passkey,
 };
-pub use self::certificates::{load_tls_config, refresh_infrastructure};
+pub use self::certificates::{certificate_fingerprint, load_tls_config, refresh_infrastructure};
 pub use self::settings::{
     ensure_auto_configuration, load_settings, secure_app_origin, set_enabled,
 };
@@ -61,7 +61,10 @@ use self::managed::{
     has_managed_device_secret, is_missing_managed_secret_error, managed_delete_txt,
     managed_present_txt, managed_register_device, managed_service_base_url, managed_update_dns,
 };
-use self::settings::provision_managed_device;
+use self::settings::{
+    can_serve_locally, clear_last_error, degraded_provisioning_message, provision_managed_device,
+    record_last_error,
+};
 use self::util::{
     clear_session_cookie, constant_time_eq, extract_cookie, generate_token,
     get_managed_device_secret, get_managed_registration_secret, hash_secret, is_past, map_db_error,

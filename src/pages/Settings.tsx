@@ -354,6 +354,7 @@ const SettingsPage: React.FC = () => {
     const secureBridgeActive = Boolean(secureBridge?.active);
     const certificateReady = Boolean(secureBridge?.certificateReady);
     const activePasskeys = secureBridge?.passkeys?.filter(item => !item.revokedAt) ?? [];
+    const bridgeDegraded = Boolean(secureBridge?.degraded);
     const provisioningReady = Boolean(secureBridge?.configured);
     const provisioningPending = !secureBridgeEnabled && !provisioningReady;
     const provisioningLabel = provisioningReady
@@ -644,10 +645,19 @@ const SettingsPage: React.FC = () => {
                                     </div>
 
                                     {secureBridgeEnabled && secureBridge?.lastError && (
-                                        <div className="rounded-xl bg-red-50 dark:bg-red-500/10 px-3 py-2 text-[12px] leading-relaxed text-red-700 dark:text-red-200">
+                                        <div className={`rounded-xl px-3 py-2 text-[12px] leading-relaxed ${
+                                            bridgeDegraded
+                                                ? 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'
+                                                : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-200'
+                                        }`}>
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                                                <span>{secureBridge.lastError}</span>
+                                                <div className="space-y-1">
+                                                    {bridgeDegraded && (
+                                                        <p className="font-semibold">Appairage toujours possible</p>
+                                                    )}
+                                                    <p>{secureBridge.lastError}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -687,13 +697,16 @@ const SettingsPage: React.FC = () => {
                                     </div>
                                     <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
                                         Ouvre la PWA sur mobile, puis appaire le téléphone avec ce QR. Les données apparaissent après cette étape.
+                                        Génère un QR par appareil : plusieurs mobiles peuvent rester appairés en même temps.
                                     </p>
                                 </div>
                             </div>
 
                             {secureBridge && (
                                 <div className="px-4 pb-4 space-y-2">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Mobiles appairés</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                        Mobiles appairés ({activePasskeys.length})
+                                    </p>
                                     {activePasskeys.length > 0 ? (
                                         activePasskeys.map(passkey => (
                                             <div key={passkey.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-gray-50 dark:bg-black/30">
@@ -719,6 +732,11 @@ const SettingsPage: React.FC = () => {
                                         <div className="rounded-xl bg-gray-50 dark:bg-black/30 px-3 py-2 text-[12px] text-gray-500 dark:text-gray-400">
                                             Aucun mobile appairé pour l’instant.
                                         </div>
+                                    )}
+                                    {activePasskeys.length === 1 && (
+                                        <p className="px-1 text-[11px] text-gray-500 dark:text-gray-400">
+                                            Pour ajouter un second appareil, génère un nouveau QR et scanne-le depuis celui-ci : le premier reste appairé.
+                                        </p>
                                     )}
                                 </div>
                             )}

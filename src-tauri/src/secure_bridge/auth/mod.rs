@@ -12,8 +12,8 @@ pub use self::routes::{
 
 use self::challenges::{delete_challenge, load_challenge, store_challenge};
 use self::passkeys::{
-    find_passkey_by_credential_id, insert_passkey, list_active_credentials, list_active_passkeys,
-    update_passkey_usage,
+    find_passkey_by_credential_id, insert_passkey, list_active_credentials_for_device,
+    list_active_passkeys, update_passkey_usage,
 };
 use self::sessions::{
     authorize_session_for_auth, create_session, revoke_session, session_response,

@@ -40,6 +40,8 @@ export interface SecureBridgeStatus {
     managedCredentialReady: boolean;
     passkeys: MobilePasskeyInfo[];
     lastError?: string | null;
+    /** The bridge still serves the paired mobiles, but managed renewal is failing. */
+    degraded?: boolean;
 }
 
 const invokeMobileCommand = async <T>(command: string, args?: Record<string, unknown>) => {

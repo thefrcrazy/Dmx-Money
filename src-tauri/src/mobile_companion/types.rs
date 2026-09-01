@@ -24,6 +24,10 @@ pub(super) struct ServerRuntime {
     pub(super) port: u16,
     pub(super) url: String,
     pub(super) secure: bool,
+    /// Identifies the TLS material the running listener was started with, so a
+    /// renewed certificate or a new local host restarts the server instead of
+    /// serving an expired chain until the next app launch.
+    pub(super) tls_fingerprint: Option<String>,
     pub(super) stop: Arc<AtomicBool>,
 }
 

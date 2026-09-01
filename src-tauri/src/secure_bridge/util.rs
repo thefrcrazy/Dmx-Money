@@ -105,9 +105,12 @@ pub(super) fn set_managed_device_secret(secret: &str) -> Result<(), String> {
 }
 
 pub(super) fn get_managed_device_secret() -> Result<String, String> {
-    managed_device_secret_entry()?
-        .get_password()
-        .map_err(|e| format!("Secret DmxMoney Bridge absent du trousseau: {e}"))
+    managed_device_secret_entry()?.get_password().map_err(|e| {
+        // Worth logging: a locked or re-signed keychain reads the same as a
+        // genuinely missing entry, and the two need very different diagnosis.
+        log::warn!("Managed bridge device secret unavailable from the keychain: {e}");
+        format!("Secret DmxMoney Bridge absent du trousseau: {e}")
+    })
 }
 
 fn managed_registration_secret_entry() -> Result<keyring::Entry, String> {

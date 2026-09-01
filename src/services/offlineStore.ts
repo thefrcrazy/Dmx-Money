@@ -161,6 +161,50 @@ export const offlineStore = {
         await transactionDone(transaction);
     },
 
+    /**
+     * Carries the cached data and the still-unsent mutations over to a new API
+     * base URL. The desktop can come back on another port or with a re-issued
+     * bridge host, and everything the mobile changed while it was away lives
+     * under the old scope: without this it would stay there forever.
+     */
+    async migrateScope(previousScope: string): Promise<number> {
+        const scope = currentScope();
+        if (!previousScope || previousScope === scope) return 0;
+
+        const db = await openDb();
+        const readTransaction = db.transaction([DATA_STORE, MUTATION_STORE], 'readonly');
+        const [records, mutations] = await Promise.all([
+            requestToPromise<OfflineDataRecord[]>(readTransaction.objectStore(DATA_STORE).getAll()),
+            requestToPromise<OfflineMutation[]>(readTransaction.objectStore(MUTATION_STORE).getAll()),
+        ]);
+
+        const staleRecords = records.filter(record => record.scope === previousScope);
+        const staleMutations = mutations.filter(mutation => mutation.scope === previousScope);
+        if (staleRecords.length === 0 && staleMutations.length === 0) return 0;
+
+        const existingKeys = new Set(records.map(record => record.key));
+        const writeTransaction = db.transaction([DATA_STORE, MUTATION_STORE], 'readwrite');
+        const dataStore = writeTransaction.objectStore(DATA_STORE);
+        const mutationStore = writeTransaction.objectStore(MUTATION_STORE);
+
+        staleRecords.forEach(record => {
+            const key = scopedKey(record.dataKey, scope);
+            // Data already fetched under the new scope is fresher than the cache
+            // we are carrying over, so it wins.
+            if (!existingKeys.has(key)) {
+                dataStore.put({ ...record, key, scope });
+            }
+            dataStore.delete(record.key);
+        });
+
+        staleMutations.forEach(mutation => {
+            mutationStore.put({ ...mutation, scope });
+        });
+
+        await transactionDone(writeTransaction);
+        return staleMutations.length;
+    },
+
     async clearAll(): Promise<void> {
         const db = await openDb();
         const transaction = db.transaction([DATA_STORE, MUTATION_STORE], 'readwrite');

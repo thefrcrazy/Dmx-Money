@@ -30,6 +30,11 @@ type DeviceRecord = {
   lastLocalIp?: string;
 };
 
+type RegisterBody = {
+  existingDeviceId?: string;
+  localIp?: string;
+};
+
 type CloudflareResponse<T> = {
   success: boolean;
   result?: T;
@@ -65,7 +70,8 @@ export default {
       }
 
       if (route.name === "register") {
-        const registrationAuth = await authorizeRegistration(request, env);
+        const body = await readJson<RegisterBody>(request);
+        const registrationAuth = await authorizeRegistration(request, env, body);
         if (registrationAuth) {
           return registrationAuth;
         }
@@ -73,7 +79,7 @@ export default {
         if (rateLimit) {
           return rateLimit;
         }
-        return await registerDevice(request, env);
+        return await registerDevice(body, env);
       }
 
       const device = await authorizeDevice(request, env, route.deviceId);
@@ -209,23 +215,41 @@ function matchRoute(pathname: string):
   return null;
 }
 
-async function authorizeRegistration(request: Request, env: Env): Promise<Response | null> {
+async function authorizeRegistration(
+  request: Request,
+  env: Env,
+  body: RegisterBody,
+): Promise<Response | null> {
+  const header = request.headers.get("authorization") || "";
+  const provided = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!provided) {
+    return jsonResponse({ error: "unauthorized" }, 401);
+  }
+  const providedHash = await hashSecret(provided);
+
+  // A device that already registered renews its own credentials with the secret it
+  // holds. Without this an installation that lost the shared registration secret
+  // could never rotate, and every pairing attempt answered 401.
+  const existing = normalizeId(body.existingDeviceId);
+  if (existing) {
+    const record = await env.DEVICES.get<DeviceRecord>(deviceKey(existing), "json");
+    if (record && timingSafeEqual(providedHash, record.secretHash)) {
+      return null;
+    }
+  }
+
   const secret = env.REGISTRATION_SECRET?.trim();
   if (!secret) {
     return jsonResponse({ error: "registration_disabled" }, 403);
   }
-
-  const header = request.headers.get("authorization") || "";
-  const provided = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!provided || !timingSafeEqual(await hashSecret(provided), await hashSecret(secret))) {
+  if (!timingSafeEqual(providedHash, await hashSecret(secret))) {
     return jsonResponse({ error: "unauthorized" }, 401);
   }
 
   return null;
 }
 
-async function registerDevice(request: Request, env: Env): Promise<Response> {
-  const body = await readJson<{ existingDeviceId?: string; localIp?: string }>(request);
+async function registerDevice(body: RegisterBody, env: Env): Promise<Response> {
   const existing = normalizeId(body.existingDeviceId);
   const reusable = existing ? await env.DEVICES.get<DeviceRecord>(deviceKey(existing), "json") : null;
   const id = existing || crypto.randomUUID().replaceAll("-", "").slice(0, 20);

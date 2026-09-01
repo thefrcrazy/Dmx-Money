@@ -31,12 +31,34 @@ pub(super) async fn insert_passkey(
     Ok(id)
 }
 
-pub(super) async fn list_active_credentials(pool: &DbPool) -> Result<Vec<CredentialId>, String> {
-    Ok(list_active_passkeys(pool)
-        .await?
-        .into_iter()
-        .map(|passkey| passkey.id)
-        .collect())
+/// Credentials to exclude when registering a new mobile. Only the passkeys of the
+/// same device are excluded: a second phone or tablet must be able to enrol its
+/// own credential even when it shares an authenticator (iCloud Keychain, Google
+/// Password Manager) with an already paired device.
+pub(super) async fn list_active_credentials_for_device(
+    pool: &DbPool,
+    device_label: &str,
+) -> Result<Vec<CredentialId>, String> {
+    let rows = sqlx::query(
+        "SELECT public_key FROM mobile_passkeys
+         WHERE revoked_at IS NULL AND device_label = $1
+         ORDER BY created_at DESC",
+    )
+    .bind(device_label)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| map_db_error(e, "lecture des passkeys de l’appareil"))?;
+
+    rows.into_iter()
+        .map(|row| {
+            let value = row
+                .try_get::<String, _>("public_key")
+                .map_err(|e| e.to_string())?;
+            serde_json::from_str::<PasskeyCredential>(&value)
+                .map(|passkey| passkey.id)
+                .map_err(|e| e.to_string())
+        })
+        .collect()
 }
 
 pub(super) async fn list_active_passkeys(pool: &DbPool) -> Result<Vec<PasskeyCredential>, String> {
@@ -92,7 +114,9 @@ pub(super) async fn update_passkey_usage(
          SET counter = $1,
              last_used_at = $2,
              device_label = CASE
-                WHEN $3 IS NOT NULL AND length($3) > 0 THEN $3
+                WHEN $3 IS NOT NULL AND length($3) > 0
+                     AND (device_label IS NULL OR length(device_label) = 0 OR device_label = 'Mobile')
+                THEN $3
                 ELSE device_label
              END
          WHERE id = $4",

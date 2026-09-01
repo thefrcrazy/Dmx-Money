@@ -48,6 +48,8 @@ pub struct SecureBridgeStatus {
     pub managed_credential_ready: bool,
     pub passkeys: Vec<MobilePasskeyInfo>,
     pub last_error: Option<String>,
+    /// The bridge still serves the paired mobiles, but managed renewal is failing.
+    pub degraded: bool,
 }
 
 #[derive(Debug)]

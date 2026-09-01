@@ -26,6 +26,7 @@ impl MobileCompanionState {
         if settings.enabled || secure_enabled {
             self.start_server(settings.port).await?;
         }
+        self.spawn_secure_bridge_maintenance();
         Ok(())
     }
 
@@ -85,9 +86,19 @@ impl MobileCompanionState {
             None => None,
         };
         let secure = tls_config.is_some();
+        let tls_fingerprint = secure
+            .then(|| {
+                secure_settings
+                    .as_ref()
+                    .and_then(|settings| secure_bridge::certificate_fingerprint(&self.app_handle, settings))
+            })
+            .flatten();
 
         if let Some(current) = self.runtime.lock().map_err(|e| e.to_string())?.clone() {
-            if current.secure == secure && !current.stop.load(Ordering::SeqCst) {
+            if current.secure == secure
+                && current.tls_fingerprint == tls_fingerprint
+                && !current.stop.load(Ordering::SeqCst)
+            {
                 return Ok(());
             }
             current.stop.store(true, Ordering::SeqCst);
@@ -115,6 +126,7 @@ impl MobileCompanionState {
             port,
             url,
             secure,
+            tls_fingerprint,
             stop: stop.clone(),
         };
 
@@ -188,10 +200,59 @@ impl MobileCompanionState {
         });
     }
 
+    /// Keeps the DNS record pointing at the current LAN address and renews the
+    /// certificate before it lapses. Without it, a desktop left closed for weeks
+    /// comes back with a stale A record and an expired chain, which is exactly
+    /// when pairing used to fail.
+    fn spawn_secure_bridge_maintenance(&self) {
+        let pool = self.pool.clone();
+        let app_handle = self.app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(MAINTENANCE_START_DELAY_SECS)).await;
+
+                let enabled = secure_bridge::load_settings(&pool)
+                    .await
+                    .map(|settings| settings.enabled)
+                    .unwrap_or(false);
+                if enabled {
+                    match secure_bridge::refresh_infrastructure(&pool, &app_handle, false).await {
+                        Ok(_) => log::info!("Secure bridge maintenance pass completed"),
+                        Err(error) => {
+                            log::warn!("Secure bridge maintenance pass failed: {error}")
+                        }
+                    }
+                    let _ = app_handle.emit("mobile-companion-status-changed", json!({ "ok": true }));
+                }
+
+                tokio::time::sleep(Duration::from_secs(
+                    MAINTENANCE_INTERVAL_SECS - MAINTENANCE_START_DELAY_SECS,
+                ))
+                .await;
+            }
+        });
+    }
+
     pub(super) async fn regenerate_secure_pairing_token(
         &self,
     ) -> Result<MobileCompanionStatus, String> {
-        secure_bridge::ensure_auto_configuration(&self.pool, &self.app_handle).await?;
+        // A refused managed renewal must not block pairing: as long as the local
+        // HTTPS bridge is up, the QR only needs a fresh local token.
+        if let Err(error) =
+            secure_bridge::ensure_auto_configuration(&self.pool, &self.app_handle).await
+        {
+            let serving = self
+                .runtime
+                .lock()
+                .map_err(|e| e.to_string())?
+                .as_ref()
+                .map(|server| server.secure && !server.stop.load(Ordering::SeqCst))
+                .unwrap_or(false);
+            if !serving {
+                return Err(error);
+            }
+            log::warn!("Pairing token generated while the managed bridge is degraded: {error}");
+        }
         let pairing = secure_bridge::regenerate_pairing_token(&self.pool).await?;
         *self.secure_pairing.lock().map_err(|e| e.to_string())? = Some(pairing);
         self.status().await

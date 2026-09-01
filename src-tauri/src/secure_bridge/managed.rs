@@ -64,26 +64,65 @@ pub(super) async fn managed_register_device(
     existing_device_id: Option<&str>,
 ) -> Result<ManagedRegisterResponse, String> {
     let base_url = managed_service_base_url(None);
-    let payload = ManagedRegisterRequest {
-        existing_device_id: existing_device_id.map(str::to_string),
-        local_ip: crate::mobile_companion::detect_local_ip(),
-    };
-    let client = reqwest::Client::new();
-    let mut request = client
-        .post(format!("{base_url}/v1/devices/register"))
-        .json(&payload);
-    if let Some(secret) = get_managed_registration_secret() {
-        request = request.bearer_auth(secret);
+    let existing_device_id = existing_device_id.filter(|value| !value.trim().is_empty());
+
+    // A device that is already enrolled proves ownership with its own secret, so
+    // that is tried first: the shared registration secret is rotated from time to
+    // time and an installation carrying an outdated one would otherwise be locked
+    // out of its own bridge. Fresh enrolments have only the registration secret.
+    let mut credentials: Vec<String> = Vec::new();
+    if existing_device_id.is_some() {
+        if let Ok(secret) = get_available_managed_device_secret() {
+            credentials.push(secret);
+        }
     }
-    let response = request
-        .send()
+    if let Some(secret) = get_managed_registration_secret() {
+        if !credentials.contains(&secret) {
+            credentials.push(secret);
+        }
+    }
+    if credentials.is_empty() {
+        credentials.push(String::new());
+    }
+
+    let mut last_error = None;
+    for credential in credentials {
+        let payload = ManagedRegisterRequest {
+            existing_device_id: existing_device_id.map(str::to_string),
+            local_ip: crate::mobile_companion::detect_local_ip(),
+        };
+        let mut request = reqwest::Client::new()
+            .post(format!("{base_url}/v1/devices/register"))
+            .json(&payload);
+        if !credential.is_empty() {
+            request = request.bearer_auth(&credential);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("Service DmxMoney Bridge indisponible ({base_url}): {e}"))?;
+
+        let rejected = matches!(response.status().as_u16(), 401 | 403);
+        match parse_managed_response::<ManagedRegisterResponse>(
+            response,
+            "Provisionnement DmxMoney Bridge",
+        )
         .await
-        .map_err(|e| format!("Service DmxMoney Bridge indisponible ({base_url}): {e}"))?;
-    let registration = parse_managed_response::<ManagedRegisterResponse>(
-        response,
-        "Provisionnement DmxMoney Bridge",
-    )
-    .await?;
+        {
+            Ok(registration) => return validate_registration(registration),
+            // Only an authentication refusal is worth retrying with another
+            // credential; anything else is reported as-is.
+            Err(error) if rejected => last_error = Some(error),
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| "Provisionnement DmxMoney Bridge refusé.".to_string()))
+}
+
+fn validate_registration(
+    registration: ManagedRegisterResponse,
+) -> Result<ManagedRegisterResponse, String> {
     if registration.device_id.trim().is_empty()
         || registration.device_secret.trim().is_empty()
         || registration.domain.trim().is_empty()
@@ -192,6 +231,8 @@ fn get_available_managed_device_secret() -> Result<String, String> {
 
 pub(super) fn is_missing_managed_secret_error(error: &str) -> bool {
     error.contains("Secret DmxMoney Bridge absent")
+        || error.contains("Secret DmxMoney Bridge vide")
+        || error.contains("Trousseau système indisponible")
         || error.contains("No matching entry found in secure storage")
 }
 
@@ -207,7 +248,8 @@ async fn parse_managed_response<T: for<'de> Deserialize<'de>>(
     if !status.is_success() {
         if status.as_u16() == 401 || status.as_u16() == 403 {
             return Err(format!(
-                "{context} refusé ({status}): pont managé non autorisé pour cette installation"
+                "{context} refusé ({status}): cette installation n’est plus autorisée par le service \
+                 DmxMoney Bridge. Mets à jour l’application desktop pour récupérer un accès valide."
             ));
         }
         return Err(format!("{context} refusé ({status}): {body}"));

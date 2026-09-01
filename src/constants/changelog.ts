@@ -12,6 +12,42 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.21",
+        date: "2026-09-01",
+        title: "Pont mobile increvable et prédictions plus sûres",
+        changes: [
+            "Le QR d'appairage se génère à nouveau quand le service managé refuse le provisionnement.",
+            "Un appareil déjà enregistré renouvelle ses accès avec son propre secret, sans secret partagé.",
+            "Le sous-domaine local et le certificat existants sont conservés au lieu d'être remplacés.",
+            "Renouvellement automatique du DNS et du certificat toutes les 6 heures.",
+            "La PWA retrouve le desktop revenu sur un autre port et rejoue les modifications hors ligne.",
+            "Deux mobiles peuvent rester appairés en même temps sans écraser leurs noms.",
+            "Prédictions : retraits calculés avant les revenus, avec indicateur de point bas journalier."
+        ],
+        features: [
+            {
+                title: "Appairage toujours possible",
+                description: "Un pont déjà certifié reste appairable même si le service managé est injoignable.",
+                icon: "Key"
+            },
+            {
+                title: "Reconnexion automatique",
+                description: "La PWA retrouve le desktop et ne perd plus les modifications faites hors ligne.",
+                icon: "Wifi"
+            },
+            {
+                title: "Deux mobiles appairés",
+                description: "Téléphone et tablette peuvent rester liés en même temps au même desktop.",
+                icon: "Smartphone"
+            },
+            {
+                title: "Point bas journalier",
+                description: "Un retrait avant un revenu le même jour est signalé, même si la journée finit en positif.",
+                icon: "Shield"
+            }
+        ]
+    },
+    {
         version: "1.0.20",
         date: "2026-07-04",
         title: "Pont mobile sans fausse alerte",
