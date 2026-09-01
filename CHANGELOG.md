@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.22 - 2026-09-01
+
+- Correction majeure du trousseau : `keyring` était compilé sans backend natif et retombait sur un stockage en mémoire, donc le secret du pont était perdu à chaque redémarrage de l'application.
+- Conséquence corrigée en chaîne : l'application ne tente plus de se reprovisionner en boucle, le certificat HTTPS se renouvelle à nouveau et l'appairage mobile refonctionne.
+- Le statut du pont signale désormais un certificat expiré au lieu de l'afficher comme prêt.
+
 ## 1.0.21 - 2026-09-01
 
 - Le QR d'appairage se génère à nouveau quand le service managé refuse le provisionnement : un pont déjà certifié n'est plus bloqué par un 401.

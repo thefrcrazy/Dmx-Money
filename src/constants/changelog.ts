@@ -12,6 +12,29 @@ export interface VersionUpdate {
 
 export const CHANGELOG: VersionUpdate[] = [
     {
+        version: "1.0.22",
+        date: "2026-09-01",
+        title: "Trousseau réparé, pont mobile rétabli",
+        changes: [
+            "Le secret du pont est de nouveau conservé dans le trousseau système entre deux lancements.",
+            "Plus de tentatives de reprovisionnement en boucle causées par un secret introuvable.",
+            "Le certificat HTTPS se renouvelle à nouveau automatiquement.",
+            "Un certificat expiré est signalé au lieu d'être affiché comme prêt."
+        ],
+        features: [
+            {
+                title: "Secret enfin persistant",
+                description: "Le trousseau système est réellement utilisé, au lieu d'un stockage en mémoire perdu à chaque redémarrage.",
+                icon: "Key"
+            },
+            {
+                title: "Certificat renouvelé",
+                description: "Le renouvellement automatique refonctionne, donc l'appairage mobile aussi.",
+                icon: "Shield"
+            }
+        ]
+    },
+    {
         version: "1.0.21",
         date: "2026-09-01",
         title: "Pont mobile increvable et prédictions plus sûres",

@@ -9,9 +9,19 @@ pub async fn build_status(
 ) -> Result<SecureBridgeStatus, String> {
     let settings = load_settings(pool).await?;
     let managed_credential_ready = has_managed_device_secret();
-    let certificate_ready = certificate_paths(app_handle, settings.device_id.as_deref())
-        .map(|paths| paths.cert.exists() && paths.key.exists())
+    // An expired certificate is not "ready": the files are still on disk, but every
+    // mobile fails the TLS handshake. Reporting it as ready is what let the desktop
+    // hand out a pairing QR that could never connect. An unknown expiry stays
+    // trusted, so an install repaired without that field is not disabled.
+    let certificate_expired = settings
+        .certificate_expires_at
+        .as_deref()
+        .map(is_past)
         .unwrap_or(false);
+    let certificate_ready = !certificate_expired
+        && certificate_paths(app_handle, settings.device_id.as_deref())
+            .map(|paths| paths.cert.exists() && paths.key.exists())
+            .unwrap_or(false);
     let configured = settings
         .domain
         .as_deref()
