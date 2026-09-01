@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cloudflare Worker config with real KV namespace ids
+cloudflare/managed-bridge/wrangler.local.toml
