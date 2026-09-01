@@ -25,3 +25,6 @@ dist-ssr
 
 # Cloudflare Worker config with real KV namespace ids
 cloudflare/managed-bridge/wrangler.local.toml
+
+# Wrangler local state/cache
+.wrangler/
